@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage 
+    x:Class="YessGoFront.Views.QrPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8">
+
+    <Grid RowDefinitions="*,Auto">
+        <VerticalStackLayout Grid.Row="0" Padding="16" Spacing="16">
+            <Frame CornerRadius="24" HeightRequest="360" BackgroundColor="White" HasShadow="True" Padding="24">
+                <Grid>
+                    <Border Stroke="#0F6B53" StrokeThickness="3" StrokeShape="RoundRectangle 16"
+                  HorizontalOptions="Fill" VerticalOptions="Fill" />
+                    <Label Text="Сканируйте QR код" HorizontalOptions="Center" VerticalOptions="Center"
+                 TextColor="#0F6B53" FontAttributes="Bold"/>
+                </Grid>
+            </Frame>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Text="Мой QR" CornerRadius="14" BackgroundColor="#0F6B53" TextColor="White"/>
+                <Button Text="Из галереи" CornerRadius="14" BackgroundColor="White" TextColor="#0F6B53"/>
+            </Grid>
+        </VerticalStackLayout>
+
+        <controls:BottomNavBar Grid.Row="1" SelectedTab="QR"/>
+    </Grid>
+</ContentPage>

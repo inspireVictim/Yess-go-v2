@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.PartnerPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    xmlns:vm="clr-namespace:YessGoFront.ViewModels"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8">
+
+    <ContentPage.BindingContext>
+        <vm:PartnerPageViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Верхняя зелёная панель -->
+        <Grid BackgroundColor="#0F6B53" Padding="16,16,16,12">
+            <Frame BackgroundColor="White" CornerRadius="12" HasShadow="False" Padding="10">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Image Source="ic_search" WidthRequest="18" HeightRequest="18" VerticalOptions="Center"/>
+                    <Entry Grid.Column="1"
+                           Placeholder="Поиск по компаниям"
+                           PlaceholderColor="#9AA5AD"
+                           TextColor="#0B1F1A"
+                           FontSize="14"
+                           Text="{Binding SearchText}" />
+                    <ImageButton Grid.Column="2"
+                                 Source="ic_map"
+                                 BackgroundColor="Transparent"
+                                 WidthRequest="28" HeightRequest="28"
+                                 Padding="0" CornerRadius="14" />
+                </Grid>
+            </Frame>
+        </Grid>
+
+        <!-- Контент -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="16">
+
+                <Label Text="Категории" FontSize="16" FontAttributes="Bold" TextColor="#0B1F1A" />
+
+                <CollectionView ItemsSource="{Binding Categories}" SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <GridItemsLayout Orientation="Vertical" Span="3" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="6">
+                                <Frame CornerRadius="14" BackgroundColor="White" HasShadow="True" Padding="8">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Image Source="{Binding Image}" HeightRequest="64" Aspect="AspectFit"/>
+                                        <Label Text="{Binding Title}" FontSize="12" HorizontalTextAlignment="Center"/>
+                                    </VerticalStackLayout>
+                                </Frame>
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.LoadByCategoryAsyncCommand}"
+                                        CommandParameter="{Binding Title}" />
+                                </Grid.GestureRecognizers>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#0F6B53" />
+
+                <CollectionView ItemsSource="{Binding Partners}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Нижний бар -->
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="2" />
+    </Grid>
+</ContentPage>

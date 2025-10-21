@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.MorePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8"
+    FlowDirection="LeftToRight">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <!-- Карточка профиля (без стрелки) -->
+                <Frame BackgroundColor="White" CornerRadius="16" HasShadow="True" Padding="14">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" FlowDirection="LeftToRight">
+                        <!-- Аватар -->
+                        <Frame Grid.Column="0"
+                               WidthRequest="44" HeightRequest="44"
+                               CornerRadius="22"
+                               BackgroundColor="#EEF2F7"
+                               Padding="0">
+                            <Image Source="profile" Aspect="AspectFit"/>
+                        </Frame>
+
+                        <!-- Текст -->
+                        <VerticalStackLayout Grid.Column="1"
+                                             Spacing="2"
+                                             VerticalOptions="Center">
+                            <Label Text="Жакиев А."
+                                   FontAttributes="Bold"
+                                   TextColor="#0F6B53" />
+                            <Label Text="Профиль"
+                                   TextColor="#6B7280"
+                                   FontSize="12"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Frame>
+
+                <!-- Способы входа -->
+                <Frame BackgroundColor="White" CornerRadius="16" HasShadow="True" Padding="14">
+                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" FlowDirection="LeftToRight">
+                        <Label Text="Способы входа" FontAttributes="Bold" Grid.ColumnSpan="2"/>
+                        <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="12" Margin="0,8,0,0">
+                            <Image Source="icon_phone" WidthRequest="28" HeightRequest="28"/>
+                            <Image Source="icon_google" WidthRequest="28" HeightRequest="28"/>
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Frame>
+
+                <!-- Меню -->
+                <VerticalStackLayout Spacing="8">
+
+                    <!-- Мой город (иконка слева + текст, без стрелки) -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_location.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="Мой город"/>
+                                <Label Text="Бишкек" FontSize="12" TextColor="#6B7280"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Ввести промокод -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_promo.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Ввести промокод" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Сообщения -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_messages.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Сообщения" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Реферальная ссылка -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_referral.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Реферальная ссылка" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- История операции -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_history.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="История операции" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Обратная связь -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_feedback.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Обратная связь" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Мои сертификаты -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_certificate.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Сертификаты" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Выйти -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_logout.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Выйти" TextColor="#0F6B53" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Нижний навбар -->
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="1" />
+    </Grid>
+</ContentPage>

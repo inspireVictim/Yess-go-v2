@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
+    xmlns:models="clr-namespace:YessGoFront.Models"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    x:DataType="viewmodels:MainPageViewModel"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8">
+
+    <!-- ViewModel -->
+    <ContentPage.BindingContext>
+        <viewmodels:MainPageViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- ===== ПРОКРУЧИВАЕМЫЙ КОНТЕНТ ===== -->
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0">
+
+                <!-- ===== ШАПКА ===== -->
+                <Border StrokeThickness="0"
+                        BackgroundColor="#0F6B53"
+                        StrokeShape="RoundRectangle 0,0,10,10"
+                        Padding="{OnPlatform Android='16,36,16,14', iOS='16,48,16,14'}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- Профиль -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" VerticalOptions="Center">
+                            <Frame Grid.Column="0"
+                                   WidthRequest="56" HeightRequest="56"
+                                   CornerRadius="28" Padding="0"
+                                   BackgroundColor="#FFFFFF33">
+                                <Image Source="profile.png" Aspect="AspectFill"/>
+                            </Frame>
+
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="Тынаев Сыргак" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                                <Label Text="+996 507700007" FontSize="12" TextColor="#FFFFFFCC"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- Кошелёк -->
+                        <Frame WidthRequest="360"
+                               HeightRequest="130"
+                               HorizontalOptions="Center"
+                               Padding="14"
+                               CornerRadius="18"
+                               HasShadow="True"
+                               BackgroundColor="White">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnWalletTapped"/>
+                            </Frame.GestureRecognizers>
+
+                            <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,Auto">
+                                <Label Text="Ваш Баланс"
+                                       Grid.Row="0" Grid.Column="0"
+                                       TextColor="#DAA520"
+                                       FontSize="13"/>
+
+                                <Button Text="История"
+                                        Grid.Row="0" Grid.Column="1"
+                                        BackgroundColor="White"
+                                        TextColor="#7A7A7A"
+                                        Padding="10,4"
+                                        CornerRadius="10"
+                                        FontSize="13"/>
+
+                                <Grid Grid.Row="1" Grid.ColumnSpan="2"
+                                      ColumnDefinitions="*,Auto"
+                                      VerticalOptions="End"
+                                      Padding="0,0,0,2">
+
+                                    <HorizontalStackLayout Grid.Column="0"
+                                                           Spacing="8"
+                                                           VerticalOptions="End">
+                                        <Label Text="{Binding Balance}"
+                                               FontSize="30"
+                                               FontAttributes="Bold"
+                                               TextColor="#0F6B53"/>
+                                        <Frame BackgroundColor="#EEF2F7"
+                                               CornerRadius="10"
+                                               Padding="8,2">
+                                            <Label Text="Yess!Coin"
+                                                   TextColor="#0F6B53"
+                                                   FontAttributes="Bold"
+                                                   FontSize="13"/>
+                                        </Frame>
+                                    </HorizontalStackLayout>
+
+                                    <Image Grid.Column="1"
+                                           Source="coin.png"
+                                           WidthRequest="40" HeightRequest="40"
+                                           HorizontalOptions="End"
+                                           VerticalOptions="End"
+                                           Margin="0,0,0,2"/>
+                                </Grid>
+                            </Grid>
+                        </Frame>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- ===== ОСНОВНОЙ КОНТЕНТ ===== -->
+                <VerticalStackLayout Spacing="16" Padding="16,12,16,20">
+
+                    <!-- Быстрый доступ (СТОРИС) -->
+                    <Label Text="Быстрый доступ"
+                           FontAttributes="Bold"
+                           FontSize="16"
+                           TextColor="#333"
+                           Margin="0,0,0,4"/>
+
+                    <CollectionView ItemsSource="{Binding Stories}"
+                                    ItemsLayout="HorizontalList"
+                                    SelectionMode="None"
+                                    HeightRequest="100"
+                                    HorizontalScrollBarVisibility="Never">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:StoryModel">
+                                <VerticalStackLayout Padding="4" Spacing="4" WidthRequest="80">
+                                    <!-- КРУГЛОЕ ПРЕВЬЮ -->
+                                    <Border WidthRequest="64" HeightRequest="64"
+                                            BackgroundColor="White"
+                                            Stroke="#DAA520" StrokeThickness="2"
+                                            HorizontalOptions="Center" VerticalOptions="Center">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="32"/>
+                                        </Border.StrokeShape>
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding BindingContext.OpenStoryAsyncCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                                CommandParameter="{Binding .}" />
+                                        </Border.GestureRecognizers>
+
+                                        <!-- Изображение внутри круга -->
+                                        <Image Source="{Binding Icon}" Aspect="AspectFill"/>
+                                    </Border>
+
+                                    <Label Text="{Binding Title}"
+                                           FontSize="12"
+                                           HorizontalTextAlignment="Center"
+                                           TextColor="#333"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="1"/>
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Баннеры -->
+                    <CollectionView ItemsSource="{Binding Banners}"
+                                    ItemsLayout="HorizontalList"
+                                    SelectionMode="None"
+                                    HeightRequest="120"
+                                    HorizontalScrollBarVisibility="Never">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:BannerModel">
+                                <Frame CornerRadius="16" Padding="0" HasShadow="True" Margin="0,0,12,0">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding BindingContext.OpenBannerAsyncCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                            CommandParameter="{Binding .}" />
+                                    </Frame.GestureRecognizers>
+                                    <Image Source="{Binding Image}" Aspect="AspectFill"/>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Наши партнёры -->
+                    <Label Text="Наши партнёры"
+                           FontAttributes="Bold"
+                           FontSize="16"
+                           TextColor="#555"
+                           Margin="0,2,0,0"/>
+
+                    <!-- Почти без вертикального зазора между рядами -->
+                    <VerticalStackLayout Spacing="0" Padding="0" Margin="0">
+
+                        <!-- Ряд 1 -->
+                        <ScrollView x:Name="Row1"
+                                    Orientation="Horizontal"
+                                    HeightRequest="98"
+                                    HorizontalScrollBarVisibility="Never"
+                                    Margin="0">
+                            <Grid Padding="24,0">
+                                <CollectionView ItemsSource="{Binding PartnersRow1}"
+                                                SelectionMode="None"
+                                                HorizontalScrollBarVisibility="Never"
+                                                HeightRequest="98">
+                                    <CollectionView.ItemsLayout>
+                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
+                                    </CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PartnerLogoModel">
+                                            <Border WidthRequest="84" HeightRequest="84"
+                                                    Padding="0"
+                                                    BackgroundColor="White"
+                                                    Stroke="#0F6B53" StrokeThickness="1">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="42"/>
+                                                </Border.StrokeShape>
+                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Grid>
+                        </ScrollView>
+
+                        <!-- Ряд 2 -->
+                        <ScrollView x:Name="Row2"
+                                    Orientation="Horizontal"
+                                    HeightRequest="98"
+                                    HorizontalScrollBarVisibility="Never"
+                                    Margin="0">
+                            <Grid Padding="24,0">
+                                <CollectionView ItemsSource="{Binding PartnersRow2}"
+                                                SelectionMode="None"
+                                                HorizontalScrollBarVisibility="Never"
+                                                HeightRequest="98">
+                                    <CollectionView.ItemsLayout>
+                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
+                                    </CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PartnerLogoModel">
+                                            <Border WidthRequest="84" HeightRequest="84"
+                                                    Padding="0"
+                                                    BackgroundColor="White"
+                                                    Stroke="#0F6B53" StrokeThickness="1">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="42"/>
+                                                </Border.StrokeShape>
+                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Grid>
+                        </ScrollView>
+
+                        <!-- Ряд 3 -->
+                        <ScrollView x:Name="Row3"
+                                    Orientation="Horizontal"
+                                    HeightRequest="98"
+                                    HorizontalScrollBarVisibility="Never"
+                                    Margin="0">
+                            <Grid Padding="24,0">
+                                <CollectionView ItemsSource="{Binding PartnersRow3}"
+                                                SelectionMode="None"
+                                                HorizontalScrollBarVisibility="Never"
+                                                HeightRequest="98">
+                                    <CollectionView.ItemsLayout>
+                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
+                                    </CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PartnerLogoModel">
+                                            <Border WidthRequest="84" HeightRequest="84"
+                                                    Padding="0"
+                                                    BackgroundColor="White"
+                                                    Stroke="#0F6B53" StrokeThickness="1">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="42"/>
+                                                </Border.StrokeShape>
+                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Grid>
+                        </ScrollView>
+
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ===== НИЖНИЙ НАВБАР ===== -->
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="1" />
+
+        <!-- ====== OVERLAY: Story (full-screen) ====== -->
+        <Grid Grid.RowSpan="2"
+              IsVisible="{Binding IsStoryOpen}"
+              BackgroundColor="#000000CC"
+              InputTransparent="False"
+              Padding="0"
+              ZIndex="9999">
+
+            <!-- Сегменты прогресса сверху (по количеству страниц) -->
+            <Grid Padding="12,14,12,8" VerticalOptions="Start">
+                <CollectionView ItemsSource="{Binding PageProgressList}"
+                                ItemsLayout="HorizontalList"
+                                HeightRequest="3"
+                                SelectionMode="None"
+                                HorizontalScrollBarVisibility="Never">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="x:Double">
+                            <Grid Margin="2,0" HeightRequest="3" VerticalOptions="Center">
+                                <!-- Фон сегмента -->
+                                <BoxView HeightRequest="3" Opacity="0.3" Color="White" />
+                                <!-- Текущий прогресс -->
+                                <ProgressBar Progress="{Binding .}"
+                                             HeightRequest="3"
+                                             ProgressColor="White"
+                                             BackgroundColor="Transparent"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+
+            <!-- Левая/правая зоны для навигации по страницам -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Левая половина — назад -->
+                <Grid Grid.Column="0" BackgroundColor="Transparent">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding PrevPageCommand}" NumberOfTapsRequired="1"/>
+                    </Grid.GestureRecognizers>
+                </Grid>
+
+                <!-- Правая половина — вперёд -->
+                <Grid Grid.Column="1" BackgroundColor="Transparent">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding NextPageCommand}" NumberOfTapsRequired="1"/>
+                    </Grid.GestureRecognizers>
+                </Grid>
+            </Grid>
+
+            <!-- ТЕКУЩЕЕ ИЗОБРАЖЕНИЕ СТРАНИЦЫ (для fade-анимации в code-behind есть x:Name) -->
+            <Image x:Name="StoryImage"
+                   Source="{Binding CurrentPageImage}"
+                   Aspect="AspectFill"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill"/>
+        </Grid>
+
+        <!-- ====== OVERLAY: Banner (full-screen) ====== -->
+        <Grid Grid.RowSpan="2"
+              IsVisible="{Binding IsBannerOpen}"
+              BackgroundColor="#000000CC"
+              InputTransparent="False"
+              Padding="0"
+              ZIndex="9999">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseBannerCommand}"/>
+            </Grid.GestureRecognizers>
+            <Image Source="{Binding CurrentBanner.Image}"
+                   Aspect="AspectFill"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

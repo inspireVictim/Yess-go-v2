@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage 
+    x:Class="YessGoFront.Views.NotificationsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8">
+
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="16" Spacing="12">
+                <Frame CornerRadius="14" BackgroundColor="White" HasShadow="True" Padding="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Начисление бонусов" FontAttributes="Bold"/>
+                        <Label Text="Поступили Yess!Coins за покупку в Red Sun" FontSize="12" TextColor="#6B7280"/>
+                        <Label Text="13:45" FontSize="11" TextColor="#9CA3AF"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame CornerRadius="14" BackgroundColor="White" HasShadow="True" Padding="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Акции рядом с вами" FontAttributes="Bold"/>
+                        <Label Text="Burger Club — скидка 15% до конца недели" FontSize="12" TextColor="#6B7280"/>
+                        <Label Text="Вчера" FontSize="11" TextColor="#9CA3AF"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="1" />
+    </Grid>
+</ContentPage>

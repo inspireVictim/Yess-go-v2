@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="YessGoFront.Views.Controls.BottomNavBar"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Grid Padding="12,8" BackgroundColor="White" ColumnDefinitions="*,*,*,*,*">
+
+        <!-- Главная -->
+        <VerticalStackLayout Grid.Column="0" Spacing="4" HorizontalOptions="Center">
+            <Image x:Name="HomeIcon" WidthRequest="28" HeightRequest="28" />
+            <Label Text="Главная" FontSize="11" />
+            <VerticalStackLayout.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnHomeTapped"/>
+            </VerticalStackLayout.GestureRecognizers>
+        </VerticalStackLayout>
+
+        <!-- Партнёры -->
+        <VerticalStackLayout Grid.Column="1" Spacing="4" HorizontalOptions="Center">
+            <Image x:Name="PartnerIcon" WidthRequest="28" HeightRequest="28" />
+            <Label Text="Партнёры" FontSize="11" />
+            <VerticalStackLayout.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnPartnerTapped"/>
+            </VerticalStackLayout.GestureRecognizers>
+        </VerticalStackLayout>
+
+        <!-- QR -->
+        <Grid Grid.Column="2" HorizontalOptions="Center" VerticalOptions="Center" Margin="0,-10,0,0">
+            <Frame WidthRequest="56" HeightRequest="56" Padding="0" CornerRadius="28"
+                   BackgroundColor="#0F6B53" HasShadow="True">
+                <Image x:Name="QrIcon" WidthRequest="28" HeightRequest="28"
+                       Source="nav_qr" HorizontalOptions="Center" VerticalOptions="Center"/>
+            </Frame>
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnQrTapped"/>
+            </Grid.GestureRecognizers>
+        </Grid>
+
+        <!-- Уведомления -->
+        <VerticalStackLayout Grid.Column="3" Spacing="4" HorizontalOptions="Center">
+            <Image x:Name="NotificationIcon" WidthRequest="28" HeightRequest="28" />
+            <Label Text="Уведомления" FontSize="11" />
+            <VerticalStackLayout.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnNotificationsTapped"/>
+            </VerticalStackLayout.GestureRecognizers>
+        </VerticalStackLayout>
+
+        <!-- Ещё -->
+        <VerticalStackLayout Grid.Column="4" Spacing="4" HorizontalOptions="Center">
+            <Image x:Name="MoreIcon" WidthRequest="28" HeightRequest="28" />
+            <Label Text="Ещё" FontSize="11" />
+            <VerticalStackLayout.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnMoreTapped"/>
+            </VerticalStackLayout.GestureRecognizers>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentView>

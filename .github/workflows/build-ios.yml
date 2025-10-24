@@ -18,21 +18,22 @@ jobs:
         uses: actions/checkout@v4
 
       # ===========================
-      # 2️⃣  Устанавливаем .NET 8
+      # 2️⃣  Ставим именно .NET 8.0.302
+      # (совместим с net8.0-ios)
       # ===========================
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '8.0.302'
 
       # ===========================
-      # 3️⃣  Проверяем структуру
+      # 3️⃣  Проверяем содержимое
       # ===========================
       - name: List project files
         run: ls -R
 
       # ===========================
-      # 4️⃣  Устанавливаем workload MAUI
+      # 4️⃣  Устанавливаем MAUI workloads
       # ===========================
       - name: Install MAUI workloads
         run: dotnet workload install maui ios
@@ -44,13 +45,13 @@ jobs:
         run: dotnet restore YessGoFront.csproj
 
       # ===========================
-      # 6️⃣  Сборка iOS проекта
+      # 6️⃣  Собираем iOS проект
       # ===========================
       - name: Build iOS app (Release)
         run: dotnet build YessGoFront.csproj -c Release -f net8.0-ios /p:BuildIpa=true
 
       # ===========================
-      # 7️⃣  Публикуем артефакт .ipa
+      # 7️⃣  Загружаем артефакты сборки
       # ===========================
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

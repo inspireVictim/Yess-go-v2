@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.PartnersListPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False">
+
+	<Grid RowDefinitions="Auto,*" Padding="16,16,16,24">
+		<Grid.Background>
+			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+				<GradientStop Color="#005D45" Offset="0.0" />
+				<GradientStop Color="#00C97B" Offset="1.0" />
+			</LinearGradientBrush>
+		</Grid.Background>
+
+		<!-- ===== Шапка ===== -->
+		<Grid Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*"
+              ColumnSpacing="12" Padding="0,0,0,12">
+
+			<!-- Назад -->
+			<Frame WidthRequest="36" HeightRequest="36"
+                   CornerRadius="8" Padding="8"
+                   BackgroundColor="#FFFFFF22" HasShadow="False">
+				<Image Source="icon_back_white.png" Aspect="AspectFit">
+					<Image.GestureRecognizers>
+						<TapGestureRecognizer Tapped="OnBackTapped" />
+					</Image.GestureRecognizers>
+				</Image>
+			</Frame>
+
+			<!-- Поиск -->
+			<Frame Grid.Column="1" BackgroundColor="White" CornerRadius="12"
+                   HasShadow="False" Padding="12,10" HeightRequest="44">
+				<Grid ColumnDefinitions="Auto,*">
+					<Image Source="search_icon.png"
+                           WidthRequest="18" HeightRequest="18"
+                           VerticalOptions="Center" />
+					<Entry x:Name="SearchEntry"
+                           Grid.Column="1"
+                           Placeholder="Поиск"
+                           PlaceholderColor="#6B7280"
+                           TextColor="#111827"
+                           FontSize="14"
+                           BackgroundColor="Transparent" />
+				</Grid>
+			</Frame>
+
+			<!-- Категории -->
+			<ScrollView Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal"
+                        HorizontalScrollBarVisibility="Never" Margin="0,12,0,0">
+				<HorizontalStackLayout Spacing="8">
+					<Frame Padding="12,8" BackgroundColor="#008C5D"
+                           CornerRadius="12" HasShadow="False">
+						<Label Text="Красота" TextColor="White" FontSize="13" />
+					</Frame>
+					<Frame Padding="12,8" BackgroundColor="#009F66"
+                           CornerRadius="12" HasShadow="False">
+						<Label Text="Еда и напитки" TextColor="White" FontSize="13" />
+					</Frame>
+					<Frame Padding="12,8" BackgroundColor="#00AA6C"
+                           CornerRadius="12" HasShadow="False">
+						<Label Text="Продукты" TextColor="White" FontSize="13" />
+					</Frame>
+				</HorizontalStackLayout>
+			</ScrollView>
+		</Grid>
+
+		<!-- ===== Список партнёров ===== -->
+		<Frame Grid.Row="1" BackgroundColor="White" CornerRadius="16" Padding="0">
+			<CollectionView x:Name="PartnersListView"
+                            ItemsSource="{Binding Partners}"
+                            SelectionMode="None">
+				<CollectionView.ItemsLayout>
+					<LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
+				</CollectionView.ItemsLayout>
+
+				<CollectionView.ItemTemplate>
+					<DataTemplate>
+						<Grid RowDefinitions="Auto,Auto" BackgroundColor="White">
+							<!-- Контент строки -->
+							<Grid Padding="12,10"
+                                  ColumnDefinitions="Auto,*,Auto"
+                                  ColumnSpacing="12">
+								<Frame Grid.Column="0"
+                                       WidthRequest="36" HeightRequest="36"
+                                       CornerRadius="18" Padding="0"
+                                       BackgroundColor="#F2F2F2" HasShadow="False">
+									<Image Source="{Binding Logo}" Aspect="AspectFill" />
+								</Frame>
+
+								<VerticalStackLayout Grid.Column="1"
+                                                     Spacing="2"
+                                                     VerticalOptions="Center">
+									<Label Text="{Binding Name}"
+                                           FontAttributes="Bold"
+                                           FontSize="14"
+                                           TextColor="#111827" />
+									<Label Text="{Binding Category}"
+                                           FontSize="12"
+                                           TextColor="#6B7280" />
+								</VerticalStackLayout>
+
+								<Label Grid.Column="2"
+                                       Text="{Binding CashbackText}"
+                                       FontAttributes="Bold"
+                                       TextColor="#008C5D"
+                                       VerticalOptions="Center" />
+							</Grid>
+
+							<!-- Разделитель -->
+							<BoxView Grid.Row="1"
+                                     HeightRequest="1"
+                                     BackgroundColor="#E5E7EB"
+                                     Margin="12,0"
+                                     IsVisible="{Binding IsLast, Converter={StaticResource InverseBoolConverter}}" />
+						</Grid>
+					</DataTemplate>
+				</CollectionView.ItemTemplate>
+			</CollectionView>
+		</Frame>
+	</Grid>
+</ContentPage>

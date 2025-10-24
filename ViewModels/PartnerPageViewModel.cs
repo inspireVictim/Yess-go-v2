@@ -47,6 +47,7 @@ public partial class PartnerPageViewModel : ObservableObject
         LoadByCategoryAsyncCommand.Execute("для дома");
     }
 
+
     // ❌ БЕЗ [RelayCommand] — метод вызывается из явной команды
     private async Task LoadByCategoryAsync(string? categoryTitle)
     {

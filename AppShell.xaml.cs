@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Microsoft.Maui.Controls;
+﻿using YessGoFront.Services;
 using YessGoFront.Views;
 
 namespace YessGoFront
@@ -10,25 +9,15 @@ namespace YessGoFront
         {
             InitializeComponent();
 
-            // Регистрируем маршрут страницы кошелька
+            // регистрация маршрутов внутренних страниц
             Routing.RegisterRoute(nameof(WalletPage), typeof(WalletPage));
+            Routing.RegisterRoute(nameof(PartnersListPage), typeof(PartnersListPage));
 
-            // Стартовая вкладка через коллекции, без Shell.Current
-            var tabBar = this.Items.OfType<TabBar>().FirstOrDefault();
-            if (tabBar != null)
-            {
-                var homeTab = tabBar.Items.OfType<Tab>().FirstOrDefault(t => t.Route == "home");
-                if (homeTab != null)
-                    this.CurrentItem = homeTab;
-            }
-
-            // Если очень хочется GoToAsync — делаем после загрузки:
-            this.Loaded += async (_, __) =>
-            {
-                // здесь Shell.Current уже не null
-                // навигация на корень home (не обязательно, но допустимо)
-                // await this.GoToAsync("//home");
-            };
+            // выбор стартовой страницы
+            if (AccountStore.Instance.IsSignedIn)
+                _ = GoToAsync("///main");
+            else
+                _ = GoToAsync("///login");
         }
     }
 }

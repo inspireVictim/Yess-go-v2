@@ -6,6 +6,7 @@
     xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
     xmlns:models="clr-namespace:YessGoFront.Models"
     xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    xmlns:services="clr-namespace:YessGoFront.Services"
     x:DataType="viewmodels:MainPageViewModel"
     Shell.NavBarIsVisible="False"
     BackgroundColor="#F4F6F8">
@@ -38,8 +39,15 @@
                             </Frame>
 
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="Тынаев Сыргак" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                                <Label Text="+996 507700007" FontSize="12" TextColor="#FFFFFFCC"/>
+                                <Label
+                                    FontSize="20"
+                                    FontAttributes="Bold"
+                                    TextColor="White"
+                                    Text="{Binding Source={x:Static services:AccountStore.Instance}, Path=DisplayName}" />
+                                <Label
+                                    FontSize="12"
+                                    TextColor="#FFFFFFCC"
+                                    Text="{Binding Source={x:Static services:AccountStore.Instance}, Path=Email}" />
                             </VerticalStackLayout>
                         </Grid>
 
@@ -60,7 +68,6 @@
                                        Grid.Row="0" Grid.Column="0"
                                        TextColor="#DAA520"
                                        FontSize="13"/>
-
                                 <Button Text="История"
                                         Grid.Row="0" Grid.Column="1"
                                         BackgroundColor="White"
@@ -68,29 +75,22 @@
                                         Padding="10,4"
                                         CornerRadius="10"
                                         FontSize="13"/>
-
                                 <Grid Grid.Row="1" Grid.ColumnSpan="2"
                                       ColumnDefinitions="*,Auto"
                                       VerticalOptions="End"
                                       Padding="0,0,0,2">
-
-                                    <HorizontalStackLayout Grid.Column="0"
-                                                           Spacing="8"
-                                                           VerticalOptions="End">
+                                    <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="End">
                                         <Label Text="{Binding Balance}"
                                                FontSize="30"
                                                FontAttributes="Bold"
                                                TextColor="#0F6B53"/>
-                                        <Frame BackgroundColor="#EEF2F7"
-                                               CornerRadius="10"
-                                               Padding="8,2">
+                                        <Frame BackgroundColor="#EEF2F7" CornerRadius="10" Padding="8,2">
                                             <Label Text="Yess!Coin"
                                                    TextColor="#0F6B53"
                                                    FontAttributes="Bold"
                                                    FontSize="13"/>
                                         </Frame>
                                     </HorizontalStackLayout>
-
                                     <Image Grid.Column="1"
                                            Source="coin.png"
                                            WidthRequest="40" HeightRequest="40"
@@ -100,14 +100,13 @@
                                 </Grid>
                             </Grid>
                         </Frame>
-
                     </VerticalStackLayout>
                 </Border>
 
                 <!-- ===== ОСНОВНОЙ КОНТЕНТ ===== -->
                 <VerticalStackLayout Spacing="16" Padding="16,12,16,20">
 
-                    <!-- Быстрый доступ (СТОРИС) -->
+                    <!-- Быстрый доступ -->
                     <Label Text="Быстрый доступ"
                            FontAttributes="Bold"
                            FontSize="16"
@@ -122,7 +121,6 @@
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="models:StoryModel">
                                 <VerticalStackLayout Padding="4" Spacing="4" WidthRequest="80">
-                                    <!-- КРУГЛОЕ ПРЕВЬЮ -->
                                     <Border WidthRequest="64" HeightRequest="64"
                                             BackgroundColor="White"
                                             Stroke="#DAA520" StrokeThickness="2"
@@ -135,11 +133,8 @@
                                                 Command="{Binding BindingContext.OpenStoryAsyncCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
                                                 CommandParameter="{Binding .}" />
                                         </Border.GestureRecognizers>
-
-                                        <!-- Изображение внутри круга -->
                                         <Image Source="{Binding Icon}" Aspect="AspectFill"/>
                                     </Border>
-
                                     <Label Text="{Binding Title}"
                                            FontSize="12"
                                            HorizontalTextAlignment="Center"
@@ -171,111 +166,95 @@
                         </CollectionView.ItemTemplate>
                     </CollectionView>
 
-                    <!-- Наши партнёры -->
+                    <!-- ===== Наши партнёры ===== -->
                     <Label Text="Наши партнёры"
                            FontAttributes="Bold"
                            FontSize="16"
                            TextColor="#555"
                            Margin="0,2,0,0"/>
 
-                    <!-- Почти без вертикального зазора между рядами -->
+                    <!-- 🔹 Исправленный блок -->
                     <VerticalStackLayout Spacing="0" Padding="0" Margin="0">
 
                         <!-- Ряд 1 -->
                         <ScrollView x:Name="Row1"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never"
-                                    Margin="0">
-                            <Grid Padding="24,0">
-                                <CollectionView ItemsSource="{Binding PartnersRow1}"
-                                                SelectionMode="None"
-                                                HorizontalScrollBarVisibility="Never"
-                                                HeightRequest="98">
-                                    <CollectionView.ItemsLayout>
-                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
-                                    </CollectionView.ItemsLayout>
-                                    <CollectionView.ItemTemplate>
-                                        <DataTemplate x:DataType="models:PartnerLogoModel">
-                                            <Border WidthRequest="84" HeightRequest="84"
-                                                    Padding="0"
-                                                    BackgroundColor="White"
-                                                    Stroke="#0F6B53" StrokeThickness="1">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="42"/>
-                                                </Border.StrokeShape>
-                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
-                                            </Border>
-                                        </DataTemplate>
-                                    </CollectionView.ItemTemplate>
-                                </CollectionView>
-                            </Grid>
+                                    HorizontalScrollBarVisibility="Never">
+                            <HorizontalStackLayout x:Name="Row1Panel"
+                                                   Spacing="20"
+                                                   Padding="24,0"
+                                                   BindableLayout.ItemsSource="{Binding PartnersRow1}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PartnerLogoModel">
+                                        <Border WidthRequest="84" HeightRequest="84"
+                                                Padding="0"
+                                                BackgroundColor="White"
+                                                Stroke="#0F6B53"
+                                                StrokeThickness="1">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="42"/>
+                                            </Border.StrokeShape>
+                                            <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </HorizontalStackLayout>
                         </ScrollView>
 
                         <!-- Ряд 2 -->
                         <ScrollView x:Name="Row2"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never"
-                                    Margin="0">
-                            <Grid Padding="24,0">
-                                <CollectionView ItemsSource="{Binding PartnersRow2}"
-                                                SelectionMode="None"
-                                                HorizontalScrollBarVisibility="Never"
-                                                HeightRequest="98">
-                                    <CollectionView.ItemsLayout>
-                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
-                                    </CollectionView.ItemsLayout>
-                                    <CollectionView.ItemTemplate>
-                                        <DataTemplate x:DataType="models:PartnerLogoModel">
-                                            <Border WidthRequest="84" HeightRequest="84"
-                                                    Padding="0"
-                                                    BackgroundColor="White"
-                                                    Stroke="#0F6B53" StrokeThickness="1">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="42"/>
-                                                </Border.StrokeShape>
-                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
-                                            </Border>
-                                        </DataTemplate>
-                                    </CollectionView.ItemTemplate>
-                                </CollectionView>
-                            </Grid>
+                                    HorizontalScrollBarVisibility="Never">
+                            <HorizontalStackLayout x:Name="Row2Panel"
+                                                   Spacing="20"
+                                                   Padding="24,0"
+                                                   BindableLayout.ItemsSource="{Binding PartnersRow2}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PartnerLogoModel">
+                                        <Border WidthRequest="84" HeightRequest="84"
+                                                Padding="0"
+                                                BackgroundColor="White"
+                                                Stroke="#0F6B53"
+                                                StrokeThickness="1">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="42"/>
+                                            </Border.StrokeShape>
+                                            <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </HorizontalStackLayout>
                         </ScrollView>
 
                         <!-- Ряд 3 -->
                         <ScrollView x:Name="Row3"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never"
-                                    Margin="0">
-                            <Grid Padding="24,0">
-                                <CollectionView ItemsSource="{Binding PartnersRow3}"
-                                                SelectionMode="None"
-                                                HorizontalScrollBarVisibility="Never"
-                                                HeightRequest="98">
-                                    <CollectionView.ItemsLayout>
-                                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="20"/>
-                                    </CollectionView.ItemsLayout>
-                                    <CollectionView.ItemTemplate>
-                                        <DataTemplate x:DataType="models:PartnerLogoModel">
-                                            <Border WidthRequest="84" HeightRequest="84"
-                                                    Padding="0"
-                                                    BackgroundColor="White"
-                                                    Stroke="#0F6B53" StrokeThickness="1">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="42"/>
-                                                </Border.StrokeShape>
-                                                <Image Source="{Binding Logo}" Aspect="AspectFill"/>
-                                            </Border>
-                                        </DataTemplate>
-                                    </CollectionView.ItemTemplate>
-                                </CollectionView>
-                            </Grid>
+                                    HorizontalScrollBarVisibility="Never">
+                            <HorizontalStackLayout x:Name="Row3Panel"
+                                                   Spacing="20"
+                                                   Padding="24,0"
+                                                   BindableLayout.ItemsSource="{Binding PartnersRow3}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PartnerLogoModel">
+                                        <Border WidthRequest="84" HeightRequest="84"
+                                                Padding="0"
+                                                BackgroundColor="White"
+                                                Stroke="#0F6B53"
+                                                StrokeThickness="1">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="42"/>
+                                            </Border.StrokeShape>
+                                            <Image Source="{Binding Logo}" Aspect="AspectFill"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </HorizontalStackLayout>
                         </ScrollView>
 
                     </VerticalStackLayout>
-
                 </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
@@ -288,76 +267,108 @@
               IsVisible="{Binding IsStoryOpen}"
               BackgroundColor="#000000CC"
               InputTransparent="False"
-              Padding="0"
               ZIndex="9999">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-            <!-- Сегменты прогресса сверху (по количеству страниц) -->
-            <Grid Padding="12,14,12,8" VerticalOptions="Start">
-                <CollectionView ItemsSource="{Binding PageProgressList}"
-                                ItemsLayout="HorizontalList"
-                                HeightRequest="3"
-                                SelectionMode="None"
-                                HorizontalScrollBarVisibility="Never">
-                    <CollectionView.ItemTemplate>
+            <!-- Прогресс -->
+            <Grid Grid.Row="0" Padding="0" Margin="0">
+                <FlexLayout Direction="Row"
+                            AlignItems="Center"
+                            JustifyContent="SpaceBetween"
+                            BindableLayout.ItemsSource="{Binding PageProgressList}">
+                    <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="x:Double">
-                            <Grid Margin="2,0" HeightRequest="3" VerticalOptions="Center">
-                                <!-- Фон сегмента -->
-                                <BoxView HeightRequest="3" Opacity="0.3" Color="White" />
-                                <!-- Текущий прогресс -->
-                                <ProgressBar Progress="{Binding .}"
-                                             HeightRequest="3"
+                            <Grid HeightRequest="4" Margin="2,0" HorizontalOptions="FillAndExpand">
+                                <BoxView HeightRequest="4" Color="#FFFFFF55"/>
+                                <ProgressBar Progress="{Binding ., TargetNullValue=0, FallbackValue=0}"
+                                             HeightRequest="4"
                                              ProgressColor="White"
                                              BackgroundColor="Transparent"/>
                             </Grid>
                         </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
             </Grid>
 
-            <!-- Левая/правая зоны для навигации по страницам -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <!-- Сцена сторис -->
+            <Grid Grid.Row="1">
+                <Image x:Name="StoryImageA" Aspect="AspectFill" Opacity="1"/>
+                <Image x:Name="StoryImageB" Aspect="AspectFill" Opacity="0"/>
 
-                <!-- Левая половина — назад -->
-                <Grid Grid.Column="0" BackgroundColor="Transparent">
-                    <Grid.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding PrevPageCommand}" NumberOfTapsRequired="1"/>
-                    </Grid.GestureRecognizers>
+                <!-- Подпись сторис -->
+                <HorizontalStackLayout Spacing="10"
+                                       Padding="16,44,16,0"
+                                       HorizontalOptions="Start"
+                                       VerticalOptions="Start"
+                                       InputTransparent="True">
+
+                    <Border WidthRequest="42" HeightRequest="42"
+                            Stroke="White" StrokeThickness="1.5"
+                            BackgroundColor="Transparent"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="21" />
+                        </Border.StrokeShape>
+                        <Image Source="{Binding CurrentStory.Icon}"
+                               Aspect="AspectFill" />
+                    </Border>
+
+                    <Label Text="{Binding CurrentStory.Title}"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           VerticalOptions="Center">
+                        <Label.Shadow>
+                            <Shadow Brush="#000000"
+                                    Opacity="0.7"
+                                    Radius="4"
+                                    Offset="1,1"/>
+                        </Label.Shadow>
+                    </Label>
+                </HorizontalStackLayout>
+
+                <!-- Навигация сторис -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding PrevPageCommand}"/>
+                        </Grid.GestureRecognizers>
+                    </Grid>
+                    <Grid Grid.Column="1">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NextPageCommand}"/>
+                        </Grid.GestureRecognizers>
+                    </Grid>
                 </Grid>
 
-                <!-- Правая половина — вперёд -->
-                <Grid Grid.Column="1" BackgroundColor="Transparent">
-                    <Grid.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding NextPageCommand}" NumberOfTapsRequired="1"/>
-                    </Grid.GestureRecognizers>
-                </Grid>
+                <Image Source="{Binding CurrentPageImage}"
+                       Aspect="AspectFill"
+                       HorizontalOptions="Fill"
+                       VerticalOptions="Fill"
+                       InputTransparent="True"/>
             </Grid>
-
-            <!-- ТЕКУЩЕЕ ИЗОБРАЖЕНИЕ СТРАНИЦЫ (для fade-анимации в code-behind есть x:Name) -->
-            <Image x:Name="StoryImage"
-                   Source="{Binding CurrentPageImage}"
-                   Aspect="AspectFill"
-                   HorizontalOptions="Fill"
-                   VerticalOptions="Fill"/>
         </Grid>
 
         <!-- ====== OVERLAY: Banner (full-screen) ====== -->
         <Grid Grid.RowSpan="2"
               IsVisible="{Binding IsBannerOpen}"
               BackgroundColor="#000000CC"
-              InputTransparent="False"
-              Padding="0"
-              ZIndex="9999">
-            <Grid.GestureRecognizers>
-                <TapGestureRecognizer Command="{Binding CloseBannerCommand}"/>
-            </Grid.GestureRecognizers>
+              ZIndex="10000">
             <Image Source="{Binding CurrentBanner.Image}"
                    Aspect="AspectFill"
                    HorizontalOptions="Fill"
                    VerticalOptions="Fill"/>
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseBannerCommand}"/>
+            </Grid.GestureRecognizers>
         </Grid>
 
     </Grid>

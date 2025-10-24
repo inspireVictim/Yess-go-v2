@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Dispatching;
-using Microsoft.Maui; // для MainThread
+using Microsoft.Maui.ApplicationModel; // MainThread
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -9,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using YessGoFront.Models;
+using YessGoFront.Services;
 
 namespace YessGoFront.ViewModels
 {
@@ -41,7 +41,8 @@ namespace YessGoFront.ViewModels
         [ObservableProperty] private double pageProgress; // 0..1
         public ObservableCollection<double> PageProgressList { get; } = new();
 
-        public string Balance => "55.7";
+        // Баланс берём из общего BalanceStore
+        public string Balance => BalanceStore.Instance.Balance.ToString("0.##");
 
         private CancellationTokenSource? _overlayCts;
 
@@ -56,6 +57,13 @@ namespace YessGoFront.ViewModels
 
         public MainPageViewModel()
         {
+            // Подписка на изменение баланса — обновляем метку на главной
+            BalanceStore.Instance.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(BalanceStore.Balance))
+                    OnPropertyChanged(nameof(Balance));
+            };
+
             LoadStories();
             LoadBanners();
             LoadTopCategories();
@@ -75,49 +83,52 @@ namespace YessGoFront.ViewModels
         {
             Stories.Clear();
 
-            // Несколько страниц в каждом сторис (для теста — URL, потом заменишь на ассеты)
             Stories.Add(new StoryModel
             {
                 Title = "Бонусы",
-                Icon = "https://picsum.photos/seed/bonus/200/200",
+                Icon = "sc_bonus.png",
                 Pages = new() {
                     "https://picsum.photos/seed/bonus1/1200/2200",
                     "https://picsum.photos/seed/bonus2/1200/2200",
                     "https://picsum.photos/seed/bonus3/1200/2200",
                 }
             });
+
             Stories.Add(new StoryModel
             {
                 Title = "Йесскоины",
-                Icon = "https://picsum.photos/seed/coin/200/200",
+                Icon = "sc_coin.png",
                 Pages = new() {
                     "https://picsum.photos/seed/coin1/1200/2200",
                     "https://picsum.photos/seed/coin2/1200/2200",
                 }
             });
+
             Stories.Add(new StoryModel
             {
                 Title = "Мы",
-                Icon = "https://picsum.photos/seed/we/200/200",
+                Icon = "sc_we.png",
                 Pages = new() {
-                    "https://picsum.photos/seed/we1/1200/2200",
+                    "we_stories.png",
                 }
             });
+
             Stories.Add(new StoryModel
             {
                 Title = "Акции",
-                Icon = "https://picsum.photos/seed/sale/200/200",
+                Icon = "sc_sale.png",
                 Pages = new() {
-                    "https://picsum.photos/seed/sale1/1200/2200",
-                    "https://picsum.photos/seed/sale2/1200/2200",
-                    "https://picsum.photos/seed/sale3/1200/2200",
-                    "https://picsum.photos/seed/sale4/1200/2200",
+                    "sales_stories1.png",
+                    "sales_stories2.png",
+                    "sales_stories3.png",
+                    "sales_stories4.png",
                 }
             });
+
             Stories.Add(new StoryModel
             {
                 Title = "Новости",
-                Icon = "https://picsum.photos/seed/news/200/200",
+                Icon = "sc_news.png",
                 Pages = new() {
                     "https://picsum.photos/seed/news1/1200/2200",
                     "https://picsum.photos/seed/news2/1200/2200",
@@ -128,18 +139,19 @@ namespace YessGoFront.ViewModels
         private void LoadBanners()
         {
             Banners.Clear();
-            Banners.Add(new BannerModel { Image = "https://picsum.photos/seed/banner1/1200/600", PartnerName = "Партнёр A" });
-            Banners.Add(new BannerModel { Image = "https://picsum.photos/seed/banner2/1200/600", PartnerName = "Партнёр B" });
+            Banners.Add(new BannerModel { Image = "banner_1.png", PartnerName = "Партнёр A" });
+            Banners.Add(new BannerModel { Image = "banner_2.png", PartnerName = "Партнёр B" });
+            Banners.Add(new BannerModel { Image = "banner_3.png", PartnerName = "Партнёр C" });
         }
 
         private void LoadTopCategories()
         {
             TopCategories.Clear();
-            TopCategories.Add(new CategoryModel { Title = "Одежда и обувь", Icon = "https://picsum.photos/seed/cat1/200/200" });
-            TopCategories.Add(new CategoryModel { Title = "Для дома", Icon = "https://picsum.photos/seed/cat2/200/200" });
-            TopCategories.Add(new CategoryModel { Title = "Электроника", Icon = "https://picsum.photos/seed/cat3/200/200" });
-            TopCategories.Add(new CategoryModel { Title = "Здоровье", Icon = "https://picsum.photos/seed/cat4/200/200" });
-            TopCategories.Add(new CategoryModel { Title = "Детям", Icon = "https://picsum.photos/seed/cat5/200/200" });
+            TopCategories.Add(new CategoryModel { Title = "Одежда и обувь", Icon = "cat_clothes.png" });
+            TopCategories.Add(new CategoryModel { Title = "Для дома", Icon = "cat_home.png" });
+            TopCategories.Add(new CategoryModel { Title = "Электроника", Icon = "cat_electronics.png" });
+            TopCategories.Add(new CategoryModel { Title = "Здоровье", Icon = "cat_beauty.png" });
+            TopCategories.Add(new CategoryModel { Title = "Детям", Icon = "cat_kids.png" });
         }
 
         private void LoadPartners()
@@ -150,18 +162,15 @@ namespace YessGoFront.ViewModels
 
             var logos = new[]
             {
-                "https://picsum.photos/seed/p1/200/200",
-                "https://picsum.photos/seed/p2/200/200",
-                "https://picsum.photos/seed/p3/200/200",
-                "https://picsum.photos/seed/p4/200/200",
-                "https://picsum.photos/seed/p5/200/200",
-                "https://picsum.photos/seed/p6/200/200"
+                "promzona.jpg","faiza.png","navat.png","flask.png","chickenstar.jpg",
+                "bublik.png","sierra.jpg","ants.jpg","supara.png","teplo.png","savetheales.png"
             };
 
             foreach (var l in logos) PartnersRow1.Add(new PartnerLogoModel { Logo = l });
             foreach (var l in logos.Reverse()) PartnersRow2.Add(new PartnerLogoModel { Logo = l });
             foreach (var l in logos) PartnersRow3.Add(new PartnerLogoModel { Logo = l });
 
+            // дублирование — для бесшовной ленты
             foreach (var l in logos) PartnersRow1.Add(new PartnerLogoModel { Logo = l });
             foreach (var l in logos.Reverse()) PartnersRow2.Add(new PartnerLogoModel { Logo = l });
             foreach (var l in logos) PartnersRow3.Add(new PartnerLogoModel { Logo = l });
@@ -192,18 +201,16 @@ namespace YessGoFront.ViewModels
 
                 PrepareSegments(pages.Count);
 
+                IsStoryOpen = true;
+
                 for (int p = 0; p < pages.Count; p++)
                 {
-                    // Инициализация до показа
                     CurrentPageIndex = p;
-                    UpdateCurrentPageImage(); // выставить картинку заранее
+                    UpdateCurrentPageImage();
 
-                    IsStoryOpen = true;
-                    await RunSmoothProgressAsync(p, ct); // плавная анимация прогресса
-
+                    await RunSmoothProgressAsync(p, ct);
                     if (ct.IsCancellationRequested) return;
 
-                    // зафиксировать сегмент = 100%
                     PageProgressList[p] = 1.0;
                     OnPropertyChanged(nameof(PageProgressList));
                 }
@@ -212,18 +219,17 @@ namespace YessGoFront.ViewModels
             CloseStory();
         }
 
-        // Плавная анимация прогресса, как в инсте (линейно ~5.5 сек)
         private async Task RunSmoothProgressAsync(int segmentIndex, CancellationToken ct)
         {
-            const int durationMs = 5500; // около 5.5с
+            const int durationMs = 5500;
             var sw = Stopwatch.StartNew();
 
-            // Предзагрузка следующей страницы в фоне (если есть)
             _ = PrefetchNextImage();
 
             while (sw.ElapsedMilliseconds < durationMs && !ct.IsCancellationRequested)
             {
                 double prog = Math.Clamp(sw.Elapsed.TotalMilliseconds / durationMs, 0, 1);
+
                 await MainThread.InvokeOnMainThreadAsync(() =>
                 {
                     PageProgress = prog;
@@ -231,8 +237,7 @@ namespace YessGoFront.ViewModels
                     OnPropertyChanged(nameof(PageProgressList));
                 });
 
-                // 60fps ~ 16мс
-                await Task.Delay(16, ct);
+                await Task.Delay(16, ct); // ~60fps
             }
 
             sw.Stop();
@@ -268,7 +273,6 @@ namespace YessGoFront.ViewModels
             CurrentPageImage = img;
         }
 
-        // Предзагрузка следующего изображения (простая warmed-cache логика для UriImageSource)
         private Task PrefetchNextImage()
         {
             try
@@ -278,17 +282,24 @@ namespace YessGoFront.ViewModels
                 int next = CurrentPageIndex + 1;
                 if (next >= 0 && next < pages.Count)
                 {
-                    var uri = pages[next];
-                    // «Коснуться» UriImageSource, чтобы MAUI прогрел кэш
-                    var src = new UriImageSource { Uri = new Uri(uri), CachingEnabled = true, CacheValidity = TimeSpan.FromHours(3) };
-                    // Ничего не делаем с результатом — MAUI сам прогреет картинку
+                    var path = pages[next];
+
+                    if (Uri.TryCreate(path, UriKind.Absolute, out var absUri)
+                        && (absUri.Scheme == Uri.UriSchemeHttp || absUri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        var _ = new UriImageSource
+                        {
+                            Uri = absUri,
+                            CachingEnabled = true,
+                            CacheValidity = TimeSpan.FromHours(3)
+                        };
+                    }
                 }
             }
             catch { }
             return Task.CompletedTask;
         }
 
-        // вправо (следующая страница / следующий сторис)
         private void NextPage()
         {
             if (!IsStoryOpen || CurrentStory == null) return;
@@ -306,7 +317,6 @@ namespace YessGoFront.ViewModels
             }
         }
 
-        // влево (предыдущая страница / предыдущий сторис)
         private void PrevPage()
         {
             if (!IsStoryOpen) return;
@@ -348,9 +358,10 @@ namespace YessGoFront.ViewModels
                 PageProgressList[i] = i < pageIndex ? 1.0 : 0.0;
             OnPropertyChanged(nameof(PageProgressList));
 
+            IsStoryOpen = true;
+
             CurrentPageIndex = Math.Clamp(pageIndex, 0, pages.Count - 1);
             UpdateCurrentPageImage();
-            IsStoryOpen = true;
 
             for (int p = CurrentPageIndex; p < pages.Count; p++)
             {

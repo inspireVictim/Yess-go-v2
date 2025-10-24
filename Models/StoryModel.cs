@@ -3,7 +3,7 @@
     public class StoryModel
     {
         public string Title { get; set; } = "";
-        public string Icon { get; set; } = "";            // круглый превью
-        public List<string> Pages { get; set; } = new();   // список картинок внутри сторис (по порядку)
+        public string Icon { get; set; } = "";              // иконка превью (круг)
+        public List<string> Pages { get; set; } = new();    // картинки внутри сторис (по порядку)
     }
 }

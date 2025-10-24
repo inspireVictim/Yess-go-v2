@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.RegisterPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Регистрация"
+    BackgroundColor="#007A51">
+
+	<Grid RowDefinitions="Auto,*,Auto" Padding="24" RowSpacing="16">
+		<!-- Фон -->
+		<Grid.Background>
+			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+				<GradientStop Color="#007A51" Offset="0.0"/>
+				<GradientStop Color="#00C97B" Offset="1.0"/>
+			</LinearGradientBrush>
+		</Grid.Background>
+
+		<!-- Карточка регистрации -->
+		<Frame Grid.Row="1" Padding="20" CornerRadius="24" HasShadow="True" BackgroundColor="White">
+			<VerticalStackLayout Spacing="16">
+
+				<!-- Вкладки (Вход / Регистрация) -->
+				<Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="16" Margin="0,0,0,8">
+					<Label Text="Вход" TextColor="#B0B0B0">
+						<Label.GestureRecognizers>
+							<TapGestureRecognizer Tapped="OpenLogin_Tapped" />
+						</Label.GestureRecognizers>
+					</Label>
+					<Label Grid.Column="1" Text="Регистрация" FontAttributes="Bold" TextColor="#0B4A3B" />
+				</Grid>
+
+				<!-- Имя -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0">
+						<Entry x:Name="FirstNameEntry" Placeholder="Имя" BackgroundColor="Transparent" />
+					</Grid>
+				</Border>
+
+				<!-- Фамилия -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0">
+						<Entry x:Name="LastNameEntry" Placeholder="Фамилия" BackgroundColor="Transparent" />
+					</Grid>
+				</Border>
+
+				<!-- E-mail -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0">
+						<Entry x:Name="EmailEntry" Placeholder="E-mail" Keyboard="Email" BackgroundColor="Transparent" />
+					</Grid>
+				</Border>
+
+				<!-- Пароль -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0">
+						<Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" BackgroundColor="Transparent" />
+					</Grid>
+				</Border>
+
+				<!-- Кнопка регистрации -->
+				<Button Text="Зарегистрироваться"
+                        HeightRequest="52"
+                        CornerRadius="16"
+                        BackgroundColor="#0B4A3B"
+                        TextColor="White"
+                        Clicked="Register_Clicked" />
+
+				<!-- Кнопка входа через Google -->
+				<Button Text="Войти через Google"
+                        HeightRequest="48"
+                        CornerRadius="12"
+                        BackgroundColor="White"
+                        TextColor="Black" />
+			</VerticalStackLayout>
+		</Frame>
+	</Grid>
+</ContentPage>

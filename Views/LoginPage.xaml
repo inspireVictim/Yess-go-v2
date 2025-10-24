@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Вход"
+    BackgroundColor="#007A51">
+
+	<Grid RowDefinitions="Auto,*,Auto" Padding="24" RowSpacing="16">
+		<!-- Фон с градиентом -->
+		<Grid.Background>
+			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+				<GradientStop Color="#007A51" Offset="0.0"/>
+				<GradientStop Color="#00C97B" Offset="1.0"/>
+			</LinearGradientBrush>
+		</Grid.Background>
+
+		<!-- Карточка -->
+		<Frame Grid.Row="1" Padding="20" CornerRadius="24" HasShadow="True" BackgroundColor="White">
+			<VerticalStackLayout Spacing="16">
+
+				<!-- Вкладки (Вход / Регистрация) -->
+				<Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="16" Margin="0,0,0,8">
+					<Label Text="Вход" FontAttributes="Bold" TextColor="#0B4A3B"/>
+					<Label Grid.Column="1" Text="Регистрация" TextColor="#B0B0B0">
+						<Label.GestureRecognizers>
+							<TapGestureRecognizer Tapped="OpenRegister_Tapped"/>
+						</Label.GestureRecognizers>
+					</Label>
+				</Grid>
+
+				<!-- Поле E-mail -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0">
+						<Entry x:Name="EmailEntry" Placeholder="E-mail" Keyboard="Email" BackgroundColor="Transparent" />
+					</Grid>
+				</Border>
+
+				<!-- Поле Пароль -->
+				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+					<Grid Padding="12,0" ColumnDefinitions="*,Auto">
+						<Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" BackgroundColor="Transparent" />
+						<Image Source="eye.png" WidthRequest="20" HeightRequest="20" Opacity="0.6" Grid.Column="1">
+							<Image.GestureRecognizers>
+								<TapGestureRecognizer Tapped="TogglePassword_Tapped"/>
+							</Image.GestureRecognizers>
+						</Image>
+					</Grid>
+				</Border>
+
+				<!-- Запомнить меня -->
+				<HorizontalStackLayout Spacing="8">
+					<CheckBox x:Name="RememberCheck" Color="#007A51"/>
+					<Label Text="Запомнить меня" VerticalOptions="Center"/>
+				</HorizontalStackLayout>
+
+				<!-- Кнопка входа -->
+				<Button Text="Войти"
+                        HeightRequest="52"
+                        CornerRadius="16"
+                        BackgroundColor="#0B4A3B"
+                        TextColor="White"
+                        Clicked="Login_Clicked"/>
+
+				<BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
+
+				<Label Text="Забыли пароль?" HorizontalOptions="Center" TextColor="#0B4A3B" />
+
+				<!-- Вход через Google -->
+				<Button Text="Войти с помощью Google"
+                        HeightRequest="48"
+                        CornerRadius="12"
+                        BackgroundColor="White"
+                        TextColor="Black"/>
+			</VerticalStackLayout>
+		</Frame>
+	</Grid>
+</ContentPage>

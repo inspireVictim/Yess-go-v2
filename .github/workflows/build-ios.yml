@@ -1,0 +1,37 @@
+name: Build iOS (.NET MAUI)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install MAUI workloads
+        run: dotnet workload install maui
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build iOS app (unsigned)
+        run: dotnet build -t:Build -f net8.0-ios --configuration Release
+
+      - name: Publish build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: |
+            **/bin/Release/net8.0-ios/ios-arm64/
+            **/bin/Release/net8.0-ios/iossimulator-arm64/

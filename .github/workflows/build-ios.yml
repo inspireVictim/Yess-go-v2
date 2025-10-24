@@ -23,10 +23,12 @@ jobs:
         run: dotnet workload install maui
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore YessGoFront.sln
 
-      - name: Build iOS app (unsigned)
-        run: dotnet build -t:Build -f net8.0-ios --configuration Release
+
+      - name: Build iOS app
+        run: dotnet build YessGoFront.sln -c Release
+
 
       - name: Publish build output
         uses: actions/upload-artifact@v4

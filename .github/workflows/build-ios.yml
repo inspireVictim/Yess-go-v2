@@ -10,49 +10,37 @@ jobs:
   build-ios:
     runs-on: macos-latest
 
+    env:
+      DOTNET_ROLL_FORWARD: LatestMinor
+
     steps:
-      # ===========================
       # 1️⃣  Клонируем репозиторий
-      # ===========================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ===========================
-      # 2️⃣  Ставим именно .NET 8.0.302
-      # (совместим с net8.0-ios)
-      # ===========================
+      # 2️⃣  Устанавливаем именно .NET 8
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.302'
 
-      # ===========================
-      # 3️⃣  Проверяем содержимое
-      # ===========================
-      - name: List project files
-        run: ls -R
+      # 3️⃣  Проверяем, что активен .NET 8
+      - name: Check active SDK
+        run: dotnet --info
 
-      # ===========================
       # 4️⃣  Устанавливаем MAUI workloads
-      # ===========================
       - name: Install MAUI workloads
         run: dotnet workload install maui ios
 
-      # ===========================
       # 5️⃣  Восстанавливаем зависимости
-      # ===========================
       - name: Restore dependencies
         run: dotnet restore YessGoFront.csproj
 
-      # ===========================
-      # 6️⃣  Собираем iOS проект
-      # ===========================
+      # 6️⃣  Собираем iOS проект (Release)
       - name: Build iOS app (Release)
         run: dotnet build YessGoFront.csproj -c Release -f net8.0-ios /p:BuildIpa=true
 
-      # ===========================
-      # 7️⃣  Загружаем артефакты сборки
-      # ===========================
+      # 7️⃣  Публикуем артефакты (.ipa / .app)
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

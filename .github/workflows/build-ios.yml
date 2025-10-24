@@ -1,39 +1,61 @@
-name: Build iOS (.NET MAUI)
+name: Build iOS App
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build-ios:
     runs-on: macos-latest
 
     steps:
+      # ===========================
+      # 1️⃣  Клонируем репозиторий
+      # ===========================
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ===========================
+      # 2️⃣  Устанавливаем .NET 8
+      # ===========================
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: '8.0.x'
 
+      # ===========================
+      # 3️⃣  Проверяем структуру
+      # ===========================
+      - name: List project files
+        run: ls -R
+
+      # ===========================
+      # 4️⃣  Устанавливаем workload MAUI
+      # ===========================
       - name: Install MAUI workloads
-        run: dotnet workload install maui
+        run: dotnet workload install maui ios
 
+      # ===========================
+      # 5️⃣  Восстанавливаем зависимости
+      # ===========================
       - name: Restore dependencies
-        run: dotnet restore YessGoFront.sln
+        run: dotnet restore YessGoFront.csproj
 
+      # ===========================
+      # 6️⃣  Сборка iOS проекта
+      # ===========================
+      - name: Build iOS app (Release)
+        run: dotnet build YessGoFront.csproj -c Release -f net8.0-ios /p:BuildIpa=true
 
-      - name: Build iOS app
-        run: dotnet build YessGoFront.sln -c Release
-
-
-      - name: Publish build output
+      # ===========================
+      # 7️⃣  Публикуем артефакт .ipa
+      # ===========================
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
+          name: YessGoFront-iOS
           path: |
-            **/bin/Release/net8.0-ios/ios-arm64/
-            **/bin/Release/net8.0-ios/iossimulator-arm64/
+            **/bin/Release/net8.0-ios/**/*.ipa
+            **/bin/Release/net8.0-ios/**/*.app

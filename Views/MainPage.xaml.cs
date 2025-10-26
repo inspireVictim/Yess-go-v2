@@ -12,7 +12,6 @@ namespace YessGoFront.Views
 {
     public partial class MainPage : ContentPage
     {
-        // ===== Навигация в кошелёк =====
         private bool _isNavigating;
         private const string WalletRoute = "///wallet";
 
@@ -28,9 +27,9 @@ namespace YessGoFront.Views
         private const int IdleSeconds = 5;
 
         // скорость пикселей в секунду
-        private const double SpeedRow1 = 20; // вправо
+        private const double SpeedRow1 = 20;  // вправо
         private const double SpeedRow2 = -15; // влево
-        private const double SpeedRow3 = 18; // вправо
+        private const double SpeedRow3 = 18;  // вправо
 
         private ScrollView? _row1;
         private ScrollView? _row2;
@@ -70,8 +69,9 @@ namespace YessGoFront.Views
             HookPartnerRows();
             StartSmoothAutoScroll();
 
+            // ✅ Обновлённый вызов для новой версии BottomNavBar
             if (BottomBar != null)
-                BottomBar.SelectedTab = BottomTab.Home;
+                BottomBar.UpdateSelectedTab("Home");
         }
 
         protected override void OnDisappearing()
@@ -84,7 +84,20 @@ namespace YessGoFront.Views
                 vm.PropertyChanged -= OnVmPropertyChanged;
         }
 
-        // ======== Кросс-фейд сторис ========
+        // ===== Баннерам подгоняем размер =====
+        protected override void OnSizeAllocated(double width, double height)
+        {
+            base.OnSizeAllocated(width, height);
+
+            double bannerWidth = width * 0.8;
+            double bannerHeight = bannerWidth / 1.78;
+
+            var banners = this.FindByName<CollectionView>("BannersCollection");
+            if (banners != null)
+                banners.HeightRequest = bannerHeight;
+        }
+
+        // ===== Обработка VM обновлений (сторис) =====
         private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
@@ -126,17 +139,11 @@ namespace YessGoFront.Views
                     top.Opacity = 0;
                 });
             }
-            catch (TaskCanceledException)
-            {
-                // новый кадр — игнорируем
-            }
-            catch
-            {
-                // безопасно игнорировать
-            }
+            catch (TaskCanceledException) { }
+            catch { }
         }
 
-        // ======== Размер рядов ========
+        // ===== Регистрируем готовность рядов =====
         private void HookSizeReady(ScrollView? row, Action<bool> setReady)
         {
             if (row == null) { setReady(false); return; }
@@ -155,7 +162,7 @@ namespace YessGoFront.Views
         private static bool IsRowReady(ScrollView row)
             => row.ContentSize.Width > Math.Max(0, row.Width) + 1;
 
-        // ======== Пользователь взаимодействует ========
+        // ===== Реакция на прокрутку =====
         private void HookPartnerRows()
         {
             Attach(_row1);
@@ -193,7 +200,7 @@ namespace YessGoFront.Views
                 SeamlessWrap(sv);
         }
 
-        // ======== Плавная авто-анимация ========
+        // ===== Плавная авто-анимация =====
         private void StartSmoothAutoScroll()
         {
             StopSmoothAutoScroll();
@@ -214,7 +221,6 @@ namespace YessGoFront.Views
 
             while (!token.IsCancellationRequested)
             {
-                // ждём 5 секунд простоя
                 if ((DateTime.Now - _lastTouch).TotalSeconds >= IdleSeconds)
                 {
                     double dt = sw.Elapsed.TotalSeconds;
@@ -229,7 +235,7 @@ namespace YessGoFront.Views
                     sw.Restart();
                 }
 
-                await Task.Delay(16, token); // ~60fps
+                await Task.Delay(16, token); // ~60 fps
             }
         }
 
@@ -254,7 +260,7 @@ namespace YessGoFront.Views
                 await MainThread.InvokeOnMainThreadAsync(() =>
                     sv.ScrollToAsync(newX, 0, false));
             }
-            catch { /* безопасно игнорируем */ }
+            catch { }
         }
 
         private void SeamlessWrap(ScrollView sv)
@@ -273,7 +279,7 @@ namespace YessGoFront.Views
                 _ = sv.ScrollToAsync(x + half, 0, false);
         }
 
-        // ======== Навигация в кошелёк ========
+        // ===== Навигация =====
         private async void OnWalletTapped(object? sender, EventArgs e)
         {
             if (_isNavigating) return;
@@ -290,6 +296,11 @@ namespace YessGoFront.Views
             {
                 _isNavigating = false;
             }
+        }
+
+        private async void OnMoreTapped(object sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("//main/partner");
         }
     }
 }

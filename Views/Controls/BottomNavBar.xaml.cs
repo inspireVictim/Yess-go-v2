@@ -1,168 +1,91 @@
-﻿using Microsoft.Maui.Controls;
-using System;
-using System.Threading.Tasks;
+﻿using System;
+using Microsoft.Maui.Controls;
 
 namespace YessGoFront.Views.Controls
 {
-    public enum BottomTab
-    {
-        Home,
-        Partner,
-        Qr,
-        Notifications,
-        More
-    }
-
     public partial class BottomNavBar : ContentView
     {
-        bool _isNavigating = false;
-
-        Image? _homeIcon, _partnerIcon, _qrIcon, _bellIcon, _moreIcon;
-        Label? _homeText, _partnerText, _qrText, _bellText, _moreText;
+        private string _selectedTab = "Home";
 
         public BottomNavBar()
         {
             InitializeComponent();
-
-            _homeIcon = FindByName("HomeIcon") as Image;
-            _partnerIcon = FindByName("PartnerIcon") as Image;
-            _qrIcon = FindByName("QrIcon") as Image;
-            _bellIcon = FindByName("BellIcon") as Image;
-            _moreIcon = FindByName("MoreIcon") as Image;
-
-            _homeText = FindByName("HomeText") as Label;
-            _partnerText = FindByName("PartnerText") as Label;
-            _qrText = FindByName("QrText") as Label;
-            _bellText = FindByName("BellText") as Label;
-            _moreText = FindByName("MoreText") as Label;
-
-            SelectedTab = BottomTab.Home;
         }
 
-        BottomTab _selected;
-        public BottomTab SelectedTab
+        // ✅ Вызывается из страниц (MainPage, MorePage и т.д.)
+        public void UpdateSelectedTab(string tab)
         {
-            get => _selected;
-            set
+            _selectedTab = tab;
+
+            // Сбрасываем все иконки и подписи в неактивное состояние
+            HomeIcon.Source = "nav_home.png";
+            PartnerIcon.Source = "nav_partners.png";
+            BellIcon.Source = "nav_notification.png";
+            MoreIcon.Source = "nav_more.png";
+
+            HomeText.TextColor = Color.FromArgb("#9E9E9E");
+            PartnerText.TextColor = Color.FromArgb("#9E9E9E");
+            BellText.TextColor = Color.FromArgb("#9E9E9E");
+            MoreText.TextColor = Color.FromArgb("#9E9E9E");
+
+            // Активная вкладка
+            switch (tab)
             {
-                _selected = value;
-                UpdateVisual();
-            }
-        }
-
-        string GetIcon(BottomTab tab, bool active)
-        {
-            return tab switch
-            {
-                BottomTab.Home => active ? "nav_home_press.png" : "nav_home.png",
-                BottomTab.Partner => active ? "nav_partners_press.png" : "nav_partners.png",
-                BottomTab.Qr => active ? "nav_qr_press.png" : "nav_qr.png",
-                BottomTab.Notifications => active ? "nav_notification_press.png" : "nav_notification.png",
-                BottomTab.More => active ? "nav_more_press.png" : "nav_more.png",
-                _ => "nav_home.png"
-            };
-        }
-
-        void UpdateVisual()
-        {
-            if (_homeIcon == null ||
-                _partnerIcon == null ||
-                _qrIcon == null ||
-                _bellIcon == null ||
-                _moreIcon == null ||
-                _homeText == null ||
-                _partnerText == null ||
-                _qrText == null ||
-                _bellText == null ||
-                _moreText == null)
-                return;
-
-            var normal = Color.FromArgb("#6B6B6B");
-            var active = Color.FromArgb("#0F6B53");
-
-            _homeText.TextColor = normal;
-            _partnerText.TextColor = normal;
-            _qrText.TextColor = normal;
-            _bellText.TextColor = normal;
-            _moreText.TextColor = normal;
-
-            _homeIcon.Source = GetIcon(BottomTab.Home, false);
-            _partnerIcon.Source = GetIcon(BottomTab.Partner, false);
-            _qrIcon.Source = GetIcon(BottomTab.Qr, false);
-            _bellIcon.Source = GetIcon(BottomTab.Notifications, false);
-            _moreIcon.Source = GetIcon(BottomTab.More, false);
-
-            switch (_selected)
-            {
-                case BottomTab.Home:
-                    _homeText.TextColor = active;
-                    _homeIcon.Source = GetIcon(BottomTab.Home, true);
+                case "Home":
+                    HomeIcon.Source = "nav_home_press.png";
+                    HomeText.TextColor = Color.FromArgb("#146B4D");
                     break;
-                case BottomTab.Partner:
-                    _partnerText.TextColor = active;
-                    _partnerIcon.Source = GetIcon(BottomTab.Partner, true);
+
+                case "Partners":
+                    PartnerIcon.Source = "nav_partners_press.png";
+                    PartnerText.TextColor = Color.FromArgb("#146B4D");
                     break;
-                case BottomTab.Qr:
-                    _qrText.TextColor = active;
-                    _qrIcon.Source = GetIcon(BottomTab.Qr, true);
+
+                case "Notifications":
+                    BellIcon.Source = "nav_notification_press.png";
+                    BellText.TextColor = Color.FromArgb("#146B4D");
                     break;
-                case BottomTab.Notifications:
-                    _bellText.TextColor = active;
-                    _bellIcon.Source = GetIcon(BottomTab.Notifications, true);
-                    break;
-                case BottomTab.More:
-                    _moreText.TextColor = active;
-                    _moreIcon.Source = GetIcon(BottomTab.More, true);
+
+                case "More":
+                    MoreIcon.Source = "nav_more_press.png";
+                    MoreText.TextColor = Color.FromArgb("#146B4D");
                     break;
             }
         }
 
-        // ---------- Обработчики вкладок ----------
-        async void OnHomeTapped(object? sender, EventArgs e)
-            => await NavigateAsync(BottomTab.Home, "///main/home");
-
-        async void OnPartnerTapped(object? sender, EventArgs e)
-            => await NavigateAsync(BottomTab.Partner, "///main/partner");
-
-        async void OnQrTapped(object? sender, EventArgs e)
-            => await NavigateAsync(BottomTab.Qr, "///main/qr");
-
-        async void OnNotificationsTapped(object? sender, EventArgs e)
-            => await NavigateAsync(BottomTab.Notifications, "///main/notifications");
-
-        async void OnMoreTapped(object? sender, EventArgs e)
-            => await NavigateAsync(BottomTab.More, "///main/more");
-
-        // ---------- Универсальный переход ----------
-        async Task NavigateAsync(BottomTab target, string route)
+        // 🏠 Главная
+        private async void OnHomeTapped(object? sender, EventArgs e)
         {
-            if (_isNavigating)
-                return;
+            UpdateSelectedTab("Home");
+            await Shell.Current.GoToAsync("//main/home");
+        }
 
-            _isNavigating = true;
+        // 🤝 Партнёры
+        private async void OnPartnerTapped(object? sender, EventArgs e)
+        {
+            UpdateSelectedTab("Partners");
+            await Shell.Current.GoToAsync("//main/partner");
+        }
 
-            try
-            {
-                // визуально показываем нажатие
-                SelectedTab = target;
+        // 📱 QR
+        private async void OnQrTapped(object? sender, EventArgs e)
+        {
+            UpdateSelectedTab("QR");
+            await Shell.Current.GoToAsync("//main/qr");
+        }
 
-                // выполняем переход
-                await Shell.Current.GoToAsync(route, true);
+        // 🔔 Уведомления
+        private async void OnNotificationsTapped(object? sender, EventArgs e)
+        {
+            UpdateSelectedTab("Notifications");
+            await Shell.Current.GoToAsync("//main/notifications");
+        }
 
-                // ждём, чтобы Shell применил состояние
-                await Task.Delay(80);
-
-                // финально выставляем выбранный таб
-                SelectedTab = target;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[BottomNavBar] Ошибка навигации: {ex.Message}");
-            }
-            finally
-            {
-                _isNavigating = false;
-            }
+        // ⋯ Ещё
+        private async void OnMoreTapped(object? sender, EventArgs e)
+        {
+            UpdateSelectedTab("More");
+            await Shell.Current.GoToAsync("//main/more");
         }
     }
 }

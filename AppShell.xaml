@@ -10,6 +10,16 @@
         Route="login"
         ContentTemplate="{DataTemplate views:LoginPage}" />
 
+    <!-- Карта -->
+    <ShellContent
+        Route="MapPage"
+        ContentTemplate="{DataTemplate views:MapPage}" />
+
+    <!-- Экран регистрации -->
+    <ShellContent
+        Route="register"
+        ContentTemplate="{DataTemplate views:RegisterPage}" />
+
     <!-- Основное приложение -->
     <!-- 🔹 Отключаем системную TabBar, т.к. используется кастомный BottomNavBar -->
     <TabBar Route="main" Shell.TabBarIsVisible="False">

@@ -15,20 +15,21 @@ namespace YessGoFront.Views
         protected override void OnAppearing()
         {
             base.OnAppearing();
+
+            // ✅ Используем новый метод из BottomNavBar
             if (this.FindByName<BottomNavBar>("BottomBar") is { } bottom)
-                bottom.SelectedTab = BottomTab.More;
+                bottom.UpdateSelectedTab("More");
         }
 
-        // Обработчик тапа по "Выйти"
+        // ✅ Обработчик тапа по "Выйти"
         private async void OnLogoutTapped(object? sender, EventArgs e)
         {
             try
             {
-                // 1) Чистим локальный аккаунт
+                // 1) Очистка локального аккаунта
                 AccountStore.Instance.SignOut();
 
-                // 2) Сбрасываем стек Shell и уходим на экран логина
-                //    Предполагается, что в AppShell.xaml есть <ShellContent Route="login" .../>
+                // 2) Навигация на экран логина (сброс стека)
                 await Shell.Current.GoToAsync("///login");
             }
             catch (Exception ex)

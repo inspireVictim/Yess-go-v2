@@ -69,12 +69,12 @@ namespace YessGoFront.ViewModels
             LoadTopCategories();
             LoadPartners();
 
-            OpenStoryAsyncCommand = new AsyncRelayCommand<StoryModel>(OpenStoryAsync);
+            OpenStoryAsyncCommand = new AsyncRelayCommand<StoryModel?>(OpenStoryAsync);
             CloseStoryCommand = new RelayCommand(CloseStory);
             NextPageCommand = new RelayCommand(NextPage);
             PrevPageCommand = new RelayCommand(PrevPage);
 
-            OpenBannerAsyncCommand = new AsyncRelayCommand<BannerModel>(OpenBannerAsync);
+            OpenBannerAsyncCommand = new AsyncRelayCommand<BannerModel?>(OpenBannerAsync);
             CloseBannerCommand = new RelayCommand(CloseBanner);
         }
 
@@ -178,8 +178,10 @@ namespace YessGoFront.ViewModels
 
         // ====== СТОРИС: «как в инсте» ======
 
-        public async Task OpenStoryAsync(StoryModel story)
+        public async Task OpenStoryAsync(StoryModel? story)
         {
+            if (story == null) return;
+            
             _overlayCts?.Cancel();
             _overlayCts = new CancellationTokenSource();
 
@@ -400,8 +402,10 @@ namespace YessGoFront.ViewModels
         }
 
         // ====== Баннеры ======
-        public async Task OpenBannerAsync(BannerModel banner)
+        public async Task OpenBannerAsync(BannerModel? banner)
         {
+            if (banner == null) return;
+            
             _overlayCts?.Cancel();
             _overlayCts = new CancellationTokenSource();
 

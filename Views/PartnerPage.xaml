@@ -8,11 +8,36 @@
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Поиск -->
-        <SearchBar Placeholder="Поиск по компаниям"
-                   Margin="16,8,16,0"
+        <StackLayout Orientation="Horizontal"
+             Margin="16,8,16,0"
+             VerticalOptions="Center">
+
+            <Frame CornerRadius="10"
+                   Padding="0"
+                   HasShadow="False"
                    BackgroundColor="White"
                    HeightRequest="40"
-                   VerticalOptions="Center" />
+                   HorizontalOptions="FillAndExpand">
+                <SearchBar Placeholder="Поиск по компаниям"
+                   BackgroundColor="Transparent"
+                   Margin="8,0"
+                   VerticalOptions="Center"
+                   HeightRequest="40"/>
+            </Frame>
+
+            <ImageButton x:Name="MabButton"
+                Source="map_category_icon.png"
+                WidthRequest="40"
+                HeightRequest="40"
+                CornerRadius="10"
+                BackgroundColor="White"
+                Aspect="AspectFill"
+                Padding="0"
+                Margin="8,0,0,0"
+                VerticalOptions="Center"
+                Clicked="OnMapButtonClicked"/>
+        </StackLayout>
+
 
         <!-- Категории -->
         <ScrollView Grid.Row="1"

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="YessGoFront.Views.MapPage"
+             BackgroundColor="#007F5F">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="0">
+		<Frame Grid.Row="0"
+			   HeightRequest="500"
+			   BackgroundColor="#00694D"
+			   CornerRadius="0"
+			   VerticalOptions="Center"
+			   HorizontalOptions="FillAndExpand">
+			<Label Text="Карта временно недоступна"
+				   TextColor="White"
+				   HorizontalOptions="Center"
+				   VerticalOptions="Center"
+				   FontSize="16"
+				   FontAttributes="Bold"/>
+		</Frame>
+
+		<StackLayout Grid.Row="1"
+                     Orientation="Horizontal"
+                     Margin="16,8,16,0"
+                     VerticalOptions="Center">
+
+            <Frame CornerRadius="10"
+                   Padding="0"
+                   HasShadow="False"
+                   BackgroundColor="White"
+                   HeightRequest="40"
+                   HorizontalOptions="FillAndExpand">
+                <SearchBar x:Name="SearchBar"
+                           Placeholder="�����"
+                           BackgroundColor="Transparent"
+                           Margin="8,0"
+                           VerticalOptions="Center"
+                           HeightRequest="40"/>
+            </Frame>
+
+            <ImageButton x:Name="FilterButton"
+                         Source="map_category_icon.png"
+                         WidthRequest="40"
+                         HeightRequest="40"
+                         CornerRadius="10"
+                         BackgroundColor="White"
+                         Aspect="AspectFill"
+                         Padding="0"
+                         Margin="8,0,0,0"
+                         VerticalOptions="Center"/>
+        </StackLayout>
+
+        <StackLayout Grid.Row="2"
+                     Orientation="Horizontal"
+                     Margin="16,8"
+                     Spacing="8"
+                     HorizontalOptions="Center">
+            <Button Text="�������"
+                    BackgroundColor="White"
+                    TextColor="#007F5F"
+                    CornerRadius="10"
+                    HeightRequest="35"/>
+            <Button Text="��� � �������"
+                    BackgroundColor="White"
+                    TextColor="#007F5F"
+                    CornerRadius="10"
+                    HeightRequest="35"/>
+            <Button Text="��������"
+                    BackgroundColor="White"
+                    TextColor="#007F5F"
+                    CornerRadius="10"
+                    HeightRequest="35"/>
+        </StackLayout>
+
+    </Grid>
+</ContentPage>

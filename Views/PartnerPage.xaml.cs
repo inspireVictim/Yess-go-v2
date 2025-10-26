@@ -7,6 +7,13 @@ namespace YessGoFront.Views
     {
         public ObservableCollection<CategoryItem> Categories { get; set; }
 
+        private async void OnMapButtonClicked(object sender, EventArgs e)
+        {
+            // Переход на другую страницу
+            await Shell.Current.GoToAsync("///MapPage");
+        }
+
+
         public PartnerPage()
         {
             InitializeComponent();

@@ -9,6 +9,9 @@ public partial class NotificationsPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        BottomBar.SelectedTab = BottomTab.Notifications; // ← это убирает “двойной тап”
+
+        // ✅ Обновлённый вызов для новой навигационной панели
+        if (this.FindByName<BottomNavBar>("BottomBar") is { } bottom)
+            bottom.UpdateSelectedTab("Notifications");
     }
 }

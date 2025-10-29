@@ -18,3 +18,4 @@ Platforms/Android/app/
 # IDEs
 .idea/
 .vscode/
+.env

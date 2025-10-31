@@ -47,6 +47,16 @@ public partial class PartnerPageViewModel : ObservableObject
         LoadByCategoryAsyncCommand.Execute("для дома");
     }
 
+    [RelayCommand]
+    private async Task OpenPartnerAsync(PartnerDto partner)
+    {
+        if (partner == null)
+            return;
+
+        // Если используешь Shell навигацию:
+        await Shell.Current.GoToAsync($"partnerdetails?partnerId={partner.Id}");
+    }
+
 
     // ❌ БЕЗ [RelayCommand] — метод вызывается из явной команды
     private async Task LoadByCategoryAsync(string? categoryTitle)
@@ -67,5 +77,7 @@ public partial class PartnerPageViewModel : ObservableObject
                 Partners.Add(p);
         }
         finally { IsBusy = false; }
+
+
     }
 }

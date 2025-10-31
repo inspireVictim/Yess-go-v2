@@ -3,9 +3,17 @@
     x:Class="YessGoFront.Views.PartnersListPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:YessGoFront.Converters"
     Shell.NavBarIsVisible="False">
 
-	<Grid RowDefinitions="Auto,*" Padding="16,16,16,24">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+
+    <Grid RowDefinitions="Auto,*" Padding="16,16,16,24">
 		<Grid.Background>
 			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
 				<GradientStop Color="#005D45" Offset="0.0" />
@@ -13,7 +21,19 @@
 			</LinearGradientBrush>
 		</Grid.Background>
 
-		<!-- ===== Шапка ===== -->
+        <ImageButton Source="back_arrow_icon.png"
+             WidthRequest="30"
+             HeightRequest="30"
+             BackgroundColor="Transparent"
+             Command="{Binding BackCommand}"
+             VerticalOptions="Start"
+             HorizontalOptions="Start"
+             Margin="20,50,0,0"
+             AbsoluteLayout.LayoutBounds="0,0,50,50"
+             AbsoluteLayout.LayoutFlags="PositionProportional"/>
+
+
+        <!-- ===== Шапка ===== -->
 		<Grid Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*"
               ColumnSpacing="12" Padding="0,0,0,12">
 

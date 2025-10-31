@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="YessGoFront.Views.PartnerDetailPage"
+    BackgroundColor="#F9F9F9"
+    Title="О партнёре">
+
+    <ScrollView Padding="20">
+        <VerticalStackLayout Spacing="20">
+
+            <Image x:Name="PartnerLogo"
+                   HeightRequest="120"
+                   WidthRequest="120"
+                   Aspect="AspectFit"
+                   HorizontalOptions="Center"/>
+
+            <Label x:Name="PartnerName"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="#0F6B53"
+                   HorizontalOptions="Center"/>
+
+            <Label x:Name="PartnerCategory"
+                   FontSize="14"
+                   TextColor="#777"
+                   HorizontalOptions="Center"/>
+
+            <Label x:Name="PartnerDescription"
+                   FontSize="15"
+                   TextColor="#333"
+                   LineBreakMode="WordWrap"/>
+
+            <Button Text="📍 Посмотреть на карте"
+                    BackgroundColor="#0F6B53"
+                    TextColor="White"
+                    CornerRadius="12"
+                    Clicked="OnMapClicked"/>
+
+            <Button Text="📞 Позвонить"
+                    BackgroundColor="White"
+                    TextColor="#0F6B53"
+                    BorderColor="#0F6B53"
+                    BorderWidth="1"
+                    CornerRadius="12"
+                    Clicked="OnCallClicked"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

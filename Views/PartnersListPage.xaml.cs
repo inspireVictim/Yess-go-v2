@@ -11,6 +11,8 @@ namespace YessGoFront.Views
         {
             InitializeComponent();
 
+
+
             // наполняем тестовыми данными (как на макете)
             Partners.Add(new PartnerListItem
             {

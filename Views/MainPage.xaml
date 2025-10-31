@@ -38,17 +38,20 @@
                                 <Image Source="profile.png" Aspect="AspectFill"/>
                             </Frame>
 
-                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label
-                                    FontSize="20"
-                                    FontAttributes="Bold"
-                                    TextColor="White"
-                                    Text="{Binding Source={x:Static services:AccountStore.Instance}, Path=DisplayName}" />
-                                <Label
-                                    FontSize="12"
-                                    TextColor="#FFFFFFCC"
-                                    Text="{Binding Source={x:Static services:AccountStore.Instance}, Path=Email}" />
+                            <VerticalStackLayout Grid.Column="1"
+                     Spacing="2"
+                     VerticalOptions="Center"
+                     x:DataType="services:AccountStore"
+                     BindingContext="{x:Static services:AccountStore.Instance}">
+                                <Label FontSize="20"
+           FontAttributes="Bold"
+           TextColor="White"
+           Text="{Binding DisplayName}" />
+                                <Label FontSize="12"
+           TextColor="#FFFFFFCC"
+           Text="{Binding Phone}" />
                             </VerticalStackLayout>
+
                         </Grid>
 
                         <!-- Кошелёк -->
@@ -146,9 +149,9 @@
                         </CollectionView.ItemTemplate>
                     </CollectionView>
 
-                
-                    
-                        <CollectionView x:Name="BannersCollection"
+
+
+                    <CollectionView x:Name="BannersCollection"
                             ItemsSource="{Binding Banners}"
                             ItemsLayout="HorizontalList"
                             SelectionMode="None"
@@ -176,114 +179,114 @@
 
 
                     <!-- 🔹 Лента категорий -->
-<ScrollView Orientation="Horizontal"
+                    <ScrollView Orientation="Horizontal"
             HorizontalScrollBarVisibility="Never"
             Margin="0"
             HeightRequest="160">
-    <HorizontalStackLayout Spacing="12"
+                        <HorizontalStackLayout Spacing="12"
                            Padding="12,0,12,0">
 
-        <!-- Категория 1 -->
-        <VerticalStackLayout Spacing="6"
+                            <!-- Категория 1 -->
+                            <VerticalStackLayout Spacing="6"
                              WidthRequest="120"
                              HorizontalOptions="Center">
-            <Frame WidthRequest="120"
+                                <Frame WidthRequest="120"
                    HeightRequest="120"
                    CornerRadius="12"
                    Padding="0"
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
-                <Image Source="cat_beauty.png"
+                                    <Image Source="cat_beauty.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
                        VerticalOptions="Fill"/>
-            </Frame>
-            <Label Text="Салоны красоты"
+                                </Frame>
+                                <Label Text="Салоны красоты"
                    FontSize="13"
                    FontAttributes="Bold"
                    TextColor="#333"
                    HorizontalTextAlignment="Center"/>
-        </VerticalStackLayout>
+                            </VerticalStackLayout>
 
-        <!-- Категория 2 -->
-        <VerticalStackLayout Spacing="6"
+                            <!-- Категория 2 -->
+                            <VerticalStackLayout Spacing="6"
                              WidthRequest="120"
                              HorizontalOptions="Center">
-            <Frame WidthRequest="120"
+                                <Frame WidthRequest="120"
                    HeightRequest="120"
                    CornerRadius="12"
                    Padding="0"
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
-                <Image Source="cat_pharmacy.png"
+                                    <Image Source="cat_pharmacy.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
                        VerticalOptions="Fill"/>
-            </Frame>
-            <Label Text="Аптеки"
+                                </Frame>
+                                <Label Text="Аптеки"
                    FontSize="13"
                    FontAttributes="Bold"
                    TextColor="#333"
                    HorizontalTextAlignment="Center"/>
-        </VerticalStackLayout>
+                            </VerticalStackLayout>
 
-        <!-- Категория 3 -->
-        <VerticalStackLayout Spacing="6"
+                            <!-- Категория 3 -->
+                            <VerticalStackLayout Spacing="6"
                              WidthRequest="120"
                              HorizontalOptions="Center">
-            <Frame WidthRequest="120"
+                                <Frame WidthRequest="120"
                    HeightRequest="120"
                    CornerRadius="12"
                    Padding="0"
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
-                <Image Source="cat_market.png"
+                                    <Image Source="cat_market.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
                        VerticalOptions="Fill"/>
-            </Frame>
-            <Label Text="Магазины"
+                                </Frame>
+                                <Label Text="Магазины"
                    FontSize="13"
                    FontAttributes="Bold"
                    TextColor="#333"
                    HorizontalTextAlignment="Center"/>
-        </VerticalStackLayout>
+                            </VerticalStackLayout>
 
-        <!-- Кнопка “Ещё...” -->
-        <VerticalStackLayout Spacing="6"
+                            <!-- Кнопка “Ещё...” -->
+                            <VerticalStackLayout Spacing="6"
                              WidthRequest="120"
                              HorizontalOptions="Center">
-            <Frame WidthRequest="120"
+                                <Frame WidthRequest="120"
                    HeightRequest="120"
                    CornerRadius="12"
                    Padding="0"
                    HasShadow="True"
                    BackgroundColor="#F3F3F3"
                    HorizontalOptions="Center">
-                <Grid>
-                    <Label Text="+"
+                                    <Grid>
+                                        <Label Text="+"
                            FontSize="48"
                            FontAttributes="Bold"
                            TextColor="#0F6B53"
                            HorizontalOptions="Center"
                            VerticalOptions="Center"/>
-                    <Grid.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnMoreTapped" />
-                    </Grid.GestureRecognizers>
-                </Grid>
-            </Frame>
-            <Label Text="Ещё..."
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnMoreTapped" />
+                                        </Grid.GestureRecognizers>
+                                    </Grid>
+                                </Frame>
+                                <Label Text="Ещё..."
                    FontSize="13"
                    FontAttributes="Bold"
                    TextColor="#555"
                    HorizontalTextAlignment="Center"/>
-        </VerticalStackLayout>
+                            </VerticalStackLayout>
 
-    </HorizontalStackLayout>
-</ScrollView>
+                        </HorizontalStackLayout>
+                    </ScrollView>
 
 
 
@@ -319,6 +322,11 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="42"/>
                                             </Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PartnerPageViewModel}}, Path=OpenPartnerCommand}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Border.GestureRecognizers>
                                             <Image Source="{Binding Logo}" Aspect="AspectFill"/>
                                         </Border>
                                     </DataTemplate>
@@ -345,6 +353,11 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="42"/>
                                             </Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PartnerPageViewModel}}, Path=OpenPartnerCommand}"
+                                                CommandParameter="{Binding .}" />
+                                            </Border.GestureRecognizers>
                                             <Image Source="{Binding Logo}" Aspect="AspectFill"/>
                                         </Border>
                                     </DataTemplate>
@@ -371,6 +384,12 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="42"/>
                                             </Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PartnerPageViewModel}}, Path=OpenPartnerCommand}"
+                                                CommandParameter="{Binding .}" />
+                                            </Border.GestureRecognizers>
+
                                             <Image Source="{Binding Logo}" Aspect="AspectFill"/>
                                         </Border>
                                     </DataTemplate>

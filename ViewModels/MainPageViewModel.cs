@@ -88,19 +88,16 @@ namespace YessGoFront.ViewModels
                 Title = "Бонусы",
                 Icon = "sc_bonus.png",
                 Pages = new() {
-                    "https://picsum.photos/seed/bonus1/1200/2200",
-                    "https://picsum.photos/seed/bonus2/1200/2200",
-                    "https://picsum.photos/seed/bonus3/1200/2200",
+                    "storiespage_bonus.png",
                 }
             });
 
             Stories.Add(new StoryModel
             {
-                Title = "Йесскоины",
-                Icon = "sc_coin.png",
+                Title = "Yess!Coin",
+                Icon = "stories_yesscoin.png",
                 Pages = new() {
-                    "https://picsum.photos/seed/coin1/1200/2200",
-                    "https://picsum.photos/seed/coin2/1200/2200",
+                    "storiespage_yesscoin.png",
                 }
             });
 
@@ -116,7 +113,7 @@ namespace YessGoFront.ViewModels
             Stories.Add(new StoryModel
             {
                 Title = "Акции",
-                Icon = "sc_sale.png",
+                Icon = "stories_sales.png",
                 Pages = new() {
                     "sales_stories1.png",
                     "sales_stories2.png",
@@ -127,14 +124,53 @@ namespace YessGoFront.ViewModels
 
             Stories.Add(new StoryModel
             {
-                Title = "Новости",
-                Icon = "sc_news.png",
+                Title = "ДР",
+                Icon = "stories_bday.png",
                 Pages = new() {
-                    "https://picsum.photos/seed/news1/1200/2200",
-                    "https://picsum.photos/seed/news2/1200/2200",
+                    "storiespage_bday.png",
                 }
             });
         }
+
+        // ====== ДАННЫЕ Партнёров======
+        private void LoadPartnerInfo()
+        {
+            // 🔹 Тестовый партнёр — пример данных для карточки
+            var testPartner = new PartnerDetailDto
+            {
+                Id = "p001",
+                Name = "CoffeeTime",
+                Description = "CoffeeTime — уютная кофейня с ароматным кофе, десертами и атмосферой уюта. " +
+                              "Держателям карты YessGo доступны скидки до 10% и кешбэк 5%.",
+                Category = "Кафе и рестораны",
+                LogoUrl = "coffeetime_logo.png",     // картинка в Resources/Images/
+                BannerUrl = "coffee_banner.png",     // опционально
+                Address = "г. Бишкек, ул. Ибраимова, 115",
+                Latitude = 42.8746,
+                Longitude = 74.6122,
+                Phone = "+996 555 123 456",
+                Website = "https://coffeetime.kg",
+                Rating = 4.7,
+                ReviewsCount = 128,
+                CashbackPercent = 5,
+                Tags = new List<string> { "кофе", "десерты", "уютное место" }
+            };
+
+            // 🔹 Лог: выводим информацию в Output (в будущем можно передавать на экран деталей)
+            System.Diagnostics.Debug.WriteLine(
+                $"[Partner Info]\n" +
+                $"Название: {testPartner.Name}\n" +
+                $"Категория: {testPartner.Category}\n" +
+                $"Описание: {testPartner.Description}\n" +
+                $"Телефон: {testPartner.Phone}\n" +
+                $"Адрес: {testPartner.Address}\n" +
+                $"Кешбэк: {testPartner.CashbackPercent}%\n" +
+                $"Рейтинг: {testPartner.Rating:F1} ⭐");
+
+            // 🔹 Пример, как можно позже использовать:
+            // await Shell.Current.GoToAsync($"partnerdetails?partnerId={testPartner.Id}");
+        }
+
 
         private void LoadBanners()
         {
@@ -226,33 +262,40 @@ namespace YessGoFront.ViewModels
             const int durationMs = 5500;
             var sw = Stopwatch.StartNew();
 
-            _ = PrefetchNextImage();
-
-            while (sw.ElapsedMilliseconds < durationMs && !ct.IsCancellationRequested)
+            try
             {
-                double prog = Math.Clamp(sw.Elapsed.TotalMilliseconds / durationMs, 0, 1);
+                _ = PrefetchNextImage();
 
-                await MainThread.InvokeOnMainThreadAsync(() =>
+                while (sw.ElapsedMilliseconds < durationMs && !ct.IsCancellationRequested)
                 {
-                    PageProgress = prog;
-                    PageProgressList[segmentIndex] = prog;
-                    OnPropertyChanged(nameof(PageProgressList));
-                });
+                    double prog = Math.Clamp(sw.Elapsed.TotalMilliseconds / durationMs, 0, 1);
 
-                await Task.Delay(16, ct); // ~60fps
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        PageProgress = prog;
+                        PageProgressList[segmentIndex] = prog;
+                        OnPropertyChanged(nameof(PageProgressList));
+                    });
+
+                    await Task.Delay(16, ct); // ~60fps
+                }
             }
-
-            sw.Stop();
-            if (!ct.IsCancellationRequested)
+            catch (TaskCanceledException)
             {
-                await MainThread.InvokeOnMainThreadAsync(() =>
-                {
-                    PageProgress = 1.0;
-                    PageProgressList[segmentIndex] = 1.0;
-                    OnPropertyChanged(nameof(PageProgressList));
-                });
+                // 🔹 Это штатная ситуация — пользователь пролистал или закрыл сторис.
+                // Игнорируем отмену, чтобы не падало приложение.
+            }
+            catch (Exception ex)
+            {
+                // 🔹 Любые другие ошибки логируем, чтобы не крашилось приложение.
+                System.Diagnostics.Debug.WriteLine($"[StoryProgress] Unexpected error: {ex}");
+            }
+            finally
+            {
+                sw.Stop();
             }
         }
+
 
         private void PrepareSegments(int pagesCount)
         {
@@ -429,6 +472,23 @@ namespace YessGoFront.ViewModels
             _overlayCts?.Cancel();
             IsBannerOpen = false;
             CurrentBanner = null;
+        }
+
+
+        [RelayCommand]
+        private async Task OpenPartnerAsync(PartnerLogoModel partner)
+        {
+            if (partner == null)
+                return;
+
+            // 🔹 Для проверки — выведем лог
+            System.Diagnostics.Debug.WriteLine($"[MainPage] Нажали на партнёра: {partner.Name}");
+
+            // 🔹 Если используешь Shell-навигацию (AppShell)
+            await Shell.Current.GoToAsync($"partnerdetails?partnerName={Uri.EscapeDataString(partner.Name)}");
+
+            // 🔹 Если используешь обычный NavigationPage, можно так:
+            // await Application.Current.MainPage.Navigation.PushAsync(new PartnerDetailPage(partner));
         }
     }
 }

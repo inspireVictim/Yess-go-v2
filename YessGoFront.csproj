@@ -16,6 +16,7 @@
 		<ApplicationTitle>YESS Go Front</ApplicationTitle>
 		<ApplicationId>com.yessgo.front</ApplicationId>
 		<ApplicationIdGuid>5F4C77F0-AC7A-4C4E-9E8B-32B6B1C9F22F</ApplicationIdGuid>
+		<Platforms>AnyCPU;ARM64</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -28,9 +29,15 @@
 
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="Mapsui" Version="4.1.9" />
+		<PackageReference Include="Mapsui.Maui" Version="4.1.9" />
+		<PackageReference Include="Mapsui.Tiling" Version="4.1.9" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.100" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.100" />
 		<PackageReference Include="Microsoft.Maui.Controls.Maps" Version="9.0.120" />
+		<PackageReference Include="SkiaSharp" Version="3.119.1" />
+		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.119.1" />
+		<PackageReference Include="ZXing.Net.Maui.Controls" Version="0.6.0" />
 	</ItemGroup>
 
 	<ItemGroup>

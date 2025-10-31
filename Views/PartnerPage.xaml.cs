@@ -1,5 +1,7 @@
 ﻿using Microsoft.Maui.Controls;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+
 
 namespace YessGoFront.Views
 {
@@ -40,7 +42,16 @@ namespace YessGoFront.Views
         private async void Category_Tapped(object sender, TappedEventArgs e)
         {
             // Навигация на страницу списка партнёров
-            await Shell.Current.GoToAsync("///PartnersListPage");
+            try
+            {
+                await Shell.Current.GoToAsync("///PartnersListPage");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Navigation error: {ex.Message}");
+                await DisplayAlert("Ошибка", $"Не удалось перейти: {ex.Message}", "ОК");
+            }
+
         }
     }
 

@@ -6,7 +6,38 @@
              BackgroundColor="#007F5F">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="0">
-		<Frame Grid.Row="0"
+
+
+        <Grid Grid.Row="0" 
+              BackgroundColor="{StaticResource PrimaryGreen}"
+              Padding="20,50,20,20">
+
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="10">
+
+                <!-- 🔙 Кнопка выхода с карты (Назад) -->
+                <ImageButton Grid.Column="0"
+                     Source="back_arrow_icon.png"
+                     WidthRequest="30"
+                     HeightRequest="30"
+                     BackgroundColor="Transparent"
+                     Clicked="OnExitClicked"
+                     VerticalOptions="Center"
+                     HorizontalOptions="Start"/>
+
+
+                <!-- Заголовок -->
+                <Label Grid.Column="1"
+                       Text="Карта партнёров"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       Margin="10,0"/>
+            </Grid>
+        </Grid>
+        <Frame Grid.Row="0"
 			   HeightRequest="500"
 			   BackgroundColor="#00694D"
 			   CornerRadius="0"

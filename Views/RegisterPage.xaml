@@ -3,75 +3,167 @@
     x:Class="YessGoFront.Views.RegisterPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    Title="Регистрация"
-    BackgroundColor="#007A51">
+    Shell.NavBarIsVisible="False"
+    Title="Регистрация">
 
-	<Grid RowDefinitions="Auto,*,Auto" Padding="24" RowSpacing="16">
-		<!-- Фон -->
-		<Grid.Background>
-			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-				<GradientStop Color="#007A51" Offset="0.0"/>
-				<GradientStop Color="#00C97B" Offset="1.0"/>
-			</LinearGradientBrush>
-		</Grid.Background>
+    <!-- ===== Стили и ресурсы (вверху!) ===== -->
+    <ContentPage.Resources>
+        <!-- Стиль Entry (без Padding!) -->
+        <Style x:Key="CapsuleEntry" TargetType="Entry">
+            <Setter Property="HeightRequest" Value="46"/>
+            <Setter Property="BackgroundColor" Value="#C8D7D1"/>
+            <Setter Property="TextColor" Value="#1F2A28"/>
+            <Setter Property="PlaceholderColor" Value="#7A8783"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0"/>
+            <!-- отступы пусть контролирует Border -->
+        </Style>
 
-		<!-- Карточка регистрации -->
-		<Frame Grid.Row="1" Padding="20" CornerRadius="24" HasShadow="True" BackgroundColor="White">
-			<VerticalStackLayout Spacing="16">
+        <!-- Обёртка-капсула -->
+        <Style x:Key="CapsuleWrap" TargetType="Border">
+            <Setter Property="StrokeThickness" Value="0"/>
+            <Setter Property="BackgroundColor" Value="#C8D7D1"/>
+            <Setter Property="HeightRequest" Value="46"/>
+            <Setter Property="StrokeShape">
+                <Setter.Value>
+                    <RoundRectangle CornerRadius="10"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ContentPage.Resources>
 
-				<!-- Вкладки (Вход / Регистрация) -->
-				<Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="16" Margin="0,0,0,8">
-					<Label Text="Вход" TextColor="#B0B0B0">
-						<Label.GestureRecognizers>
-							<TapGestureRecognizer Tapped="OpenLogin_Tapped" />
-						</Label.GestureRecognizers>
-					</Label>
-					<Label Grid.Column="1" Text="Регистрация" FontAttributes="Bold" TextColor="#0B4A3B" />
-				</Grid>
+    <!-- Градиентный фон -->
+    <ContentPage.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#0ABF82" Offset="0.0" />
+            <GradientStop Color="#00C08A" Offset="0.35" />
+            <GradientStop Color="#04A56F" Offset="1.0" />
+        </LinearGradientBrush>
+    </ContentPage.Background>
 
-				<!-- Имя -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-					<Grid Padding="12,0">
-						<Entry x:Name="FirstNameEntry" Placeholder="Имя" BackgroundColor="Transparent" />
-					</Grid>
-				</Border>
+    <!-- Скролл, чтобы клавиатура не перекрывала -->
+    <ScrollView>
+        <Grid Padding="{OnPlatform iOS='0,36,0,0', Android='0'}">
 
-				<!-- Фамилия -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-					<Grid Padding="12,0">
-						<Entry x:Name="LastNameEntry" Placeholder="Фамилия" BackgroundColor="Transparent" />
-					</Grid>
-				</Border>
+            <!-- Карточка -->
+            <Border
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                WidthRequest="{OnIdiom Phone=340, Tablet=480, Desktop=420}"
+                BackgroundColor="White"
+                StrokeThickness="0">
 
-				<!-- E-mail -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-					<Grid Padding="12,0">
-						<Entry x:Name="EmailEntry" Placeholder="Номер телефона" Keyboard="Email" BackgroundColor="Transparent" />
-					</Grid>
-				</Border>
+                <!-- Тень: используем Brush, не Color -->
+                <Border.Shadow>
+                    <Shadow Brush="#00000033"
+                            Opacity="0.5"
+                            Radius="18"
+                            Offset="0,6" />
+                </Border.Shadow>
 
-				<!-- Пароль -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-					<Grid Padding="12,0">
-						<Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" BackgroundColor="Transparent" />
-					</Grid>
-				</Border>
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="28" />
+                </Border.StrokeShape>
 
-				<!-- Кнопка регистрации -->
-				<Button Text="Зарегистрироваться"
-                        HeightRequest="52"
-                        CornerRadius="16"
-                        BackgroundColor="#0B4A3B"
-                        TextColor="White"
-                        Clicked="Register_Clicked" />
+                <VerticalStackLayout Padding="22" Spacing="18">
 
-				<!-- Кнопка входа через Google -->
-				<Button Text="Войти через Google"
-                        HeightRequest="48"
-                        CornerRadius="12"
-                        BackgroundColor="White"
-                        TextColor="Black" />
-			</VerticalStackLayout>
-		</Frame>
-	</Grid>
+                    <!-- Вкладки -->
+                    <Grid ColumnDefinitions="*,*">
+                        <Label Text="ВХОД"
+                               Grid.Column="0"
+                               FontSize="16"
+                               TextColor="#9FA4A3"
+                               HorizontalTextAlignment="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OpenLogin_Tapped"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+
+                        <Label Text="РЕГИСТРАЦИЯ"
+                               Grid.Column="1"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#212121"
+                               HorizontalTextAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Поля -->
+                    <VerticalStackLayout Spacing="12">
+
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="FirstNameEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   Placeholder="Имя"/>
+                        </Border>
+
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="LastNameEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   Placeholder="Фамилия"/>
+                        </Border>
+
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="EmailEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   Keyboard="Email"
+                                   Placeholder="E-mail"/>
+                        </Border>
+
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="PasswordEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   IsPassword="True"
+                                   Placeholder="Пароль"/>
+                        </Border>
+
+                        <!-- Телефон -->
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="PhoneEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   Keyboard="Telephone"
+                                   Placeholder="+996 555 12 34"/>
+                        </Border>
+
+                        <!-- Ошибка телефона -->
+                        <Label x:Name="PhoneError"
+                               IsVisible="False"
+                               FontSize="12"
+                               TextColor="#D32F2F"/>
+                    </VerticalStackLayout>
+
+                    <!-- Кнопка регистрации -->
+                    <Button Text="РЕГИСТРАЦИЯ"
+                            Clicked="Register_Clicked"
+                            HeightRequest="50"
+                            CornerRadius="10"
+                            BackgroundColor="#0F6B53"
+                            TextColor="White"
+                            FontAttributes="Bold"/>
+
+                    <!-- Кнопка Google -->
+                    <Border Stroke="#7A3AF9"
+                            StrokeThickness="1.5"
+                            BackgroundColor="White"
+                            HeightRequest="50">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="10"/>
+                        </Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto,*" Padding="14,0">
+                            <Image Source="google.png"
+                                   WidthRequest="20"
+                                   HeightRequest="20"
+                                   VerticalOptions="Center"/>
+                            <Label Grid.Column="1"
+                                   Text="Продолжить с Google"
+                                   VerticalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="#3A3A3A"
+                                   FontSize="14"/>
+                        </Grid>
+                    </Border>
+
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </ScrollView>
 </ContentPage>

@@ -9,8 +9,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
-		<!-- Настройки Android -->
-		<SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+		<!-- Настройки платформ -->
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<ApplicationTitle>YESS Go Front</ApplicationTitle>
@@ -23,7 +23,7 @@
 		<MauiImage Include="Resources\Images\**" />
 		<MauiFont Include="Resources\Fonts\**" />
 		<MauiSplashScreen Include="Resources\Splash\**" color="FFFFFF" />
-		
+		<MauiIcon Include="Resources\AppIcon\**" />
 	</ItemGroup>
 
 

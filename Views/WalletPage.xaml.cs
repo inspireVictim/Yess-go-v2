@@ -56,7 +56,8 @@ namespace YessGoFront.Views
                 }
 
                 // Обновляем общий баланс
-                BalanceStore.Instance.Balance += amount;
+                decimal coefficient = 2m;
+                BalanceStore.Instance.Balance += amount * coefficient;
 
                 await DisplayAlert("Готово", $"Баланс пополнен на {amount:0.##} KGS.", "OK");
             }

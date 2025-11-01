@@ -7,10 +7,14 @@
     BackgroundColor="#F4F5F6">
 
     <Grid RowDefinitions="Auto,*,Auto">
+
         <!-- Поиск -->
-        <StackLayout Orientation="Horizontal"
-             Margin="16,8,16,0"
-             VerticalOptions="Center">
+        <StackLayout x:Name="SearchContainer"
+                     Orientation="Horizontal"
+                     Margin="16,8,16,0"
+                     VerticalOptions="Center"
+                     Opacity="0"
+                     TranslationY="-20">
 
             <Frame CornerRadius="10"
                    Padding="0"
@@ -19,76 +23,83 @@
                    HeightRequest="40"
                    HorizontalOptions="FillAndExpand">
                 <SearchBar Placeholder="Поиск по компаниям"
-                   BackgroundColor="Transparent"
-                   Margin="8,0"
-                   VerticalOptions="Center"
-                   HeightRequest="40"/>
+                           BackgroundColor="Transparent"
+                           Margin="8,0"
+                           VerticalOptions="Center"
+                           HeightRequest="40" />
             </Frame>
 
-            <ImageButton x:Name="MabButton"
-                Source="map_category_icon.png"
-                WidthRequest="40"
-                HeightRequest="40"
-                CornerRadius="10"
-                BackgroundColor="White"
-                Aspect="AspectFill"
-                Padding="0"
-                Margin="8,0,0,0"
-                VerticalOptions="Center"
-                Clicked="OnMapButtonClicked"/>
+            <ImageButton x:Name="MapButton"
+                         Source="map_category_icon.png"
+                         WidthRequest="40"
+                         HeightRequest="40"
+                         CornerRadius="10"
+                         BackgroundColor="White"
+                         Aspect="AspectFill"
+                         Padding="0"
+                         Margin="8,0,0,0"
+                         VerticalOptions="Center"
+                         Clicked="OnMapButtonClicked" />
         </StackLayout>
 
-
         <!-- Категории -->
-        <ScrollView Grid.Row="1"
-                    Margin="0,8,0,0"
-                    Orientation="Horizontal"
-                    HorizontalScrollBarVisibility="Never">
-            <CollectionView x:Name="CategoriesCollection"
-                            ItemsLayout="VerticalGrid,3"
-                            VerticalOptions="Center"
-                            HorizontalOptions="Center"
-                            SelectionMode="None"
-                            Margin="12,0">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <Frame Padding="10"
-                               WidthRequest="110"
-                               HeightRequest="125"
-                               CornerRadius="16"
-                               HasShadow="False"
-                               BackgroundColor="White"
-                               Margin="8"
-                               HorizontalOptions="Center"
-                               VerticalOptions="Center">
-                            <Frame.GestureRecognizers>
-                                <TapGestureRecognizer
-                                    Tapped="Category_Tapped"
-                                    CommandParameter="{Binding Name}" />
-                            </Frame.GestureRecognizers>
+        <CollectionView x:Name="CategoriesCollection"
+                        Grid.Row="1"
+                        Margin="12,8,12,0"
+                        SelectionMode="None"
+                        VerticalOptions="FillAndExpand"
+                        HorizontalOptions="FillAndExpand"
+                        Opacity="0"
+                        TranslationY="30">
 
-                            <VerticalStackLayout Spacing="8"
-                                                 HorizontalOptions="Center"
-                                                 VerticalOptions="Center">
-                                <Image Source="{Binding Image}"
-                                       WidthRequest="65"
-                                       HeightRequest="65"
-                                       Aspect="AspectFit" />
-                                <Label Text="{Binding Name}"
-                                       FontSize="13"
-                                       HorizontalTextAlignment="Center"
-                                       TextColor="Black"
-                                       LineBreakMode="TailTruncation"/>
-                            </VerticalStackLayout>
-                        </Frame>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </ScrollView>
+            <CollectionView.ItemsLayout>
+                <!-- Автоматическая адаптация под платформу -->
+                <GridItemsLayout Orientation="Vertical"
+                                 Span="{OnPlatform Android=3, iOS=2}" />
+            </CollectionView.ItemsLayout>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <!-- Каждый элемент сам себя анимирует при Loaded -->
+                    <Frame Padding="10"
+                           CornerRadius="16"
+                           HasShadow="False"
+                           BackgroundColor="White"
+                           Margin="8"
+                           HorizontalOptions="FillAndExpand"
+                           VerticalOptions="FillAndExpand"
+                           Loaded="CategoryFrame_Loaded"
+                           Opacity="0"
+                           TranslationY="20">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Tapped="Category_Tapped"
+                                CommandParameter="{Binding Name}" />
+                        </Frame.GestureRecognizers>
+
+                        <VerticalStackLayout Spacing="8"
+                                             HorizontalOptions="Center"
+                                             VerticalOptions="Center">
+                            <Image Source="{Binding Image}"
+                                   WidthRequest="65"
+                                   HeightRequest="65"
+                                   Aspect="AspectFit" />
+                            <Label Text="{Binding Name}"
+                                   FontSize="13"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="Black"
+                                   LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
 
         <!-- Нижняя панель навигации -->
         <controls:BottomNavBar x:Name="BottomBar"
                                Grid.Row="2"
-                               Margin="0,4,0,0" />
+                               Margin="0,4,0,0"
+                               Opacity="0"
+                               TranslationY="30" />
     </Grid>
 </ContentPage>

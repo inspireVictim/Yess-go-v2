@@ -1,7 +1,7 @@
 ﻿using Microsoft.Maui.Controls;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-
+using System.Threading.Tasks;
 
 namespace YessGoFront.Views
 {
@@ -9,12 +9,8 @@ namespace YessGoFront.Views
     {
         public ObservableCollection<CategoryItem> Categories { get; set; }
 
-        private async void OnMapButtonClicked(object sender, EventArgs e)
-        {
-            // Переход на другую страницу
-            await Shell.Current.GoToAsync("///MapPage");
-        }
-
+        // счётчик, чтобы делать небольшую задержку между карточками
+        private int _categoryAnimationIndex = 0;
 
         public PartnerPage()
         {
@@ -39,9 +35,87 @@ namespace YessGoFront.Views
             CategoriesCollection.ItemsSource = Categories;
         }
 
+        protected override async void OnAppearing()
+        {
+            base.OnAppearing();
+
+            // сбрасываем счётчик, когда возвращаемся на страницу
+            _categoryAnimationIndex = 0;
+
+            await AnimatePageAsync();
+        }
+
+        private async Task AnimatePageAsync()
+        {
+            try
+            {
+                // верх
+                await Task.WhenAll(
+                    SearchContainer.FadeTo(1, 350, Easing.CubicOut),
+                    SearchContainer.TranslateTo(0, 0, 350, Easing.CubicOut)
+                );
+
+                // список целиком (без карточек)
+                await Task.WhenAll(
+                    CategoriesCollection.FadeTo(1, 350, Easing.CubicOut),
+                    CategoriesCollection.TranslateTo(0, 0, 350, Easing.CubicOut)
+                );
+
+                // низ
+                await Task.WhenAll(
+                    BottomBar.FadeTo(1, 300, Easing.CubicOut),
+                    BottomBar.TranslateTo(0, 0, 300, Easing.CubicOut)
+                );
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Animation error: {ex.Message}");
+            }
+        }
+
+        // 👉 Анимация для КАЖДОЙ карточки — вызывается из XAML (Loaded="CategoryFrame_Loaded")
+        private async void CategoryFrame_Loaded(object sender, EventArgs e)
+        {
+            if (sender is VisualElement view)
+            {
+                try
+                {
+                    // небольшая ступенчатая задержка, чтобы было по очереди
+                    int delay = 60 * _categoryAnimationIndex;
+                    _categoryAnimationIndex++;
+
+                    await Task.Delay(delay);
+
+                    view.Opacity = 0;
+                    view.TranslationY = 20;
+
+                    await Task.WhenAll(
+                        view.FadeTo(1, 280, Easing.CubicOut),
+                        view.TranslateTo(0, 0, 280, Easing.CubicOut)
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Item animation error: {ex.Message}");
+                }
+            }
+        }
+
+        private async void OnMapButtonClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync("///MapPage");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Navigation error: {ex.Message}");
+                await DisplayAlert("Ошибка", $"Не удалось перейти: {ex.Message}", "ОК");
+            }
+        }
+
         private async void Category_Tapped(object sender, TappedEventArgs e)
         {
-            // Навигация на страницу списка партнёров
             try
             {
                 await Shell.Current.GoToAsync("///PartnersListPage");
@@ -51,7 +125,22 @@ namespace YessGoFront.Views
                 Debug.WriteLine($"Navigation error: {ex.Message}");
                 await DisplayAlert("Ошибка", $"Не удалось перейти: {ex.Message}", "ОК");
             }
+        }
 
+        // адаптация под размер
+        protected override void OnSizeAllocated(double width, double height)
+        {
+            base.OnSizeAllocated(width, height);
+
+            if (CategoriesCollection.ItemsLayout is GridItemsLayout gridLayout)
+            {
+                if (width < 400)
+                    gridLayout.Span = 2;
+                else if (width < 700)
+                    gridLayout.Span = 3;
+                else
+                    gridLayout.Span = 4;
+            }
         }
     }
 

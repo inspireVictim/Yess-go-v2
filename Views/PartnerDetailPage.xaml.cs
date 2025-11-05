@@ -6,9 +6,19 @@ namespace YessGoFront.Views
     [QueryProperty(nameof(PartnerId), "partnerId")]
     public partial class PartnerDetailPage : ContentPage
     {
-        public string PartnerId
+        private string? partnerId;
+
+        public string? PartnerId
         {
-            set => LoadPartner(value);
+            get => partnerId;
+            set
+            {
+                partnerId = value;
+                if (!string.IsNullOrWhiteSpace(partnerId))
+                {
+                    LoadPartner(partnerId);
+                }
+            }
         }
 
         public PartnerDetailPage()

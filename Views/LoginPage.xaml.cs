@@ -1,14 +1,34 @@
 ﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
-using YessGoFront.Services;
+using YessGoFront.Services.Domain;
+using YessGoFront.ViewModels;
 
 namespace YessGoFront.Views
 {
     public partial class LoginPage : ContentPage
     {
+        private readonly LoginViewModel _viewModel;
+
         public LoginPage()
         {
             InitializeComponent();
+
+            // Получаем сервисы через DI
+            var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
+            var logger = MauiProgram.Services.GetService<Microsoft.Extensions.Logging.ILogger<LoginViewModel>>();
+
+            _viewModel = new LoginViewModel(authService, logger);
+            BindingContext = _viewModel;
+
+            // Подписываемся на событие успешного логина
+            _viewModel.OnLoginSuccess += OnLoginSuccess;
+        }
+
+        private async Task OnLoginSuccess(Services.Api.AuthResponse response)
+        {
+            // Успешный логин - переходим на главную страницу
+            await Shell.Current.GoToAsync("///main");
         }
 
         private async void OpenRegister_Tapped(object? sender, EventArgs e)
@@ -21,23 +41,10 @@ namespace YessGoFront.Views
             PasswordEntry.IsPassword = !PasswordEntry.IsPassword;
         }
 
-        private async void Login_Clicked(object? sender, EventArgs e)
+        protected override void OnDisappearing()
         {
-            var email = EmailEntry.Text?.Trim();
-            var pass = PasswordEntry.Text;
-
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(pass))
-            {
-                await DisplayAlert("Ошибка", "Введите E-mail и пароль.", "OK");
-                return;
-            }
-
-            // ДЕМО: успешно логиним любого пользователя
-            AccountStore.Instance.SignIn(email, firstName: null, lastName: null, remember: RememberCheck.IsChecked);
-
-            // В проде: запрос к API + сохранение токена
-
-            await Shell.Current.GoToAsync("///main");
+            base.OnDisappearing();
+            _viewModel.OnLoginSuccess -= OnLoginSuccess;
         }
     }
 }

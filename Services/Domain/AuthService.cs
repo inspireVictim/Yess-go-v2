@@ -1,0 +1,186 @@
+using Microsoft.Extensions.Logging;
+using YessGoFront.Infrastructure.Auth;
+using YessGoFront.Infrastructure.Exceptions;
+using YessGoFront.Services.Api;
+using YessGoFront.Data;
+using YessGoFront.Data.Entities;
+using YessGoFront.Models;
+
+namespace YessGoFront.Services.Domain;
+
+public class AuthService : IAuthService
+{
+    private readonly IAuthApiService _apiService;
+    private readonly IAuthenticationService _authService;
+    private readonly AppDbContext _dbContext;
+    private readonly ILogger<AuthService>? _logger;
+
+    public AuthService(
+        IAuthApiService apiService,
+        IAuthenticationService authService,
+        AppDbContext dbContext,
+        ILogger<AuthService>? logger = null)
+    {
+        _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _logger = logger;
+    }
+
+    public async Task<AuthResponse> LoginAsync(string emailOrPhone, string password, CancellationToken ct = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(emailOrPhone) || string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("Email/Phone and password are required");
+
+            var request = new LoginRequest
+            {
+                Email = emailOrPhone.Contains('@') ? emailOrPhone : null,
+                Phone = !emailOrPhone.Contains('@') ? emailOrPhone : null,
+                Password = password
+            };
+
+            if (!request.IsValid)
+                throw new ArgumentException("Invalid login credentials");
+
+            var response = await _apiService.LoginAsync(request, ct);
+
+            if (response.UserId == 0)
+                response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? 0;
+
+            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
+
+            if (response.UserId > 0)
+                await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
+
+            _logger?.LogInformation("User logged in: {EmailOrPhone}, UserId: {UserId}", emailOrPhone, response.UserId);
+            return response;
+        }
+        catch (ApiException) { throw; }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during login");
+            throw new NetworkException("Не удалось войти в систему", ex);
+        }
+    }
+
+    public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            // 1) Выполняем регистрацию
+            var registeredUser = await _apiService.RegisterAsync(request, ct);
+
+            // 2) Автоматический логин
+            var loginRequest = new LoginRequest
+            {
+                Phone = request.phone_number,
+                Password = request.password
+            };
+
+            var response = await _apiService.LoginAsync(loginRequest, ct);
+
+            if (response.UserId == 0)
+                response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? registeredUser.Id;
+
+            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
+
+            var userId = response.UserId > 0 ? response.UserId : registeredUser.Id;
+            if (userId > 0)
+                await SaveOrUpdateUserAsync(userId, registeredUser, ct);
+
+            response.User = registeredUser;
+
+            _logger?.LogInformation("User registered: {Phone}, UserId: {UserId}", request.phone_number, userId);
+            return response;
+        }
+        catch (ApiException) { throw; }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during registration");
+            throw new NetworkException("Не удалось зарегистрироваться", ex);
+        }
+    }
+
+    public async Task<bool> RefreshTokenAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var refreshToken = await _authService.GetRefreshTokenAsync();
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                return false;
+
+            var response = await _apiService.RefreshTokenAsync(refreshToken, ct);
+            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
+
+            _logger?.LogDebug("Token refreshed successfully");
+            return true;
+        }
+        catch
+        {
+            await _authService.ClearTokensAsync();
+            return false;
+        }
+    }
+
+    public async Task LogoutAsync(CancellationToken ct = default)
+    {
+        try { await _apiService.LogoutAsync(ct); }
+        catch (Exception ex) { _logger?.LogWarning(ex, "Error during logout API call"); }
+        finally
+        {
+            await _authService.ClearTokensAsync();
+            _logger?.LogInformation("User logged out");
+        }
+    }
+
+    public async Task<bool> IsAuthenticatedAsync()
+        => await _authService.IsAuthenticatedAsync();
+
+    private async Task SaveOrUpdateUserAsync(int userId, UserDto? userDto, CancellationToken ct)
+    {
+        try
+        {
+            var existingUser = await _dbContext.Users.FindAsync(new object[] { userId }, ct);
+
+            if (existingUser != null)
+            {
+                if (userDto != null)
+                {
+                    existingUser.Name = userDto.Name;
+                    existingUser.Email = userDto.Email;
+                    existingUser.Phone = userDto.Phone;
+                    existingUser.CityId = userDto.CityId;
+                    existingUser.UpdatedAt = DateTime.UtcNow;
+                }
+
+                existingUser.LastLoginAt = DateTime.UtcNow;
+            }
+            else if (userDto != null)
+            {
+                _dbContext.Users.Add(new User
+                {
+                    Id = userId,
+                    Name = userDto.Name ?? string.Empty,
+                    Email = userDto.Email,
+                    Phone = userDto.Phone,
+                    CityId = userDto.CityId,
+                    IsActive = true,
+                    CreatedAt = userDto.CreatedAt != default ? userDto.CreatedAt : DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow
+                });
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to save user to local DB");
+        }
+    }
+}

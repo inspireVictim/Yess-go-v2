@@ -3,11 +3,13 @@
     x:Class="YessGoFront.Views.RegisterPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:YessGoFront.Converters"
     Shell.NavBarIsVisible="False"
     Title="Регистрация">
-
+    
     <!-- ===== Стили и ресурсы (вверху!) ===== -->
     <ContentPage.Resources>
+        <converters:InverseBoolConverter x:Key="InvertedBoolConverter"/>
         <!-- Стиль Entry (без Padding!) -->
         <Style x:Key="CapsuleEntry" TargetType="Entry">
             <Setter Property="HeightRequest" Value="46"/>
@@ -93,27 +95,39 @@
                         <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
                             <Entry x:Name="FirstNameEntry"
                                    Style="{StaticResource CapsuleEntry}"
-                                   Placeholder="Имя"/>
+                                   Placeholder="Имя"
+                                   Text="{Binding FirstName}"/>
                         </Border>
 
                         <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
                             <Entry x:Name="LastNameEntry"
                                    Style="{StaticResource CapsuleEntry}"
-                                   Placeholder="Фамилия"/>
+                                   Placeholder="Фамилия"
+                                   Text="{Binding LastName}"/>
                         </Border>
 
                         <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
                             <Entry x:Name="EmailEntry"
                                    Style="{StaticResource CapsuleEntry}"
                                    Keyboard="Email"
-                                   Placeholder="E-mail"/>
+                                   Placeholder="E-mail (опционально)"
+                                   Text="{Binding Email}"/>
                         </Border>
 
                         <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
                             <Entry x:Name="PasswordEntry"
                                    Style="{StaticResource CapsuleEntry}"
                                    IsPassword="True"
-                                   Placeholder="Пароль"/>
+                                   Placeholder="Пароль"
+                                   Text="{Binding Password}"/>
+                        </Border>
+
+                        <Border Style="{StaticResource CapsuleWrap}" Padding="14,10">
+                            <Entry x:Name="ConfirmPasswordEntry"
+                                   Style="{StaticResource CapsuleEntry}"
+                                   IsPassword="True"
+                                   Placeholder="Подтвердите пароль"
+                                   Text="{Binding ConfirmPassword}"/>
                         </Border>
 
                         <!-- Телефон -->
@@ -121,24 +135,33 @@
                             <Entry x:Name="PhoneEntry"
                                    Style="{StaticResource CapsuleEntry}"
                                    Keyboard="Telephone"
-                                   Placeholder="+996 555 12 34"/>
+                                   Placeholder="+996 555 12 34"
+                                   Text="{Binding Phone}"/>
                         </Border>
 
                         <!-- Ошибка телефона -->
-                        <Label x:Name="PhoneError"
-                               IsVisible="False"
+                        <Label Text="{Binding PhoneError}"
+                               IsVisible="{Binding HasPhoneError}"
                                FontSize="12"
                                TextColor="#D32F2F"/>
+
+                        <!-- Сообщение об ошибке -->
+                        <Label Text="{Binding ErrorMessage}"
+                               IsVisible="{Binding HasError}"
+                               FontSize="12"
+                               TextColor="#D32F2F"
+                               Margin="0,-8,0,0"/>
                     </VerticalStackLayout>
 
                     <!-- Кнопка регистрации -->
                     <Button Text="РЕГИСТРАЦИЯ"
-                            Clicked="Register_Clicked"
+                            Command="{Binding RegisterCommand}"
                             HeightRequest="50"
                             CornerRadius="10"
                             BackgroundColor="#0F6B53"
                             TextColor="White"
-                            FontAttributes="Bold"/>
+                            FontAttributes="Bold"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"/>
 
                     <!-- Кнопка Google -->
                     <Border Stroke="#7A3AF9"

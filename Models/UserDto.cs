@@ -2,11 +2,34 @@ using System.Text.Json.Serialization;
 
 namespace YessGoFront.Models;
 
+/// <summary>
+/// DTO пользователя, соответствует UserResponse схеме бэкенда
+/// </summary>
 public class UserDto
 {
-    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
-    [JsonPropertyName("fullName")] public string? FullName { get; set; }
-    [JsonPropertyName("phone")] public string? Phone { get; set; }
-    [JsonPropertyName("city")] public string? City { get; set; }
-    [JsonPropertyName("avatarUrl")] public string? AvatarUrl { get; set; }
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+    
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+    
+    [JsonPropertyName("phone")]
+    public string Phone { get; set; } = string.Empty;
+    
+    [JsonPropertyName("city_id")]
+    public int? CityId { get; set; }
+    
+    [JsonPropertyName("referral_code")]
+    public string? ReferralCode { get; set; }
+    
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; }
+    
+    /// <summary>
+    /// Полное имя для отображения
+    /// </summary>
+    public string DisplayName => !string.IsNullOrWhiteSpace(Name) ? Name : Phone;
 }

@@ -1,14 +1,18 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using Microsoft.Extensions.Logging;
+using YessGoFront.Infrastructure.Exceptions;
+using YessGoFront.Infrastructure.Ui;
 using YessGoFront.Models;
-using YessGoFront.Services;
+using YessGoFront.Services.Domain;
 
 namespace YessGoFront.ViewModels;
 
 public partial class PartnerPageViewModel : ObservableObject
 {
     private readonly IPartnersService _service;
+    private readonly ILogger<PartnerPageViewModel>? _logger;
 
     public ObservableCollection<Category> Categories { get; } = new();
     public ObservableCollection<PartnerDto> Partners { get; } = new();
@@ -16,15 +20,15 @@ public partial class PartnerPageViewModel : ObservableObject
     [ObservableProperty] private string? searchText;
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private string? selectedCategoryTitle;
+    [ObservableProperty] private string? errorMessage;
 
     // 👉 ЯВНАЯ КОМАНДА (без source generator)
     public IAsyncRelayCommand<string?> LoadByCategoryAsyncCommand { get; }
 
-    public PartnerPageViewModel() : this(new PartnersService()) { }
-
-    public PartnerPageViewModel(IPartnersService service)
+    public PartnerPageViewModel(IPartnersService service, ILogger<PartnerPageViewModel>? logger = null)
     {
-        _service = service;
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+        _logger = logger;
 
         // инициализируем команду
         LoadByCategoryAsyncCommand = new AsyncRelayCommand<string?>(LoadByCategoryAsync);
@@ -57,13 +61,13 @@ public partial class PartnerPageViewModel : ObservableObject
         await Shell.Current.GoToAsync($"partnerdetails?partnerId={partner.Id}");
     }
 
-
     // ❌ БЕЗ [RelayCommand] — метод вызывается из явной команды
     private async Task LoadByCategoryAsync(string? categoryTitle)
     {
         if (string.IsNullOrWhiteSpace(categoryTitle)) return;
 
         SelectedCategoryTitle = categoryTitle;
+        ErrorMessage = null;
 
         var backendKey = categoryTitle.Trim().ToLowerInvariant();
         if (backendKey == "все для дома") backendKey = "для дома";
@@ -72,12 +76,43 @@ public partial class PartnerPageViewModel : ObservableObject
         try
         {
             Partners.Clear();
-            var items = await _service.GetByCategoryAsync(backendKey);
+            var items = await _service.GetPartnersByCategoryAsync(backendKey);
             foreach (var p in items)
                 Partners.Add(p);
         }
-        finally { IsBusy = false; }
-
-
+        catch (NetworkException ex)
+        {
+            ErrorMessage = "Нет подключения к интернету";
+            _logger?.LogError(ex, "Network error loading partners");
+            var page = AppUiHelper.TryGetCurrentPage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Ошибка", ErrorMessage, "OK");
+            }
+        }
+        catch (ApiException ex)
+        {
+            ErrorMessage = "Не удалось загрузить партнёров";
+            _logger?.LogError(ex, "API error loading partners");
+            var page = AppUiHelper.TryGetCurrentPage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Ошибка", ErrorMessage, "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "Произошла непредвиденная ошибка";
+            _logger?.LogError(ex, "Unexpected error loading partners");
+            var page = AppUiHelper.TryGetCurrentPage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Ошибка", ErrorMessage, "OK");
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 }

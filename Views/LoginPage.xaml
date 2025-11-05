@@ -3,8 +3,13 @@
     x:Class="YessGoFront.Views.LoginPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:YessGoFront.Converters"
     Title="Вход"
     BackgroundColor="#007A51">
+    
+    <ContentPage.Resources>
+        <converters:InverseBoolConverter x:Key="InvertedBoolConverter"/>
+    </ContentPage.Resources>
 
 	<Grid RowDefinitions="Auto,*,Auto" Padding="24" RowSpacing="16">
 		<!-- Фон с градиентом -->
@@ -29,17 +34,25 @@
 					</Label>
 				</Grid>
 
-				<!-- Поле E-mail -->
+				<!-- Поле E-mail или Телефон -->
 				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
 					<Grid Padding="12,0">
-						<Entry x:Name="EmailEntry" Placeholder="E-mail" Keyboard="Email" BackgroundColor="Transparent" />
+						<Entry x:Name="EmailEntry" 
+                               Placeholder="E-mail или номер телефона" 
+                               Keyboard="Default" 
+                               BackgroundColor="Transparent"
+                               Text="{Binding EmailOrPhone}" />
 					</Grid>
 				</Border>
 
 				<!-- Поле Пароль -->
 				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
 					<Grid Padding="12,0" ColumnDefinitions="*,Auto">
-						<Entry x:Name="PasswordEntry" Placeholder="Пароль" IsPassword="True" BackgroundColor="Transparent" />
+						<Entry x:Name="PasswordEntry" 
+                                Placeholder="Пароль" 
+                                IsPassword="True" 
+                                BackgroundColor="Transparent"
+                                Text="{Binding Password}" />
 						<Image Source="eye.png" WidthRequest="20" HeightRequest="20" Opacity="0.6" Grid.Column="1">
 							<Image.GestureRecognizers>
 								<TapGestureRecognizer Tapped="TogglePassword_Tapped"/>
@@ -48,9 +61,16 @@
 					</Grid>
 				</Border>
 
+				<!-- Сообщение об ошибке -->
+				<Label Text="{Binding ErrorMessage}" 
+                       IsVisible="{Binding HasError}"
+                       TextColor="#D32F2F" 
+                       FontSize="12"
+                       Margin="0,-8,0,0"/>
+
 				<!-- Запомнить меня -->
 				<HorizontalStackLayout Spacing="8">
-					<CheckBox x:Name="RememberCheck" Color="#007A51"/>
+					<CheckBox x:Name="RememberCheck" Color="#007A51" IsChecked="{Binding RememberMe}"/>
 					<Label Text="Запомнить меня" VerticalOptions="Center"/>
 				</HorizontalStackLayout>
 
@@ -60,7 +80,8 @@
                         CornerRadius="16"
                         BackgroundColor="#0B4A3B"
                         TextColor="White"
-                        Clicked="Login_Clicked"/>
+                        Command="{Binding LoginCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"/>
 
 				<BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
 

@@ -1,0 +1,172 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
+using YessGoFront.Infrastructure.Exceptions;
+
+namespace YessGoFront.Infrastructure.Http;
+
+/// <summary>
+/// Базовый класс для всех API клиентов
+/// </summary>
+public abstract class ApiClient
+{
+    protected readonly HttpClient HttpClient;
+    protected readonly ILogger? Logger;
+    protected readonly JsonSerializerOptions JsonOptions;
+
+    protected ApiClient(HttpClient httpClient, ILogger? logger = null)
+    {
+        HttpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        Logger = logger;
+
+        // ✅ Принудительно используем HTTP/1.1 (фикс "ResponseEnded" на Android/.NET 8/9)
+        HttpClient.DefaultRequestVersion = new Version(1, 1);
+        HttpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+
+        // ✅ Гарантируем корректный BaseAddress
+        if (HttpClient.BaseAddress == null)
+        {
+#if ANDROID
+            // Эмулятор Android → localhost = 10.0.2.2
+            HttpClient.BaseAddress = new Uri("http://10.0.2.2:8000/");
+#else
+            // ПК или физическое устройство в локальной сети
+            HttpClient.BaseAddress = new Uri("http://192.168.2.155:8000/");
+#endif
+        }
+        else if (!HttpClient.BaseAddress.ToString().EndsWith("/"))
+        {
+            HttpClient.BaseAddress = new Uri(HttpClient.BaseAddress + "/");
+        }
+
+        JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+    }
+
+    protected Uri BuildUri(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+            throw new ArgumentException("Endpoint is empty", nameof(endpoint));
+
+        endpoint = endpoint.TrimStart('/');
+        return new Uri(HttpClient.BaseAddress!, endpoint);
+    }
+
+    protected async Task<TResponse> GetAsync<TResponse>(string endpoint, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("GET {Url}", uri);
+
+            var response = await HttpClient.GetAsync(uri, ct);
+            await EnsureSuccessStatusCode(response);
+
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+                   ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task<TResponse> PostAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("POST {Url}", uri);
+
+            var content = JsonContent.Create(request, options: JsonOptions);
+            var response = await HttpClient.PostAsync(uri, content, ct);
+            await EnsureSuccessStatusCode(response);
+
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+                   ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task PostAsync<TRequest>(string endpoint, TRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("POST {Url}", uri);
+
+            var content = JsonContent.Create(request, options: JsonOptions);
+            var response = await HttpClient.PostAsync(uri, content, ct);
+            await EnsureSuccessStatusCode(response);
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task<TResponse> PutAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("PUT {Url}", uri);
+
+            var content = JsonContent.Create(request, options: JsonOptions);
+            var response = await HttpClient.PutAsync(uri, content, ct);
+            await EnsureSuccessStatusCode(response);
+
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+                   ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task DeleteAsync(string endpoint, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("DELETE {Url}", uri);
+
+            var response = await HttpClient.DeleteAsync(uri, ct);
+            await EnsureSuccessStatusCode(response);
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task EnsureSuccessStatusCode(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var errorContent = await response.Content.ReadAsStringAsync();
+        Logger?.LogError("API Error: {StatusCode} - {Content}", response.StatusCode, errorContent);
+
+        throw response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized => new UnauthorizedException("Требуется авторизация"),
+            HttpStatusCode.Forbidden => new ForbiddenException("Доступ запрещён"),
+            HttpStatusCode.NotFound => new NotFoundException("Ресурс не найден"),
+            HttpStatusCode.BadRequest => new BadRequestException("Неверный запрос", errorContent),
+            HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable
+                => new ServerException("Ошибка сервера", response.StatusCode),
+            _ => new ApiException($"API error: {response.StatusCode}", response.StatusCode)
+        };
+    }
+}

@@ -488,7 +488,9 @@ namespace YessGoFront.ViewModels
             await Shell.Current.GoToAsync($"partnerdetails?partnerName={Uri.EscapeDataString(partner.Name)}");
 
             // 🔹 Если используешь обычный NavigationPage, можно так:
-            // await Application.Current.MainPage.Navigation.PushAsync(new PartnerDetailPage(partner));
+            // var page = Infrastructure.Ui.AppUiHelper.TryGetCurrentPage();
+            // if (page is NavigationPage navPage)
+            //     await navPage.Navigation.PushAsync(new PartnerDetailPage(partner));
         }
     }
 }

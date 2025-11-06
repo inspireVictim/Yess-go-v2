@@ -18,7 +18,7 @@ public interface IAuthenticationService
     /// <summary>
     /// Сохранить токены
     /// </summary>
-    Task SaveTokensAsync(string accessToken, string refreshToken);
+    Task SaveTokensAsync(string accessToken, string? refreshToken = null);
 
     /// <summary>
     /// Обновить токены (refresh)

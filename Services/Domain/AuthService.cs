@@ -49,7 +49,10 @@ public class AuthService : IAuthService
             if (response.UserId == 0)
                 response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? 0;
 
-            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
+            // Сохраняем токены (refreshToken может быть null)
+            await _authService.SaveTokensAsync(
+                response.AccessToken, 
+                string.IsNullOrWhiteSpace(response.RefreshToken) ? null : response.RefreshToken);
 
             if (response.UserId > 0)
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
@@ -151,7 +154,7 @@ public class AuthService : IAuthService
             {
                 if (userDto != null)
                 {
-                    existingUser.Name = userDto.Name;
+                    existingUser.Name = userDto.DisplayName;
                     existingUser.Email = userDto.Email;
                     existingUser.Phone = userDto.Phone;
                     existingUser.CityId = userDto.CityId;
@@ -165,7 +168,7 @@ public class AuthService : IAuthService
                 _dbContext.Users.Add(new User
                 {
                     Id = userId,
-                    Name = userDto.Name ?? string.Empty,
+                    Name = userDto.DisplayName,
                     Email = userDto.Email,
                     Phone = userDto.Phone,
                     CityId = userDto.CityId,

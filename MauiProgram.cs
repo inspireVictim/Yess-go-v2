@@ -98,7 +98,11 @@ public static class MauiProgram
     private static string GetDefaultApiBaseUrl()
     {
 #if ANDROID
-        return "http://10.0.2.2:8000/";
+        // Для эмулятора: 10.0.2.2
+        // Для реального телефона: IP компьютера в локальной сети
+        // Можно установить через переменную окружения: API_BASE_URL=http://10.0.2.2:8000/ (для эмулятора)
+        // По умолчанию используем IP компьютера (для реального телефона)
+        return "http://192.168.2.155:8000/";  // IP компьютера для реального телефона
 #else
         return "http://192.168.2.155:8000/";
 #endif
@@ -108,6 +112,9 @@ public static class MauiProgram
     {
         var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
             ?? GetDefaultApiBaseUrl();
+
+        // Логируем используемый URL для отладки
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] API Base URL: {apiBaseUrl}");
 
         var dbConnectionString = GetDatabaseConnectionString();
 

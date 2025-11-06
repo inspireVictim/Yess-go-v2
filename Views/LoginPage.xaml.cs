@@ -27,8 +27,39 @@ namespace YessGoFront.Views
 
         private async Task OnLoginSuccess(Services.Api.AuthResponse response)
         {
-            // Успешный логин - переходим на главную страницу
-            await Shell.Current.GoToAsync("///main");
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response.UserId}");
+                
+                // Проверяем, что токен действительно сохранён
+                var authService = MauiProgram.Services.GetRequiredService<Infrastructure.Auth.IAuthenticationService>();
+                var savedToken = await authService.GetAccessTokenAsync();
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Token saved: {!string.IsNullOrEmpty(savedToken)}");
+                
+                // Успешный логин - переходим на главную страницу
+                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to main...");
+                
+                // Используем абсолютный путь для навигации
+                await Shell.Current.GoToAsync("//main/home", animate: true);
+                
+                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigation completed!");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {ex.StackTrace}");
+                
+                // Попробуем альтернативный способ - перезагрузить Shell
+                try
+                {
+                    Application.Current.MainPage = new AppShell();
+                    await Shell.Current.GoToAsync("//main/home");
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LoginPage] Alternative navigation also failed: {ex2.Message}");
+                }
+            }
         }
 
         private async void OpenRegister_Tapped(object? sender, EventArgs e)

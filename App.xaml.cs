@@ -10,38 +10,29 @@ public partial class App : Application
     {
         InitializeComponent();
 
-        // ✅ Проверка соединения с API при старте (остается)
+        // ✅ Проверка соединения с API при старте (только для отладки)
+#if DEBUG
         _ = Task.Run(async () =>
         {
             try
             {
+                await Task.Delay(2000); // Ждём, пока приложение полностью запустится
                 var clientFactory = MauiProgram.Services.GetRequiredService<IHttpClientFactory>();
                 var client = clientFactory.CreateClient("ApiClient");
 
-                var response = await client.GetAsync("health");
+                // Проверяем корневой endpoint вместо /health
+                var response = await client.GetAsync("");
                 var text = await response.Content.ReadAsStringAsync();
 
-                MainThread.BeginInvokeOnMainThread(async () =>
-                {
-                    var page = AppUiHelper.TryGetCurrentPage();
-                    if (page != null)
-                    {
-                        await page.DisplayAlert("API Health", text, "OK");
-                    }
-                });
+                System.Diagnostics.Debug.WriteLine($"[App] API Health Check: {response.StatusCode} - {text}");
             }
             catch (Exception ex)
             {
-                MainThread.BeginInvokeOnMainThread(async () =>
-                {
-                    var page = AppUiHelper.TryGetCurrentPage();
-                    if (page != null)
-                    {
-                        await page.DisplayAlert("API Error", $"{ex.GetType().Name}: {ex.Message}", "OK");
-                    }
-                });
+                // Только логируем, не показываем ошибку пользователю
+                System.Diagnostics.Debug.WriteLine($"[App] API Health Check failed: {ex.Message}");
             }
         });
+#endif
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

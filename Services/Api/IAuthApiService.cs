@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using YessGoFront.Models;
 
 namespace YessGoFront.Services.Api;
@@ -94,14 +95,22 @@ public class RegisterRequest
 /// </summary>
 public class AuthResponse
 {
+    [JsonPropertyName("access_token")]
     public string AccessToken { get; set; } = string.Empty;
+    
+    [JsonPropertyName("refresh_token")]
     public string RefreshToken { get; set; } = string.Empty;
+    
+    [JsonPropertyName("token_type")]
     public string TokenType { get; set; } = "bearer";
+    
+    [JsonPropertyName("user_id")]
     public int UserId { get; set; }
     
     /// <summary>
     /// Данные пользователя (могут быть в отдельном запросе /me)
     /// </summary>
+    [JsonPropertyName("user")]
     public UserDto? User { get; set; }
 }
 

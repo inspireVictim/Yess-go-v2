@@ -38,12 +38,12 @@ public class ApiSettings
     /// <summary>
     /// Таймаут запросов в секундах
     /// </summary>
-    public int RequestTimeoutSeconds { get; set; } = 30;
+    public int RequestTimeoutSeconds { get; set; } = 60;
 }
 
 public class TimeoutSettings
 {
-    public int RequestTimeout { get; set; } = 30;
+    public int RequestTimeout { get; set; } = 60;
     public int RetryAttempts { get; set; } = 3;
     public int RetryDelayMs { get; set; } = 1000;
 }

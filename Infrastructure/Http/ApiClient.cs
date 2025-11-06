@@ -26,17 +26,27 @@ public abstract class ApiClient
         HttpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
 
         // ✅ Гарантируем корректный BaseAddress
+        // BaseAddress должен быть установлен в MauiProgram.cs через HttpClient конфигурацию
+        // Если не установлен - используем дефолтный (для обратной совместимости)
         if (HttpClient.BaseAddress == null)
         {
 #if ANDROID
-            // Эмулятор Android → localhost = 10.0.2.2
-            HttpClient.BaseAddress = new Uri("http://10.0.2.2:8000/");
+            // Для эмулятора: 10.0.2.2
+            // Для реального телефона: IP компьютера (например, 192.168.2.155)
+            // Можно установить через переменную окружения: API_BASE_URL=http://192.168.2.155:8000/
+            var apiUrl = Environment.GetEnvironmentVariable("API_BASE_URL") 
+                ?? "http://192.168.2.155:8000/";  // IP компьютера для реального телефона
+            HttpClient.BaseAddress = new Uri(apiUrl);
+            Logger?.LogWarning("[ApiClient] BaseAddress был null, установлен дефолтный: {Url}", apiUrl);
 #else
-            // ПК или физическое устройство в локальной сети
             HttpClient.BaseAddress = new Uri("http://192.168.2.155:8000/");
 #endif
         }
-        else if (!HttpClient.BaseAddress.ToString().EndsWith("/"))
+        
+        // Логируем используемый URL для отладки
+        Logger?.LogInformation("[ApiClient] Using BaseAddress: {BaseAddress}", HttpClient.BaseAddress);
+        
+        if (!HttpClient.BaseAddress.ToString().EndsWith("/"))
         {
             HttpClient.BaseAddress = new Uri(HttpClient.BaseAddress + "/");
         }

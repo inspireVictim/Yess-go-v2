@@ -34,10 +34,29 @@ public class AuthenticationService : IAuthenticationService
         }
     }
 
-    public async Task SaveTokensAsync(string accessToken, string refreshToken)
+    public async Task SaveTokensAsync(string accessToken, string? refreshToken = null)
     {
-        await SecureStorage.SetAsync(AccessTokenKey, accessToken);
-        await SecureStorage.SetAsync(RefreshTokenKey, refreshToken);
+        try
+        {
+            await SecureStorage.SetAsync(AccessTokenKey, accessToken);
+            
+            // RefreshToken может быть null, если бэкенд его не возвращает
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+            {
+                await SecureStorage.SetAsync(RefreshTokenKey, refreshToken);
+            }
+            else
+            {
+                // Если refreshToken не предоставлен, удаляем старый (если есть)
+                SecureStorage.Remove(RefreshTokenKey);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Логируем ошибку, но не прерываем процесс
+            System.Diagnostics.Debug.WriteLine($"[AuthenticationService] Error saving tokens: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task<bool> RefreshTokenAsync()

@@ -107,8 +107,17 @@ public partial class RegisterViewModel : ObservableObject
         }
         catch (BadRequestException ex)
         {
-            ShowError($"Ошибка регистрации: {ex.Message}");
-            _logger?.LogWarning(ex, "Bad request during registration");
+            // Показываем сообщение об ошибке от сервера
+            var errorMessage = ex.Message;
+            // Если сообщение начинается с "Неверный запрос", убираем это и показываем только реальное сообщение
+            if (errorMessage.StartsWith("Неверный запрос"))
+            {
+                errorMessage = errorMessage.Replace("Неверный запрос", "").Trim();
+                if (errorMessage.StartsWith(":"))
+                    errorMessage = errorMessage.Substring(1).Trim();
+            }
+            ShowError(string.IsNullOrWhiteSpace(errorMessage) ? "Ошибка регистрации" : errorMessage);
+            _logger?.LogWarning(ex, "Bad request during registration: {Message}", errorMessage);
         }
         catch (ApiException ex)
         {

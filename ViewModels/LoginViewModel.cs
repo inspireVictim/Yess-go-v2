@@ -64,8 +64,15 @@ public partial class LoginViewModel : ObservableObject
         }
         catch (UnauthorizedException ex)
         {
-            ShowError("Неверный Email/телефон или пароль");
+            ShowError(ex.Message.Contains("Неверный") || ex.Message.Contains("неверный") 
+                ? ex.Message 
+                : "Неверный Email/телефон или пароль");
             _logger?.LogWarning(ex, "Unauthorized login attempt");
+        }
+        catch (BadRequestException ex)
+        {
+            ShowError(ex.Message);
+            _logger?.LogWarning(ex, "Bad request during login");
         }
         catch (ApiException ex)
         {

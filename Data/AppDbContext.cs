@@ -37,7 +37,7 @@ public class AppDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseNpgsql(_connectionString);
+        optionsBuilder.UseSqlite(_connectionString);
 
         // Включить логирование SQL запросов
         if (_enableSqlLogging || 
@@ -58,10 +58,19 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Настройка моделей через Fluent API
-        // TODO: Добавьте конфигурацию ваших сущностей здесь
-        // modelBuilder.ApplyConfiguration(new UserConfiguration());
-        // modelBuilder.ApplyConfiguration(new PartnerConfiguration());
+        // Игнорируем JSON поля, которые не поддерживаются SQLite напрямую
+        // Эти поля не используются в локальном кэшировании данных пользователя
+        modelBuilder.Entity<Notification>()
+            .Ignore(n => n.Data);
+
+        modelBuilder.Entity<User>()
+            .Ignore(u => u.DeviceTokens);
+
+        modelBuilder.Entity<Partner>()
+            .Ignore(p => p.SocialMedia);
+
+        modelBuilder.Entity<PartnerLocation>()
+            .Ignore(pl => pl.WorkingHours);
     }
 
     /// <summary>

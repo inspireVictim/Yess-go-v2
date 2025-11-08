@@ -17,6 +17,14 @@ public class PartnersApiService : ApiClient, IPartnersApiService
     {
     }
 
+    public async Task<IReadOnlyList<PartnerDto>> GetAllAsync(
+        CancellationToken ct = default)
+    {
+        var endpoint = ApiEndpoints.PartnersEndpoints.List;
+        var result = await GetAsync<List<PartnerDto>>(endpoint, ct);
+        return result ?? new List<PartnerDto>();
+    }
+
     public async Task<IReadOnlyList<PartnerDto>> GetByCategoryAsync(
         string category,
         CancellationToken ct = default)

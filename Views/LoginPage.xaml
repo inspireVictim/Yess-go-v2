@@ -53,11 +53,17 @@
                                 IsPassword="True" 
                                 BackgroundColor="Transparent"
                                 Text="{Binding Password}" />
-						<Image Source="eye.png" WidthRequest="20" HeightRequest="20" Opacity="0.6" Grid.Column="1">
-							<Image.GestureRecognizers>
+						<Label Grid.Column="1" 
+                               Text="👁" 
+                               FontSize="20" 
+                               VerticalOptions="Center" 
+                               HorizontalOptions="Center"
+                               Padding="8,0"
+                               TextColor="#666666">
+							<Label.GestureRecognizers>
 								<TapGestureRecognizer Tapped="TogglePassword_Tapped"/>
-							</Image.GestureRecognizers>
-						</Image>
+							</Label.GestureRecognizers>
+						</Label>
 					</Grid>
 				</Border>
 
@@ -75,13 +81,27 @@
 				</HorizontalStackLayout>
 
 				<!-- Кнопка входа -->
-				<Button Text="Войти"
-                        HeightRequest="52"
-                        CornerRadius="16"
-                        BackgroundColor="#0B4A3B"
-                        TextColor="White"
-                        Command="{Binding LoginCommand}"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"/>
+				<Grid HeightRequest="52">
+					<Button Text="Войти"
+                            HeightRequest="52"
+                            CornerRadius="16"
+                            BackgroundColor="#0B4A3B"
+                            TextColor="White"
+                            Command="{Binding LoginCommand}"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
+						<Button.Triggers>
+							<DataTrigger TargetType="Button" Binding="{Binding IsBusy}" Value="True">
+								<Setter Property="Text" Value="Вход..." />
+								<Setter Property="Opacity" Value="0.7" />
+							</DataTrigger>
+						</Button.Triggers>
+					</Button>
+					<ActivityIndicator IsRunning="{Binding IsBusy}" 
+                                      IsVisible="{Binding IsBusy}"
+                                      Color="White"
+                                      VerticalOptions="Center"
+                                      HorizontalOptions="Center" />
+				</Grid>
 
 				<BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
 

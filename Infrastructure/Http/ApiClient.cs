@@ -31,15 +31,23 @@ public abstract class ApiClient
         if (HttpClient.BaseAddress == null)
         {
 #if ANDROID
-            // Для эмулятора: 10.0.2.2
-            // Для реального телефона: IP компьютера (например, 192.168.2.155)
-            // Можно установить через переменную окружения: API_BASE_URL=http://192.168.2.155:8000/
+            // ✅ Для эмулятора Android: 10.0.2.2 (специальный alias для хоста)
+            // ✅ Для реального телефона: IP компьютера в сети
+            // 📌 Установите переменную окружения перед запуском:
+            //    API_BASE_URL=http://YOUR_HOST_IP:8000/
+            // 📌 Или отредактируйте значение по умолчанию ниже:
+            
+            var isEmulator = Android.OS.Build.Fingerprint.Contains("generic");
             var apiUrl = Environment.GetEnvironmentVariable("API_BASE_URL") 
-                ?? "http://192.168.2.155:8000/";  // IP компьютера для реального телефона
+                ?? (isEmulator ? "http://10.0.2.2:8000/" : "http://192.168.1.1:8000/");
+            
             HttpClient.BaseAddress = new Uri(apiUrl);
-            Logger?.LogWarning("[ApiClient] BaseAddress был null, установлен дефолтный: {Url}", apiUrl);
+            Logger?.LogWarning("[ApiClient] Android: BaseAddress установлен на: {Url} (Emulator: {IsEmulator})", 
+                apiUrl, isEmulator);
 #else
-            HttpClient.BaseAddress = new Uri("http://192.168.2.155:8000/");
+            // 📌 Для WinUI/Desktop: используйте localhost
+            HttpClient.BaseAddress = new Uri("http://localhost:8000/");
+            Logger?.LogWarning("[ApiClient] Desktop: BaseAddress установлен на localhost");
 #endif
         }
         
@@ -168,15 +176,50 @@ public abstract class ApiClient
         var errorContent = await response.Content.ReadAsStringAsync();
         Logger?.LogError("API Error: {StatusCode} - {Content}", response.StatusCode, errorContent);
 
+        // Извлекаем сообщение из JSON ответа
+        var errorMessage = ExtractErrorMessage(errorContent);
+
         throw response.StatusCode switch
         {
-            HttpStatusCode.Unauthorized => new UnauthorizedException("Требуется авторизация"),
-            HttpStatusCode.Forbidden => new ForbiddenException("Доступ запрещён"),
-            HttpStatusCode.NotFound => new NotFoundException("Ресурс не найден"),
-            HttpStatusCode.BadRequest => new BadRequestException("Неверный запрос", errorContent),
+            HttpStatusCode.Unauthorized => new UnauthorizedException(errorMessage ?? "Требуется авторизация"),
+            HttpStatusCode.Forbidden => new ForbiddenException(errorMessage ?? "Доступ запрещён"),
+            HttpStatusCode.NotFound => new NotFoundException(errorMessage ?? "Ресурс не найден"),
+            HttpStatusCode.BadRequest => new BadRequestException(errorMessage ?? "Неверный запрос", errorContent),
             HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable
-                => new ServerException("Ошибка сервера", response.StatusCode),
-            _ => new ApiException($"API error: {response.StatusCode}", response.StatusCode)
+                => new ServerException(errorMessage ?? "Ошибка сервера", response.StatusCode),
+            _ => new ApiException(errorMessage ?? $"API error: {response.StatusCode}", response.StatusCode)
         };
+    }
+
+    private static string? ExtractErrorMessage(string? errorContent)
+    {
+        if (string.IsNullOrWhiteSpace(errorContent))
+            return null;
+
+        try
+        {
+            // Пытаемся распарсить JSON и извлечь поле "message"
+            using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
+            if (doc.RootElement.TryGetProperty("message", out var messageElement))
+            {
+                var message = messageElement.GetString();
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
+            
+            // Если нет "message", пробуем "detail"
+            if (doc.RootElement.TryGetProperty("detail", out var detailElement))
+            {
+                var detail = detailElement.GetString();
+                if (!string.IsNullOrWhiteSpace(detail))
+                    return detail;
+            }
+        }
+        catch
+        {
+            // Если не удалось распарсить JSON, возвращаем null
+        }
+
+        return null;
     }
 }

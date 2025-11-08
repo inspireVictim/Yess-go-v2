@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Dispatching;
+using YessGoFront.Data;
 using YessGoFront.Infrastructure.Ui;
 
 namespace YessGoFront;
@@ -37,31 +38,42 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        // ✅ Просто создаем главное окно без инициализации базы данных
+        // Инициализируем базу данных при запуске приложения
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500); // Небольшая задержка для полной инициализации сервисов
+                await InitializeDatabaseAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[App] Database initialization error: {ex.Message}");
+            }
+        });
+
         return new Window(new AppShell());
     }
 
-    /*
-    ❌ Удаляем/отключаем инициализацию локальной базы данных
-    private async void InitializeDatabase()
+    private async Task InitializeDatabaseAsync()
     {
         try
         {
-            var services = Handler?.MauiContext?.Services;
+            var services = MauiProgram.Services;
             if (services == null) return;
 
             using var scope = services.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var initializer = new DatabaseInitializer(
-                context,
-                scope.ServiceProvider.GetService<Microsoft.Extensions.Logging.ILogger<DatabaseInitializer>>());
+            var logger = scope.ServiceProvider.GetService<Microsoft.Extensions.Logging.ILogger<DatabaseInitializer>>();
+            var initializer = new DatabaseInitializer(context, logger);
 
             await initializer.InitializeAsync();
+            System.Diagnostics.Debug.WriteLine("[App] Database initialized successfully");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Database initialization error: {ex.Message}");
+            // Логируем ошибку, но не прерываем работу приложения
+            System.Diagnostics.Debug.WriteLine($"[App] Database initialization error: {ex.Message}");
         }
     }
-    */
 }

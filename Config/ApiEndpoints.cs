@@ -16,6 +16,7 @@ public static class ApiEndpoints
     public const string Routes = $"{ApiVersion}/routes";
     public const string Location = $"{ApiVersion}/location";
     public const string Promotions = $"{ApiVersion}/promotions";
+    public const string Banners = $"{ApiVersion}/banners";
 
     // Authentication endpoints (✅ FIXED)
     // Authentication endpoints
@@ -114,5 +115,13 @@ public static class ApiEndpoints
         public const string List = $"{Promotions}";
         public static string ById(int id) => $"{Promotions}/{id}";
         public static string Active = $"{List}?status=active";
+    }
+
+    // Banner endpoints
+    public static class BannerEndpoints
+    {
+        public const string List = $"{Banners}";
+        public const string Active = $"{List}?active=true";
+        public static string ById(int id) => $"{Banners}/{id}";
     }
 }

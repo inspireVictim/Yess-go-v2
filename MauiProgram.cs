@@ -1,10 +1,12 @@
 ﻿using System;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
+using Microsoft.Maui.Storage;
 using YessGoFront.Config;
 using YessGoFront.Data;
 using YessGoFront.Infrastructure.Auth;
@@ -71,40 +73,64 @@ public static class MauiProgram
 
     private static string GetDatabaseConnectionString()
     {
+        // Проверяем переменную окружения для SQLite
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
         if (!string.IsNullOrEmpty(connectionString))
             return connectionString;
 
-        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-        if (!string.IsNullOrEmpty(databaseUrl))
-        {
-            try
-            {
-                var uri = new Uri(databaseUrl);
-                var userInfo = uri.UserInfo.Split(':');
-                var username = Uri.UnescapeDataString(userInfo[0]);
-                var password = Uri.UnescapeDataString(userInfo[1]);
-                var host = uri.Host;
-                var port = uri.Port > 0 ? uri.Port : 5432;
-                var database = uri.AbsolutePath.TrimStart('/');
-                return $"Host={host};Port={port};Database={database};Username={username};Password={password}";
-            }
-            catch { }
-        }
-
-        return "Host=localhost;Port=5432;Database=yess_loyalty;Username=yess_user;Password=password";
+        // По умолчанию используем SQLite в локальной папке данных приложения
+        var dbPath = Path.Combine(FileSystem.AppDataDirectory, "yessgo.db");
+        return $"Data Source={dbPath}";
     }
 
     private static string GetDefaultApiBaseUrl()
     {
 #if ANDROID
-        // Для эмулятора: 10.0.2.2
-        // Для реального телефона: IP компьютера в локальной сети
-        // Можно установить через переменную окружения: API_BASE_URL=http://10.0.2.2:8000/ (для эмулятора)
-        // По умолчанию используем IP компьютера (для реального телефона)
-        return "http://192.168.2.155:8000/";  // IP компьютера для реального телефона
+        // 🤖 ANDROID: Автоматически определяем эмулятор или реальный телефон
+        try
+        {
+            // Попытка определить эмулятор несколькими способами
+            var isEmulator = 
+                Android.OS.Build.Fingerprint?.Contains("generic") == true || 
+                Android.OS.Build.Fingerprint?.Contains("emulator") == true ||
+                Android.OS.Build.Model?.Contains("Emulator") == true ||
+                Android.OS.Build.Model?.Contains("emulator") == true ||
+                Android.OS.Build.Product?.Contains("emulator") == true ||
+                Android.OS.Build.Manufacturer?.Equals("unknown") == true;
+            
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Emulator detection: {isEmulator}");
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Fingerprint: {Android.OS.Build.Fingerprint}");
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Model: {Android.OS.Build.Model}");
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Product: {Android.OS.Build.Product}");
+            
+            if (isEmulator)
+            {
+                // 🔷 Эмулятор: используем специальный IP 10.0.2.2
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using EMULATOR address: 10.0.2.2:8000");
+                return "http://10.0.2.2:8000/";
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Error detecting emulator: {ex.Message}");
+        }
+        
+        // 📱 Реальный телефон: используем IP из переменной окружения
+        var envUrl = Environment.GetEnvironmentVariable("API_BASE_URL");
+        if (!string.IsNullOrEmpty(envUrl))
+        {
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using URL from API_BASE_URL: {envUrl}");
+            return envUrl;
+        }
+        
+        // 📱 Дефолт для реального телефона
+        // IP вашего компьютера в локальной сети: 192.168.2.155
+        var defaultPhoneUrl = "http://192.168.2.155:8000/";
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using DEFAULT for real phone: {defaultPhoneUrl}");
+        return defaultPhoneUrl;
 #else
-        return "http://192.168.2.155:8000/";
+        // 🖥️ Desktop (WinUI/WPF): используем localhost
+        return "http://localhost:8000/";
 #endif
     }
 
@@ -114,7 +140,9 @@ public static class MauiProgram
             ?? GetDefaultApiBaseUrl();
 
         // Логируем используемый URL для отладки
-        System.Diagnostics.Debug.WriteLine($"[MauiProgram] API Base URL: {apiBaseUrl}");
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] ======================================");
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] API BASE URL: {apiBaseUrl}");
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] ======================================");
 
         var dbConnectionString = GetDatabaseConnectionString();
 
@@ -175,6 +203,7 @@ public static class MauiProgram
         services.AddHttpClient<IPartnersApiService, PartnersApiService>("ApiClient");
         services.AddHttpClient<IWalletApiService, WalletApiService>("ApiClient");
         services.AddHttpClient<IQRApiService, QRApiService>("ApiClient");
+        services.AddHttpClient<IBannerApiService, BannerApiService>("ApiClient");
     }
 
     private static void ConfigureServices(IServiceCollection services)

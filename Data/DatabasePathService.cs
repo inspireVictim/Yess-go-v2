@@ -1,3 +1,5 @@
+using System.IO;
+using Microsoft.Maui.Storage;
 using YessGoFront.Config;
 
 namespace YessGoFront.Data;
@@ -12,7 +14,7 @@ public interface IDatabaseConnectionService
 }
 
 /// <summary>
-/// Реализация сервиса для получения строки подключения к PostgreSQL
+/// Реализация сервиса для получения строки подключения к SQLite
 /// </summary>
 public class DatabaseConnectionService : IDatabaseConnectionService
 {
@@ -25,14 +27,15 @@ public class DatabaseConnectionService : IDatabaseConnectionService
 
     public string GetConnectionString()
     {
-        if (string.IsNullOrWhiteSpace(_settings.Database.ConnectionString))
+        // Если указана строка подключения в настройках, используем её
+        if (!string.IsNullOrWhiteSpace(_settings.Database.ConnectionString))
         {
-            throw new InvalidOperationException(
-                "Database connection string is not configured. " +
-                "Please set AppSettings.Database.ConnectionString in MauiProgram.cs");
+            return _settings.Database.ConnectionString;
         }
 
-        return _settings.Database.ConnectionString;
+        // По умолчанию используем SQLite в локальной папке данных приложения
+        var dbPath = Path.Combine(FileSystem.AppDataDirectory, "yessgo.db");
+        return $"Data Source={dbPath}";
     }
 
     public bool IsSqlLoggingEnabled()

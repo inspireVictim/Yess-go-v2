@@ -2,9 +2,11 @@
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
+using YessGoFront.Services.Api;
 using YessGoFront.ViewModels;
 using YessGoFront.Views.Controls;
 
@@ -41,6 +43,11 @@ namespace YessGoFront.Views
         {
             InitializeComponent();
 
+            // Получаем сервисы из DI и создаём ViewModel
+            var bannerApiService = MauiProgram.Services.GetService<IBannerApiService>();
+            var partnersApiService = MauiProgram.Services.GetService<IPartnersApiService>();
+            BindingContext = new MainPageViewModel(bannerApiService, partnersApiService);
+
             BindingContextChanged += (_, __) =>
             {
                 if (BindingContext is MainPageViewModel vm)
@@ -72,6 +79,18 @@ namespace YessGoFront.Views
             // ✅ Обновлённый вызов для новой версии BottomNavBar
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
+
+            // Подключаем обработчик SizeChanged для контейнера прогресс-бара
+            var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+            if (progressContainer != null)
+            {
+                progressContainer.SizeChanged += OnProgressTimelineContainerSizeChanged;
+                // Обновляем ширину сразу, если она уже установлена
+                if (progressContainer.Width > 0 && BindingContext is MainPageViewModel vm)
+                {
+                    vm.ProgressTimelineContainerWidth = progressContainer.Width;
+                }
+            }
         }
 
         protected override void OnDisappearing()
@@ -82,6 +101,13 @@ namespace YessGoFront.Views
 
             if (BindingContext is MainPageViewModel vm)
                 vm.PropertyChanged -= OnVmPropertyChanged;
+
+            // Отключаем обработчик SizeChanged для контейнера прогресс-бара
+            var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+            if (progressContainer != null)
+            {
+                progressContainer.SizeChanged -= OnProgressTimelineContainerSizeChanged;
+            }
         }
 
         // ===== Баннерам подгоняем размер =====
@@ -89,21 +115,47 @@ namespace YessGoFront.Views
         {
             base.OnSizeAllocated(width, height);
 
-            double bannerWidth = width * 0.8;
-            double bannerHeight = bannerWidth / 1.78;
-
+            // Фиксированная высота для баннеров - 90px, чтобы не было пустого пространства
             var banners = this.FindByName<CollectionView>("BannersCollection");
             if (banners != null)
-                banners.HeightRequest = bannerHeight;
+                banners.HeightRequest = 90; // Фиксированная высота, равная высоте элементов
+        }
+
+        // ===== Обновление ширины контейнера прогресс-бара =====
+        private void OnProgressTimelineContainerSizeChanged(object? sender, EventArgs e)
+        {
+            if (sender is Grid container && BindingContext is MainPageViewModel vm)
+            {
+                if (container.Width > 0)
+                {
+                    vm.ProgressTimelineContainerWidth = container.Width;
+                }
+            }
         }
 
         // ===== Обработка VM обновлений (сторис) =====
         private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
+            if (BindingContext is not MainPageViewModel vm)
                 return;
 
-            if (BindingContext is not MainPageViewModel vm)
+            // Обновляем ширину контейнера при открытии сторис
+            if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
+            {
+                if (vm.IsStoryOpen)
+                {
+                    // Небольшая задержка, чтобы контейнер успел отрисоваться
+                    await Task.Delay(50);
+                    var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+                    if (progressContainer != null && progressContainer.Width > 0)
+                    {
+                        vm.ProgressTimelineContainerWidth = progressContainer.Width;
+                    }
+                }
+                return;
+            }
+
+            if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
                 return;
 
             var nextSrc = vm.CurrentPageImage;
@@ -174,10 +226,16 @@ namespace YessGoFront.Views
                 if (sv == null) return;
                 sv.Scrolled += OnAnyRowScrolled;
 
+                // Обработка тапа на ScrollView
                 var tap = new TapGestureRecognizer();
-                tap.Tapped += (_, __) => _lastTouch = DateTime.Now;
+                tap.Tapped += (_, __) => 
+                {
+                    _lastTouch = DateTime.Now;
+                    System.Diagnostics.Debug.WriteLine("[MainPage] Touch detected, resetting idle timer");
+                };
                 sv.GestureRecognizers.Add(tap);
             }
+
         }
 
         private void UnhookPartnerRows()
@@ -277,6 +335,13 @@ namespace YessGoFront.Views
                 _ = sv.ScrollToAsync(x - half, 0, false);
             else if (x < -2)
                 _ = sv.ScrollToAsync(x + half, 0, false);
+        }
+
+        // ===== Обновление времени последнего взаимодействия =====
+        private void OnPartnerLogoTapped(object? sender, EventArgs e)
+        {
+            _lastTouch = DateTime.Now;
+            System.Diagnostics.Debug.WriteLine("[MainPage] Partner logo tapped, resetting idle timer");
         }
 
         // ===== Навигация =====

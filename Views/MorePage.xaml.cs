@@ -1,6 +1,8 @@
 ﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using YessGoFront.Services;
+using YessGoFront.Services.Domain;
 using YessGoFront.Views.Controls;
 
 namespace YessGoFront.Views
@@ -26,15 +28,28 @@ namespace YessGoFront.Views
         {
             try
             {
-                // 1) Очистка локального аккаунта
+                // 1) Вызываем LogoutAsync для очистки токенов через API и SecureStorage
+                var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
+                await authService.LogoutAsync();
+
+                // 2) Очистка локального аккаунта (AccountStore)
                 AccountStore.Instance.SignOut();
 
-                // 2) Навигация на экран логина (сброс стека)
+                // 3) Навигация на экран логина (сброс стека)
                 await Shell.Current.GoToAsync("///login");
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Ошибка", $"Не удалось выйти: {ex.Message}", "OK");
+                // Даже если произошла ошибка, всё равно очищаем локальные данные и переходим на логин
+                try
+                {
+                    AccountStore.Instance.SignOut();
+                    await Shell.Current.GoToAsync("///login");
+                }
+                catch
+                {
+                    await DisplayAlert("Ошибка", $"Не удалось выйти: {ex.Message}", "OK");
+                }
             }
         }
     }

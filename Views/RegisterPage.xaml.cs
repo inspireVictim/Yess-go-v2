@@ -36,6 +36,22 @@ namespace YessGoFront.Views
             await Shell.Current.GoToAsync("///login");
         }
 
+        private void TogglePassword_Tapped(object? sender, EventArgs e)
+        {
+            if (PasswordEntry != null)
+            {
+                PasswordEntry.IsPassword = !PasswordEntry.IsPassword;
+            }
+        }
+
+        private void ToggleConfirmPassword_Tapped(object? sender, EventArgs e)
+        {
+            if (ConfirmPasswordEntry != null)
+            {
+                ConfirmPasswordEntry.IsPassword = !ConfirmPasswordEntry.IsPassword;
+            }
+        }
+
         protected override void OnDisappearing()
         {
             base.OnDisappearing();

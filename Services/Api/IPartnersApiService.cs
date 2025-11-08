@@ -8,6 +8,11 @@ namespace YessGoFront.Services.Api;
 public interface IPartnersApiService
 {
     /// <summary>
+    /// Получить всех активных партнёров
+    /// </summary>
+    Task<IReadOnlyList<PartnerDto>> GetAllAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Получить партнёров по категории
     /// </summary>
     Task<IReadOnlyList<PartnerDto>> GetByCategoryAsync(string category, CancellationToken ct = default);

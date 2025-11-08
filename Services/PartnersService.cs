@@ -33,8 +33,8 @@ public sealed class PartnersService : IPartnersService
             // Мок для теста
             return new List<PartnerDto>
             {
-                new PartnerDto { Id = "1", Name = "Home Market", SubTitle = "Мебель", Category = category, LogoUrl = "partner_home_1", CashbackPercent = 5 },
-                new PartnerDto { Id = "2", Name = "Soft Room", SubTitle = "Интерьер", Category = category, LogoUrl = "partner_home_2", CashbackPercent = 7 }
+                new PartnerDto { Id = 1, Name = "Home Market", SubTitle = "Мебель", Category = category, LogoUrl = "partner_home_1", CashbackPercent = 5 },
+                new PartnerDto { Id = 2, Name = "Soft Room", SubTitle = "Интерьер", Category = category, LogoUrl = "partner_home_2", CashbackPercent = 7 }
             };
         }
     }

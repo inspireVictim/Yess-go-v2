@@ -32,6 +32,10 @@
 	<string>This app using barcode scanning to</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Для отображения вашего местоположения на карте</string>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 
 </dict>
 </plist>

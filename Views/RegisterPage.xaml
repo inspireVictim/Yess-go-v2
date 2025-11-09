@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:YessGoFront.Converters"
     Title="Регистрация"
-    BackgroundColor="#007A51">
+    BackgroundColor="#007A51"
+    Shell.NavBarIsVisible="False">
     
     <ContentPage.Resources>
         <converters:InverseBoolConverter x:Key="InvertedBoolConverter"/>
@@ -75,6 +76,29 @@
                            FontSize="12"
                            Margin="0,-8,0,0"/>
 
+                    <!-- Сообщение об успешной отправке кода -->
+                    <Label Text="{Binding SuccessMessage}" 
+                           IsVisible="{Binding IsCodeSent}"
+                           TextColor="#4CAF50" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
+
+                    <!-- Поле Код подтверждения (показывается только на втором шаге) -->
+                    <Border BackgroundColor="#E0EFE9" 
+                            Stroke="Transparent" 
+                            StrokeShape="RoundRectangle 16" 
+                            HeightRequest="52"
+                            IsVisible="{Binding IsVerificationStep}">
+                        <Grid Padding="12,0">
+                            <Entry x:Name="VerificationCodeEntry" 
+                                   Placeholder="Введите код из SMS" 
+                                   Keyboard="Numeric" 
+                                   BackgroundColor="Transparent"
+                                   Text="{Binding VerificationCode}"
+                                   MaxLength="6" />
+                        </Grid>
+                    </Border>
+
                     <!-- Поле Пароль -->
                     <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
                         <Grid Padding="12,0" ColumnDefinitions="*,Auto">
@@ -137,8 +161,11 @@
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
                             <Button.Triggers>
                                 <DataTrigger TargetType="Button" Binding="{Binding IsBusy}" Value="True">
-                                    <Setter Property="Text" Value="Регистрация..." />
+                                    <Setter Property="Text" Value="Отправка..." />
                                     <Setter Property="Opacity" Value="0.7" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="Button" Binding="{Binding IsVerificationStep}" Value="True">
+                                    <Setter Property="Text" Value="Подтвердить и зарегистрироваться" />
                                 </DataTrigger>
                             </Button.Triggers>
                         </Button>

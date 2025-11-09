@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:YessGoFront.Converters"
     Title="Вход"
-    BackgroundColor="#007A51">
+    BackgroundColor="#007A51"
+    Shell.NavBarIsVisible="False">
     
     <ContentPage.Resources>
         <converters:InverseBoolConverter x:Key="InvertedBoolConverter"/>

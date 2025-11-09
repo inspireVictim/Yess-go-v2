@@ -5,6 +5,7 @@ using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Services.Domain;
 using YessGoFront.Services.Api;
 using RegisterRequestDto = YessGoFront.Services.Api.RegisterRequest;
+using VerifyCodeRequest = YessGoFront.Services.Api.VerifyCodeRequest;
 
 
 namespace YessGoFront.ViewModels;
@@ -24,6 +25,12 @@ public partial class RegisterViewModel : ObservableObject
     [ObservableProperty] private bool hasError = false;
     [ObservableProperty] private string? phoneError;
     [ObservableProperty] private bool hasPhoneError = false;
+    
+    // SMS верификация
+    [ObservableProperty] private string verificationCode = string.Empty;
+    [ObservableProperty] private bool isVerificationStep = false;
+    [ObservableProperty] private bool isCodeSent = false;
+    [ObservableProperty] private string? successMessage;
 
     public RegisterViewModel(IAuthService authService, ILogger<RegisterViewModel>? logger = null)
     {
@@ -37,7 +44,89 @@ public partial class RegisterViewModel : ObservableObject
         if (IsBusy)
             return;
 
-        // === Валидация ===
+        // Если еще не отправлен код - отправляем
+        if (!IsVerificationStep)
+        {
+            await SendVerificationCodeAsync();
+            return;
+        }
+
+        // Если код отправлен - проверяем и регистрируем
+        await VerifyCodeAndRegisterAsync();
+    }
+
+    private async Task SendVerificationCodeAsync()
+    {
+        // Валидация телефона
+        var normalizedPhone = NormalizePhone(Phone);
+        if (!IsPhoneValid(normalizedPhone))
+        {
+            PhoneError = "Введите корректный номер телефона (например, +996555123456)";
+            HasPhoneError = true;
+            return;
+        }
+        HasPhoneError = false;
+
+        try
+        {
+            IsBusy = true;
+            HasError = false;
+            ErrorMessage = null;
+            SuccessMessage = null;
+
+            _logger?.LogInformation("Sending verification code to: {Phone}", normalizedPhone);
+
+            await _authService.SendVerificationCodeAsync(normalizedPhone);
+            
+            IsCodeSent = true;
+            IsVerificationStep = true;
+            SuccessMessage = "Код отправлен на ваш номер телефона";
+            
+            _logger?.LogInformation("Verification code sent successfully");
+        }
+        catch (NetworkException ex)
+        {
+            ShowError("Ошибка сети. Проверьте подключение к интернету.");
+            _logger?.LogError(ex, "Network error during code sending");
+        }
+        catch (BadRequestException ex)
+        {
+            var errorMessage = ex.Message;
+            if (errorMessage.StartsWith("Неверный запрос"))
+            {
+                errorMessage = errorMessage.Replace("Неверный запрос", "").Trim();
+                if (errorMessage.StartsWith(":"))
+                    errorMessage = errorMessage.Substring(1).Trim();
+            }
+            ShowError(string.IsNullOrWhiteSpace(errorMessage) ? "Ошибка отправки кода" : errorMessage);
+            _logger?.LogWarning(ex, "Bad request during code sending: {Message}", errorMessage);
+        }
+        catch (ApiException ex)
+        {
+            ShowError($"Ошибка API: {ex.Message}");
+            _logger?.LogWarning(ex, "API error during code sending");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Ошибка отправки кода: {ex.Message}");
+            _logger?.LogError(ex, "Unexpected error during code sending");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task VerifyCodeAndRegisterAsync()
+    {
+        // Валидация кода
+        if (string.IsNullOrWhiteSpace(VerificationCode) || VerificationCode.Length < 4)
+        {
+            ShowError("Введите код подтверждения");
+            return;
+        }
+
+        // Валидация остальных полей
         if (string.IsNullOrWhiteSpace(FirstName))
         {
             ShowError("Введите имя");
@@ -53,7 +142,7 @@ public partial class RegisterViewModel : ObservableObject
         var normalizedPhone = NormalizePhone(Phone);
         if (!IsPhoneValid(normalizedPhone))
         {
-            PhoneError = "Введите корректный номер телефона (например, +996555123456)";
+            PhoneError = "Введите корректный номер телефона";
             HasPhoneError = true;
             return;
         }
@@ -82,19 +171,20 @@ public partial class RegisterViewModel : ObservableObject
             IsBusy = true;
             HasError = false;
             ErrorMessage = null;
+            SuccessMessage = null;
 
-            var request = new RegisterRequest
+            var request = new VerifyCodeRequest
             {
                 phone_number = normalizedPhone,
+                code = VerificationCode,
                 password = Password,
                 first_name = FirstName.Trim(),
                 last_name = LastName.Trim()
             };
 
+            _logger?.LogInformation("Attempting verification and registration for phone: {Phone}", normalizedPhone);
 
-            _logger?.LogInformation("Attempting registration for phone: {Phone}", normalizedPhone);
-
-            var response = await _authService.RegisterAsync(request);
+            var response = await _authService.VerifyCodeAndRegisterAsync(request);
             _logger?.LogInformation("Registration successful. UserId: {UserId}", response.UserId);
 
             if (OnRegisterSuccess is not null)
@@ -107,9 +197,7 @@ public partial class RegisterViewModel : ObservableObject
         }
         catch (BadRequestException ex)
         {
-            // Показываем сообщение об ошибке от сервера
             var errorMessage = ex.Message;
-            // Если сообщение начинается с "Неверный запрос", убираем это и показываем только реальное сообщение
             if (errorMessage.StartsWith("Неверный запрос"))
             {
                 errorMessage = errorMessage.Replace("Неверный запрос", "").Trim();

@@ -109,6 +109,40 @@ namespace YessGoFront.Services.Api
             throw new NotSupportedException("Эндпоинт /auth/verify отсутствует на сервере.");
         }
 
+        public async Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
+        {
+            try
+            {
+                var request = new VerificationCodeRequest { phone_number = phoneNumber };
+                var response = await PostAsync<VerificationCodeRequest, Dictionary<string, object>>(
+                    $"{ApiEndpoints.AuthEndpoints.Base}/send-verification-code",
+                    request,
+                    ct
+                );
+                return response;
+            }
+            catch (Exception ex) when (IsNetworkError(ex))
+            {
+                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+            }
+        }
+
+        public async Task<UserDto> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default)
+        {
+            try
+            {
+                return await PostAsync<VerifyCodeRequest, UserDto>(
+                    $"{ApiEndpoints.AuthEndpoints.Base}/verify-code",
+                    request,
+                    ct
+                );
+            }
+            catch (Exception ex) when (IsNetworkError(ex))
+            {
+                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+            }
+        }
+
 
         // ----------------- Helpers -----------------
 

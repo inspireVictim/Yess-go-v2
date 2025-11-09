@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using YessGoFront.Services.Domain;
 using YessGoFront.ViewModels;
+using YessGoFront.Services;
 
 namespace YessGoFront.Views
 {
@@ -27,6 +28,19 @@ namespace YessGoFront.Views
 
         private async Task OnRegisterSuccess(Services.Api.AuthResponse response)
         {
+            // Сохраняем данные пользователя в AccountStore
+            if (response.User != null)
+            {
+                var accountStore = AccountStore.Instance;
+                accountStore.SignIn(
+                    email: response.User.Email ?? string.Empty,
+                    firstName: response.User.FirstName,
+                    lastName: response.User.LastName,
+                    remember: true,
+                    phone: response.User.Phone
+                );
+            }
+
             // Успешная регистрация - переходим на главную страницу
             await Shell.Current.GoToAsync("///main");
         }

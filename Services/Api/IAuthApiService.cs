@@ -33,6 +33,16 @@ public interface IAuthApiService
     /// Верификация кода
     /// </summary>
     Task<AuthResponse> VerifyCodeAsync(string code, CancellationToken ct = default);
+
+    /// <summary>
+    /// Отправка SMS-кода верификации на номер телефона
+    /// </summary>
+    Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Проверка кода и завершение регистрации
+    /// </summary>
+    Task<UserDto> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -86,6 +96,28 @@ public class RegisterRequest
     /// Фамилия (обязательно)
     /// </summary>
     public string last_name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Запрос на отправку кода верификации
+/// </summary>
+public class VerificationCodeRequest
+{
+    public string phone_number { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Запрос на проверку кода и регистрацию
+/// </summary>
+public class VerifyCodeRequest
+{
+    public string phone_number { get; set; } = string.Empty;
+    public string code { get; set; } = string.Empty;
+    public string password { get; set; } = string.Empty;
+    public string first_name { get; set; } = string.Empty;
+    public string last_name { get; set; } = string.Empty;
+    public int? city_id { get; set; }
+    public string? referral_code { get; set; }
 }
 
 

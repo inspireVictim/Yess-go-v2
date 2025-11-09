@@ -5,6 +5,7 @@ using YessGoFront.Services.Api;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
 using YessGoFront.Models;
+using VerifyCodeRequest = YessGoFront.Services.Api.VerifyCodeRequest;
 
 namespace YessGoFront.Services.Domain;
 
@@ -106,6 +107,65 @@ public class AuthService : IAuthService
         {
             _logger?.LogError(ex, "Error during registration");
             throw new NetworkException("Не удалось зарегистрироваться", ex);
+        }
+    }
+
+    public async Task SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+                throw new ArgumentException("Phone number is required");
+
+            await _apiService.SendVerificationCodeAsync(phoneNumber, ct);
+            _logger?.LogInformation("Verification code sent to: {Phone}", phoneNumber);
+        }
+        catch (ApiException) { throw; }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error sending verification code");
+            throw new NetworkException("Не удалось отправить код верификации", ex);
+        }
+    }
+
+    public async Task<AuthResponse> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            // 1) Проверяем код и завершаем регистрацию
+            var registeredUser = await _apiService.VerifyCodeAndRegisterAsync(request, ct);
+
+            // 2) Автоматический логин после успешной регистрации
+            var loginRequest = new LoginRequest
+            {
+                Phone = request.phone_number,
+                Password = request.password
+            };
+
+            var response = await _apiService.LoginAsync(loginRequest, ct);
+
+            if (response.UserId == 0)
+                response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? registeredUser.Id;
+
+            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
+
+            var userId = response.UserId > 0 ? response.UserId : registeredUser.Id;
+            if (userId > 0)
+                await SaveOrUpdateUserAsync(userId, registeredUser, ct);
+
+            response.User = registeredUser;
+
+            _logger?.LogInformation("User registered with verification: {Phone}, UserId: {UserId}", request.phone_number, userId);
+            return response;
+        }
+        catch (ApiException) { throw; }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during verification and registration");
+            throw new NetworkException("Не удалось завершить регистрацию", ex);
         }
     }
 

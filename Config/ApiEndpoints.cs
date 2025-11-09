@@ -30,6 +30,13 @@ public static class ApiEndpoints
         // если позже появятся на backend - просто будут готовы
         public const string Logout = $"{Auth}/logout";
         public const string Verify = $"{Auth}/verify";
+        
+        // SMS верификация
+        public const string SendVerificationCode = $"{Auth}/send-verification-code";
+        public const string VerifyCode = $"{Auth}/verify-code";
+        
+        // Базовый путь для Auth
+        public const string Base = Auth;
     }
 
 

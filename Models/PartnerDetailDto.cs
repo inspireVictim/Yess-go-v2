@@ -2,33 +2,86 @@ using System.Text.Json.Serialization;
 
 namespace YessGoFront.Models;
 
-/// <summary>Подробности партнёра для экрана карточки.</summary>
+/// <summary>
+/// Р”РµС‚Р°Р»СЊРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїР°СЂС‚РЅС‘СЂРµ
+/// </summary>
 public class PartnerDetailDto
 {
-    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
-    [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+    [JsonPropertyName("id")] 
+    public int Id { get; set; }
+    
+    [JsonPropertyName("name")] 
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("description")]
     public string? Description { get; set; }
 
     [JsonPropertyName("category")]
-    public string Category { get; set; } = string.Empty;
+    public string? Category { get; set; }  // Р”Р»СЏ РѕР±СЂР°С‚РЅРѕР№ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё
 
-    [JsonPropertyName("logoUrl")] public string? LogoUrl { get; set; }
-    [JsonPropertyName("bannerUrl")] public string? BannerUrl { get; set; }
+    [JsonPropertyName("categories")]
+    public List<CategoryDto>? Categories { get; set; }
 
-    [JsonPropertyName("address")] public string? Address { get; set; }
-    [JsonPropertyName("latitude")] public double? Latitude { get; set; }
-    [JsonPropertyName("longitude")] public double? Longitude { get; set; }
+    [JsonPropertyName("logo_url")] 
+    public string? LogoUrl { get; set; }
+    
+    [JsonPropertyName("cover_image_url")] 
+    public string? CoverImageUrl { get; set; }
 
-    [JsonPropertyName("phone")] public string? Phone { get; set; }
-    [JsonPropertyName("website")] public string? Website { get; set; }
+    [JsonPropertyName("address")] 
+    public string? Address { get; set; }
+    
+    [JsonPropertyName("latitude")] 
+    public double? Latitude { get; set; }
+    
+    [JsonPropertyName("longitude")] 
+    public double? Longitude { get; set; }
 
-    [JsonPropertyName("rating")] public double? Rating { get; set; }
-    [JsonPropertyName("reviewsCount")] public int? ReviewsCount { get; set; }
+    [JsonPropertyName("phone")] 
+    public string? Phone { get; set; }
+    
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+    
+    [JsonPropertyName("website")] 
+    public string? Website { get; set; }
 
-    [JsonPropertyName("cashbackPercent")]
-    public double CashbackPercent { get; set; }
+    [JsonPropertyName("default_cashback_rate")]
+    public double DefaultCashbackRate { get; set; }
+    
+    [JsonPropertyName("cashback_rate")]
+    public double? CashbackRate { get; set; }
+    
+    [JsonPropertyName("max_discount_percent")]
+    public double? MaxDiscountPercent { get; set; }
 
-    [JsonPropertyName("tags")] public List<string>? Tags { get; set; }
+    [JsonPropertyName("is_verified")]
+    public bool IsVerified { get; set; }
+    
+    [JsonPropertyName("social_media")]
+    public Dictionary<string, string>? SocialMedia { get; set; }
+    
+    [JsonPropertyName("current_promotions")]
+    public List<string>? CurrentPromotions { get; set; }
+}
+
+/// <summary>
+/// РљР°С‚РµРіРѕСЂРёСЏ РїР°СЂС‚РЅС‘СЂР°
+/// </summary>
+public class CategoryDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+    
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+    
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+    
+    [JsonPropertyName("icon")]
+    public string? Icon { get; set; }
 }

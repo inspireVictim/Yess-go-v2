@@ -1,108 +1,147 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
-             x:Class="YessGoFront.Views.MapPage"
-             BackgroundColor="#007F5F">
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+    x:Class="YessGoFront.Views.MapPage"
+    BackgroundColor="#005D45"
+    Shell.NavBarIsVisible="False">
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="0">
+    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#005D45" Offset="0.0"/>
+                <GradientStop Color="#00C97B" Offset="1.0"/>
+            </LinearGradientBrush>
+        </Grid.Background>
 
-
+        <!-- Кнопка "Назад" и заголовок -->
         <Grid Grid.Row="0" 
-              BackgroundColor="{StaticResource PrimaryGreen}"
-              Padding="20,50,20,20">
-
-            <Grid ColumnDefinitions="Auto,*"
-                  ColumnSpacing="10">
-
-                <!-- 🔙 Кнопка выхода с карты (Назад) -->
-                <ImageButton Grid.Column="0"
-                     Source="back_arrow_icon.png"
-                     WidthRequest="30"
-                     HeightRequest="30"
-                     BackgroundColor="Transparent"
-                     Clicked="OnExitClicked"
-                     VerticalOptions="Center"
-                     HorizontalOptions="Start"/>
-
-
-                <!-- Заголовок -->
-                <Label Grid.Column="1"
-                       Text="Карта партнёров"
-                       FontSize="20"
-                       FontAttributes="Bold"
-                       TextColor="White"
-                       HorizontalOptions="Center"
-                       VerticalOptions="Center"
-                       Margin="10,0"/>
-            </Grid>
-        </Grid>
-        <Frame Grid.Row="0"
-			   HeightRequest="500"
-			   BackgroundColor="#00694D"
-			   CornerRadius="0"
-			   VerticalOptions="Center"
-			   HorizontalOptions="FillAndExpand">
-			<Label Text="Карта временно недоступна"
-				   TextColor="White"
-				   HorizontalOptions="Center"
-				   VerticalOptions="Center"
-				   FontSize="16"
-				   FontAttributes="Bold"/>
-		</Frame>
-
-		<StackLayout Grid.Row="1"
-                     Orientation="Horizontal"
-                     Margin="16,8,16,0"
-                     VerticalOptions="Center">
-
-            <Frame CornerRadius="10"
-                   Padding="0"
-                   HasShadow="False"
+              Margin="16,40,16,0"
+              ColumnDefinitions="Auto,*,Auto"
+              ColumnSpacing="12"
+              VerticalOptions="Start">
+            <Frame Grid.Column="0"
+                   WidthRequest="36"
+                   HeightRequest="36"
+                   CornerRadius="8"
+                   Padding="8"
                    BackgroundColor="White"
-                   HeightRequest="40"
-                   HorizontalOptions="FillAndExpand">
-                <SearchBar x:Name="SearchBar"
-                           Placeholder="�����"
-                           BackgroundColor="Transparent"
-                           Margin="8,0"
-                           VerticalOptions="Center"
-                           HeightRequest="40"/>
+                   HasShadow="True"
+                   VerticalOptions="Center">
+                <Image Source="back_arrow_icon.png"
+                       Aspect="AspectFit">
+                    <Image.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnBackTapped" />
+                    </Image.GestureRecognizers>
+                </Image>
             </Frame>
+            
+            <Label Grid.Column="1"
+                   Text="Карта партнёров Yess!Go"
+                   FontSize="20"
+                   TextColor="White"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   VerticalTextAlignment="Center"
+                   HorizontalTextAlignment="Center"/>
+            
+            <!-- Пустая колонка для симметрии -->
+            <Frame Grid.Column="2"
+                   WidthRequest="36"
+                   HeightRequest="36"
+                   BackgroundColor="Transparent"
+                   HasShadow="False"/>
+        </Grid>
 
-            <ImageButton x:Name="FilterButton"
-                         Source="map_category_icon.png"
-                         WidthRequest="40"
-                         HeightRequest="40"
-                         CornerRadius="10"
-                         BackgroundColor="White"
-                         Aspect="AspectFill"
-                         Padding="0"
-                         Margin="8,0,0,0"
-                         VerticalOptions="Center"/>
-        </StackLayout>
+        <!-- Карта OpenStreetMap в рамке -->
+        <Frame Grid.Row="1"
+               Margin="16,16,16,0"
+               Padding="0"
+               CornerRadius="12"
+               HasShadow="True"
+               BackgroundColor="White"
+               BorderColor="Transparent">
+            <Grid x:Name="MapContainer">
+                <!-- MapView будет создан программно -->
+                
+                <!-- Индикатор загрузки -->
+                <ActivityIndicator x:Name="LoadingIndicator"
+                                   IsRunning="False"
+                                   IsVisible="False"
+                                   Color="#0F6B53"
+                                   WidthRequest="40"
+                                   HeightRequest="40"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="Center"/>
+            </Grid>
+        </Frame>
 
-        <StackLayout Grid.Row="2"
-                     Orientation="Horizontal"
-                     Margin="16,8"
-                     Spacing="8"
-                     HorizontalOptions="Center">
-            <Button Text="�������"
-                    BackgroundColor="White"
-                    TextColor="#007F5F"
-                    CornerRadius="10"
-                    HeightRequest="35"/>
-            <Button Text="��� � �������"
-                    BackgroundColor="White"
-                    TextColor="#007F5F"
-                    CornerRadius="10"
-                    HeightRequest="35"/>
-            <Button Text="��������"
-                    BackgroundColor="White"
-                    TextColor="#007F5F"
-                    CornerRadius="10"
-                    HeightRequest="35"/>
-        </StackLayout>
+        <!-- Поисковая строка (слегка перекрывает карту) -->
+        <Frame Grid.Row="2"
+               Margin="16,-20,16,0"
+               BackgroundColor="White"
+               CornerRadius="12"
+               Padding="0"
+               HasShadow="True"
+               HeightRequest="48"
+               VerticalOptions="Start">
+            <Grid ColumnDefinitions="Auto,*" Padding="12,0" ColumnSpacing="8">
+                <!-- Иконка поиска -->
+                <Label Text="🔍"
+                       FontSize="18"
+                       VerticalOptions="Center"
+                       Margin="4,0"
+                       TextColor="#9CA3AF"/>
+                
+                <!-- Поле поиска -->
+                <Entry x:Name="SearchEntry"
+                       Grid.Column="1"
+                       Placeholder="Поиск партнёров"
+                       PlaceholderColor="#9CA3AF"
+                       TextColor="#111827"
+                       FontSize="16"
+                       BackgroundColor="Transparent"
+                       VerticalOptions="Center"
+                       TextChanged="OnSearchTextChanged"
+                       Completed="OnSearchCompleted"/>
+                
+                <!-- Кнопка очистки поиска -->
+                <Button x:Name="ClearSearchButton"
+                        Grid.Column="1"
+                        Text="✕"
+                        FontSize="14"
+                        TextColor="#9CA3AF"
+                        BackgroundColor="Transparent"
+                        WidthRequest="30"
+                        HeightRequest="30"
+                        CornerRadius="15"
+                        HorizontalOptions="End"
+                        VerticalOptions="Center"
+                        Margin="0,0,8,0"
+                        IsVisible="False"
+                        Clicked="OnClearSearchClicked"/>
+            </Grid>
+        </Frame>
 
+        <!-- Категории фильтров -->
+        <Grid Grid.Row="3" 
+              BackgroundColor="Transparent"
+              Padding="16,12,16,16"
+              Margin="0,-8,0,0">
+            <ScrollView Orientation="Horizontal"
+                        HorizontalScrollBarVisibility="Never">
+                <HorizontalStackLayout x:Name="CategoriesContainer"
+                                       Spacing="12"
+                                       Padding="0">
+                    <!-- Кнопки категорий будут добавлены программно -->
+                </HorizontalStackLayout>
+            </ScrollView>
+        </Grid>
+
+        <!-- Нижняя навигационная панель -->
+        <controls:BottomNavBar x:Name="BottomBar"
+                               Grid.Row="4"
+                               Margin="0,4,0,0"/>
     </Grid>
 </ContentPage>

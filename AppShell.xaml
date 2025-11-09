@@ -54,4 +54,9 @@
         Route="PartnersListPage"
         ContentTemplate="{DataTemplate views:PartnersListPage}" />
 
+    <!-- 🔹 Страница деталей партнёра -->
+    <ShellContent
+        Route="partnerdetails"
+        ContentTemplate="{DataTemplate views:PartnerDetailPage}" />
+
 </Shell>

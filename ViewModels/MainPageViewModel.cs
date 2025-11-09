@@ -164,22 +164,21 @@ namespace YessGoFront.ViewModels
             // 🔹 Тестовый партнёр — пример данных для карточки
             var testPartner = new PartnerDetailDto
             {
-                Id = "p001",
+                Id = 1,
                 Name = "CoffeeTime",
                 Description = "CoffeeTime — уютная кофейня с ароматным кофе, десертами и атмосферой уюта. " +
                               "Держателям карты YessGo доступны скидки до 10% и кешбэк 5%.",
                 Category = "Кафе и рестораны",
                 LogoUrl = "coffeetime_logo.png",     // картинка в Resources/Images/
-                BannerUrl = "coffee_banner.png",     // опционально
+                CoverImageUrl = "coffee_banner.png",     // опционально
                 Address = "г. Бишкек, ул. Ибраимова, 115",
                 Latitude = 42.8746,
                 Longitude = 74.6122,
                 Phone = "+996 555 123 456",
                 Website = "https://coffeetime.kg",
-                Rating = 4.7,
-                ReviewsCount = 128,
-                CashbackPercent = 5,
-                Tags = new List<string> { "кофе", "десерты", "уютное место" }
+                DefaultCashbackRate = 5.0,
+                CashbackRate = 5.0,
+                MaxDiscountPercent = 10.0
             };
 
             // 🔹 Лог: выводим информацию в Output (в будущем можно передавать на экран деталей)
@@ -190,8 +189,8 @@ namespace YessGoFront.ViewModels
                 $"Описание: {testPartner.Description}\n" +
                 $"Телефон: {testPartner.Phone}\n" +
                 $"Адрес: {testPartner.Address}\n" +
-                $"Кешбэк: {testPartner.CashbackPercent}%\n" +
-                $"Рейтинг: {testPartner.Rating:F1} ⭐");
+                $"Кешбэк: {testPartner.DefaultCashbackRate}%\n" +
+                $"Макс. скидка: {testPartner.MaxDiscountPercent}%");
 
             // 🔹 Пример, как можно позже использовать:
             // await Shell.Current.GoToAsync($"partnerdetails?partnerId={testPartner.Id}");
@@ -753,7 +752,8 @@ namespace YessGoFront.ViewModels
                 // Используем ID партнёра для навигации
                 if (!string.IsNullOrWhiteSpace(partner.Id))
                 {
-                    var route = $"//partnerdetails?partnerId={Uri.EscapeDataString(partner.Id)}";
+                    // Используем абсолютный путь с тремя слешами для навигации к зарегистрированному маршруту
+                    var route = $"///partnerdetails?partnerId={Uri.EscapeDataString(partner.Id)}";
                     System.Diagnostics.Debug.WriteLine($"[MainPage] Navigating to: {route}");
                     await Shell.Current.GoToAsync(route);
                     System.Diagnostics.Debug.WriteLine("[MainPage] Navigation completed successfully");
@@ -761,7 +761,7 @@ namespace YessGoFront.ViewModels
                 else if (!string.IsNullOrWhiteSpace(partner.Name))
                 {
                     // Fallback: используем имя, если ID не указан
-                    var route = $"//partnerdetails?partnerName={Uri.EscapeDataString(partner.Name)}";
+                    var route = $"///partnerdetails?partnerName={Uri.EscapeDataString(partner.Name)}";
                     System.Diagnostics.Debug.WriteLine($"[MainPage] Navigating by name to: {route}");
                     await Shell.Current.GoToAsync(route);
                     System.Diagnostics.Debug.WriteLine("[MainPage] Navigation completed successfully");

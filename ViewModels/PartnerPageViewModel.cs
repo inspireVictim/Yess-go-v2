@@ -58,7 +58,7 @@ public partial class PartnerPageViewModel : ObservableObject
             return;
 
         // Если используешь Shell навигацию:
-        await Shell.Current.GoToAsync($"partnerdetails?partnerId={partner.Id}");
+        await Shell.Current.GoToAsync($"///partnerdetails?partnerId={partner.Id}");
     }
 
     // ❌ БЕЗ [RelayCommand] — метод вызывается из явной команды

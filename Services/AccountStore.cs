@@ -96,10 +96,24 @@ namespace YessGoFront.Services
         private AccountStore() => Load();
 
         // Отображаемое имя для UI
-        public string DisplayName =>
-            string.IsNullOrWhiteSpace(FirstName) && string.IsNullOrWhiteSpace(LastName)
-                ? (Email ?? "Гость")
-                : $"{FirstName} {LastName}".Trim();
+        public string DisplayName
+        {
+            get
+            {
+                var fullName = $"{FirstName} {LastName}".Trim();
+                if (!string.IsNullOrWhiteSpace(fullName))
+                    return fullName;
+                
+                // Если нет имени, используем телефон или email
+                if (!string.IsNullOrWhiteSpace(Phone))
+                    return Phone;
+                
+                if (!string.IsNullOrWhiteSpace(Email))
+                    return Email;
+                
+                return "Гость";
+            }
+        }
 
         // ===== Persistence =====
         public void Load()

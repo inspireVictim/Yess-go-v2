@@ -16,6 +16,17 @@ public interface IAuthService
     /// Регистрация. После успешной регистрации автоматически выполняет вход
     /// </summary>
     Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Отправка SMS-кода верификации на номер телефона
+    /// </summary>
+    Task SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Проверка кода и завершение регистрации с автоматическим входом
+    /// </summary>
+    Task<AuthResponse> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default);
+    
     Task<bool> RefreshTokenAsync(CancellationToken ct = default);
     Task LogoutAsync(CancellationToken ct = default);
     Task<bool> IsAuthenticatedAsync();

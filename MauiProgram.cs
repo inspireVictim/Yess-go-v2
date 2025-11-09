@@ -7,6 +7,7 @@ using Microsoft.Maui;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Storage;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 using YessGoFront.Config;
 using YessGoFront.Data;
 using YessGoFront.Infrastructure.Auth;
@@ -28,6 +29,7 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
+            .UseSkiaSharp(true)
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

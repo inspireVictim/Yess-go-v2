@@ -47,3 +47,5 @@ Write-Host "`n✅ Очистка завершена!" -ForegroundColor Green
 Write-Host "`n📝 Теперь выполните:`n   dotnet restore YessGoFront.csproj`n   dotnet build YessGoFront.csproj -c Debug" -ForegroundColor Cyan
 
 
+
+

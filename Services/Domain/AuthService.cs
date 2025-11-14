@@ -1,10 +1,12 @@
+using System.Linq;
 using Microsoft.Extensions.Logging;
-using YessGoFront.Infrastructure.Auth;
-using YessGoFront.Infrastructure.Exceptions;
-using YessGoFront.Services.Api;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
+using YessGoFront.Infrastructure.Auth;
+using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Models;
+using YessGoFront.Services.Api;
+using YessGoFront.Services;
 using VerifyCodeRequest = YessGoFront.Services.Api.VerifyCodeRequest;
 
 namespace YessGoFront.Services.Domain;
@@ -28,17 +30,76 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<AuthResponse> LoginAsync(string emailOrPhone, string password, CancellationToken ct = default)
+    //Проверка/логин по биометрии
+    private readonly BiometricService _biometricService = new();
+    private readonly PinStorageService _pinService = new();
+
+    public async Task<bool> AuthenticateWithBiometricsAsync()
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(emailOrPhone) || string.IsNullOrWhiteSpace(password))
-                throw new ArgumentException("Email/Phone and password are required");
+            return await _biometricService.AuthenticateAsync("Подтвердите вход в YessGo");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Ошибка биометрической аутентификации");
+            return false;
+        }
+    }
+
+    public async Task<bool> ValidatePinAsync(string pin)
+    {
+        try
+        {
+            return await _pinService.ValidatePinAsync(pin);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Ошибка проверки PIN-кода");
+            return false;
+        }
+    }
+
+    public async Task SavePinAsync(string pin)
+    {
+        try
+        {
+            await _pinService.SavePinAsync(pin);
+            _logger?.LogInformation("PIN успешно сохранён");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Ошибка сохранения PIN-кода");
+        }
+    }
+
+    public async Task<bool> HasPinAsync()
+    {
+        try
+        {
+            var pin = await _pinService.GetPinAsync();
+            return !string.IsNullOrWhiteSpace(pin);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Ошибка проверки наличия PIN-кода");
+            return false;
+        }
+    }
+
+    public async Task<AuthResponse> LoginWithPhoneAsync(string phone, string password, CancellationToken ct = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(phone) || string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("Phone and password are required");
+
+            // Нормализуем телефон (добавляем +996 если нужно)
+            var normalizedPhone = NormalizePhone(phone);
 
             var request = new LoginRequest
             {
-                Email = emailOrPhone.Contains('@') ? emailOrPhone : null,
-                Phone = !emailOrPhone.Contains('@') ? emailOrPhone : null,
+                Phone = normalizedPhone,
                 Password = password
             };
 
@@ -58,7 +119,7 @@ public class AuthService : IAuthService
             if (response.UserId > 0)
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
 
-            _logger?.LogInformation("User logged in: {EmailOrPhone}, UserId: {UserId}", emailOrPhone, response.UserId);
+            _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
             return response;
         }
         catch (ApiException) { throw; }
@@ -67,6 +128,44 @@ public class AuthService : IAuthService
             _logger?.LogError(ex, "Error during login");
             throw new NetworkException("Не удалось войти в систему", ex);
         }
+    }
+
+    // Старый метод для обратной совместимости
+    [Obsolete("Use LoginWithPhoneAsync instead")]
+    public async Task<AuthResponse> LoginAsync(string emailOrPhone, string password, CancellationToken ct = default)
+    {
+        // Если это email - выбрасываем ошибку (больше не поддерживается)
+        if (emailOrPhone.Contains("@"))
+        {
+            throw new ArgumentException("Вход по email больше не поддерживается. Используйте номер телефона.");
+        }
+        
+        // Используем новый метод
+        return await LoginWithPhoneAsync(emailOrPhone, password, ct);
+    }
+
+    private static string NormalizePhone(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return string.Empty;
+
+        // Удаляем все нецифровые символы
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+
+        // Если начинается с 996, убираем его
+        if (digits.StartsWith("996") && digits.Length > 3)
+        {
+            digits = digits.Substring(3);
+        }
+
+        // Если номер начинается с 0, убираем его
+        if (digits.StartsWith("0") && digits.Length > 1)
+        {
+            digits = digits.Substring(1);
+        }
+
+        // Возвращаем с префиксом +996
+        return "+996" + digits;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
@@ -197,6 +296,18 @@ public class AuthService : IAuthService
         finally
         {
             await _authService.ClearTokensAsync();
+            
+            // Удаляем PIN-код при выходе
+            try
+            {
+                await _pinService.ClearPinAsync();
+                _logger?.LogInformation("PIN code cleared on logout");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error clearing PIN on logout");
+            }
+            
             _logger?.LogInformation("User logged out");
         }
     }

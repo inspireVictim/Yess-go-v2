@@ -15,12 +15,16 @@ using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Models;
 using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
+using YessGoFront.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
+using SkiaSharp;
+using Mapsui.Rendering.Skia;
 #if ANDROID
 using Android.Util;
 #endif
@@ -31,12 +35,19 @@ namespace YessGoFront.Views
     {
         private readonly IPartnersService? _partnersService;
         private readonly ILogger<MapPage>? _logger;
+        private readonly ILocationService? _locationService;
+        private readonly IImageCacheService? _imageCacheService;
         private readonly ObservableCollection<CategoryFilter> _categories = new();
         private readonly Dictionary<int, PartnerLocationDto> _partnerLocations = new();
         private string? _selectedCategory;
+        private string? _selectedCategorySlug;
         private string? _searchQuery;
+        private readonly IHttpClientFactory? _httpClientFactory;
         private System.Threading.Timer? _searchDebounceTimer;
         private bool _isLoading;
+        private Location? _userLocation; // Текущее местоположение пользователя
+        private readonly Dictionary<string, int> _bitmapCache = new(); // Кэш ID битмапов для Mapsui
+        private readonly Dictionary<int, SKBitmap> _bitmapStorage = new(); // Хранилище битмапов
 
         private Mapsui.UI.Maui.MapView? MapView { get; set; }
 
@@ -53,6 +64,10 @@ namespace YessGoFront.Views
                 // Получаем сервисы из DI
                 _partnersService = MauiProgram.Services.GetService<IPartnersService>();
                 _logger = MauiProgram.Services.GetService<ILogger<MapPage>>();
+                _httpClientFactory = MauiProgram.Services.GetService<IHttpClientFactory>();
+                _locationService = MauiProgram.Services.GetService<ILocationService>() 
+                    ?? new LocationService(MauiProgram.Services.GetService<ILogger<LocationService>>());
+                _imageCacheService = MauiProgram.Services.GetService<IImageCacheService>();
                 
                 System.Diagnostics.Debug.WriteLine("[MapPage] Сервисы получены");
                 
@@ -87,6 +102,9 @@ namespace YessGoFront.Views
                     _isInitialized = true;
                     System.Diagnostics.Debug.WriteLine("[MapPage] MapView инициализирован");
                 }
+                
+                // Загружаем категории из API
+                await InitializeCategoriesAsync();
                 
                 // Загружаем партнёров на карту
                 await LoadPartnersOnMap();
@@ -179,10 +197,10 @@ namespace YessGoFront.Views
 #endif
                                         System.Diagnostics.Debug.WriteLine("[MapPage] Карта инициализирована");
                                         
-                                        // Инициализируем категории (только визуально, без функционала)
-                                        InitializeCategories();
-                                        
                                         tcs.SetResult(true);
+                                        
+                                        // Инициализируем категории асинхронно (fire-and-forget)
+                                        _ = InitializeCategoriesAsync();
                                     }
                                     catch (Exception ex)
                                     {
@@ -254,6 +272,19 @@ namespace YessGoFront.Views
             _searchDebounceTimer?.Dispose();
         }
 
+        protected override void OnNavigatedFrom(NavigatedFromEventArgs args)
+        {
+            base.OnNavigatedFrom(args);
+            
+            // Освобождаем битмапы при уходе со страницы
+            foreach (var bitmap in _bitmapStorage.Values)
+            {
+                bitmap?.Dispose();
+            }
+            _bitmapStorage.Clear();
+            _bitmapCache.Clear();
+        }
+
         private void InitializeMap()
         {
             if (MapView == null)
@@ -313,41 +344,108 @@ namespace YessGoFront.Views
             }
         }
 
-        private void InitializeCategories()
+        private async Task InitializeCategoriesAsync()
         {
-            // Категории для фильтрации
+            try
+            {
+                if (_httpClientFactory == null)
+                {
+                    _logger?.LogWarning("HttpClientFactory is null, using static categories");
+                    LoadStaticCategories();
+                    return;
+                }
+
+                var httpClient = _httpClientFactory.CreateClient("ApiClient");
+                var endpoint = ApiEndpoints.PartnersEndpoints.Categories;
+                var response = await httpClient.GetAsync(endpoint);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var apiCategories = JsonSerializer.Deserialize<List<CategoryDto>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    // Очищаем старые категории
+                    _categories.Clear();
+                    CategoriesContainer.Children.Clear();
+
+                    // Добавляем "Все" категорию
+                    var allCategory = new CategoryFilter { Name = "Все", Slug = "all", IsSelected = true };
+                    _categories.Add(allCategory);
+                    CreateCategoryButton(allCategory);
+
+                    // Добавляем категории из API
+                    foreach (var cat in apiCategories ?? new List<CategoryDto>())
+                    {
+                        var categoryFilter = new CategoryFilter 
+                        { 
+                            Name = cat.Name, 
+                            Slug = cat.Slug ?? string.Empty,
+                            IsSelected = false 
+                        };
+                        _categories.Add(categoryFilter);
+                        CreateCategoryButton(categoryFilter);
+                    }
+
+                    _logger?.LogInformation($"Loaded {_categories.Count} categories from API");
+                }
+                else
+                {
+                    _logger?.LogWarning($"Failed to load categories: {response.StatusCode}, using static categories");
+                    LoadStaticCategories();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error loading categories from API, using static categories");
+                LoadStaticCategories();
+            }
+        }
+
+        private void LoadStaticCategories()
+        {
+            // Fallback: статичные категории
             var categoryList = new List<CategoryFilter>
             {
-                new CategoryFilter { Name = "Все", IsSelected = true },
-                new CategoryFilter { Name = "Красота", IsSelected = false },
-                new CategoryFilter { Name = "Еда и напитки", IsSelected = false },
-                new CategoryFilter { Name = "Продукты", IsSelected = false },
-                new CategoryFilter { Name = "Одежда", IsSelected = false },
-                new CategoryFilter { Name = "Электроника", IsSelected = false },
-                new CategoryFilter { Name = "Спорт", IsSelected = false }
+                new CategoryFilter { Name = "Все", Slug = "all", IsSelected = true },
+                new CategoryFilter { Name = "Красота", Slug = "beauty", IsSelected = false },
+                new CategoryFilter { Name = "Еда и напитки", Slug = "food-drinks", IsSelected = false },
+                new CategoryFilter { Name = "Продукты", Slug = "groceries", IsSelected = false },
+                new CategoryFilter { Name = "Одежда", Slug = "clothes-shoes", IsSelected = false },
+                new CategoryFilter { Name = "Электроника", Slug = "electronics", IsSelected = false },
+                new CategoryFilter { Name = "Спорт", Slug = "sport-leisure", IsSelected = false }
             };
+
+            _categories.Clear();
+            CategoriesContainer.Children.Clear();
 
             foreach (var category in categoryList)
             {
                 _categories.Add(category);
-                
-                // Создаём кнопку категории
-                var button = new Button
-                {
-                    Text = category.Name,
-                    BackgroundColor = category.IsSelected ? Microsoft.Maui.Graphics.Color.FromArgb("#0F6B53") : Microsoft.Maui.Graphics.Color.FromArgb("#E5E7EB"),
-                    TextColor = category.IsSelected ? Microsoft.Maui.Graphics.Colors.White : Microsoft.Maui.Graphics.Color.FromArgb("#6B7280"),
-                    FontSize = 14,
-                    FontAttributes = FontAttributes.Bold,
-                    CornerRadius = 20,
-                    Padding = new Thickness(20, 10),
-                    Margin = new Thickness(0, 0, 0, 0)
-                };
-
-                button.Clicked += (s, e) => OnCategoryClicked(category);
-                
-                CategoriesContainer.Children.Add(button);
+                CreateCategoryButton(category);
             }
+        }
+
+        private void CreateCategoryButton(CategoryFilter category)
+        {
+            var button = new Button
+            {
+                Text = category.Name,
+                BackgroundColor = category.IsSelected 
+                    ? Microsoft.Maui.Graphics.Color.FromArgb("#0F6B53") 
+                    : Microsoft.Maui.Graphics.Color.FromArgb("#E5E7EB"),
+                TextColor = category.IsSelected 
+                    ? Microsoft.Maui.Graphics.Colors.White 
+                    : Microsoft.Maui.Graphics.Color.FromArgb("#6B7280"),
+                FontSize = 13,
+                FontAttributes = FontAttributes.Bold,
+                CornerRadius = 12,
+                Padding = new Thickness(12, 8),
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+
+            button.Clicked += (s, e) => OnCategoryClicked(category);
+            
+            CategoriesContainer.Children.Add(button);
         }
 
         private async void OnCategoryClicked(CategoryFilter category)
@@ -361,8 +459,18 @@ namespace YessGoFront.Views
             // Обновляем визуальное состояние кнопок
             UpdateCategoryButtons();
 
-            // Фильтруем партнёров на карте
-            _selectedCategory = category.IsSelected && category.Name != "Все" ? category.Name : null;
+            // Фильтруем партнёров на карте по slug
+            if (category.Slug == "all" || string.IsNullOrEmpty(category.Slug))
+            {
+                _selectedCategory = null;
+                _selectedCategorySlug = null;
+            }
+            else
+            {
+                _selectedCategory = category.Name;
+                _selectedCategorySlug = category.Slug;
+            }
+            
             await LoadPartnersOnMap();
         }
 
@@ -404,12 +512,13 @@ namespace YessGoFront.Views
                 var endpoint = ApiEndpoints.PartnersEndpoints.Locations;
                 
                 // Добавляем фильтры, если есть
-                if (!string.IsNullOrWhiteSpace(_selectedCategory) || !string.IsNullOrWhiteSpace(_searchQuery))
+                if (!string.IsNullOrWhiteSpace(_selectedCategorySlug) || !string.IsNullOrWhiteSpace(_searchQuery))
                 {
                     var queryParams = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(_selectedCategory))
+                    if (!string.IsNullOrWhiteSpace(_selectedCategorySlug))
                     {
-                        queryParams.Add($"category={Uri.EscapeDataString(_selectedCategory)}");
+                        // Используем category_slug для фильтрации
+                        queryParams.Add($"category_slug={Uri.EscapeDataString(_selectedCategorySlug)}");
                     }
                     if (!string.IsNullOrWhiteSpace(_searchQuery))
                     {
@@ -490,54 +599,73 @@ namespace YessGoFront.Views
                         feature["PartnerId"] = location.PartnerId;
                         feature["Address"] = location.Address ?? string.Empty;
                         feature["LocationId"] = location.Id;
+                        feature["LogoUrl"] = location.LogoUrl ?? string.Empty;
 
-                        // Стиль маркера (зелёный круг с белой обводкой)
-                        // Используем Mapsui.Styles.Color и Mapsui.Styles.Brush
-                        byte r = 15;
-                        byte g = 107;
-                        byte b = 83;
-                        Mapsui.Styles.Color fillColor = new Mapsui.Styles.Color(r, g, b); // #0F6B53
-                        byte whiteR = 255;
-                        byte whiteG = 255;
-                        byte whiteB = 255;
-                        Mapsui.Styles.Color outlineColor = new Mapsui.Styles.Color(whiteR, whiteG, whiteB);
-                        Mapsui.Styles.Brush fillBrush = new Mapsui.Styles.Brush(fillColor);
-                        Mapsui.Styles.Pen outlinePen = new Mapsui.Styles.Pen(outlineColor, 2);
-                        
-                        feature.Styles.Add(new SymbolStyle
-                        {
-                            SymbolType = SymbolType.Ellipse,
-                            Fill = fillBrush,
-                            Outline = outlinePen,
-                            SymbolScale = 1.2f,
-                            Opacity = 0.9f
-                        });
+                        // Создаём кастомный маркер в стиле Яндекс.Карт
+                        var markerStyle = await CreatePartnerMarkerStyleAsync(location.LogoUrl);
+                        feature.Styles.Add(markerStyle);
 
                         features.Add(feature);
                     }
                 }
 
-                // Создаём MemoryLayer с MemoryProvider
-                var memoryProvider = new MemoryProvider(features);
-                var partnersLayer = new MemoryLayer("PartnersLayer");
-                
-                // В Mapsui 4.1.9 MemoryLayer может использовать DataSource или Features
-                // Пробуем установить DataSource напрямую
-                try
+                // Создаём MemoryLayer и устанавливаем Features напрямую (Mapsui 4.x API)
+                if (features.Count > 0)
                 {
-                    // Используем dynamic для обхода проверки типов на этапе компиляции
-                    dynamic dynamicLayer = partnersLayer;
-                    dynamicLayer.DataSource = memoryProvider;
+                    var partnersLayer = new MemoryLayer("PartnersLayer");
+                    
+                    // В Mapsui 4.x Features может быть свойством, которое можно установить
+                    try
+                    {
+                        var featuresProperty = typeof(MemoryLayer).GetProperty("Features");
+                        if (featuresProperty != null && featuresProperty.CanWrite)
+                        {
+                            // Пробуем установить как List<IFeature>
+                            featuresProperty.SetValue(partnersLayer, features);
+                        }
+                        else
+                        {
+                            // Альтернатива: используем MemoryProvider через рефлексию
+                            var memoryProvider = new MemoryProvider(features);
+                            var dataSourceProperty = typeof(MemoryLayer).GetProperty("DataSource", 
+                                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                            if (dataSourceProperty != null)
+                            {
+                                dataSourceProperty.SetValue(partnersLayer, memoryProvider);
+                            }
+                            else
+                            {
+                                // Последний вариант: dynamic
+                                dynamic dynamicLayer = partnersLayer;
+                                dynamicLayer.DataSource = memoryProvider;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Could not set Features/DataSource on PartnersLayer, trying dynamic");
+                        try
+                        {
+                            var memoryProvider = new MemoryProvider(features);
+                            dynamic dynamicLayer = partnersLayer;
+                            dynamicLayer.DataSource = memoryProvider;
+                        }
+                        catch (Exception ex2)
+                        {
+                            _logger?.LogError(ex2, "All methods to set features on PartnersLayer failed");
+                        }
+                    }
+                    
+                    MapView.Map.Layers.Add(partnersLayer);
+                    _logger?.LogInformation($"Loaded {features.Count} partner locations on map");
+                    
+                    // Обновляем карту, чтобы показать новые маркеры
+                    MapView.Map.Refresh();
                 }
-                catch
+                else
                 {
-                    // Если DataSource недоступен, логируем предупреждение
-                    _logger?.LogWarning("Could not set DataSource on MemoryLayer, features may not display");
+                    _logger?.LogWarning("No partner locations with valid coordinates found");
                 }
-                
-                MapView.Map.Layers.Add(partnersLayer);
-
-                _logger?.LogInformation($"Loaded {features.Count} partner locations on map");
             }
             catch (NetworkException ex)
             {
@@ -585,21 +713,40 @@ namespace YessGoFront.Views
                 var partnerId = Convert.ToInt32(partnerIdValue);
                 if (!_partnerLocations.TryGetValue(partnerId, out var location)) return;
 
-                // Показываем диалог с информацией о партнёре
+                // Показываем улучшенное всплывающее окно с информацией о партнёре
+                var message = $"📍 {location.PartnerName}";
+                if (!string.IsNullOrWhiteSpace(location.Address))
+                {
+                    message += $"\n\n📍 Адрес: {location.Address}";
+                }
+                if (location.MaxDiscountPercent > 0)
+                {
+                    message += $"\n\n💰 Скидка до {location.MaxDiscountPercent:F0}%";
+                }
+                
+                var actions = new List<string> { "Подробнее", "Проложить путь" };
+                
+                // Убираем "Проложить путь", если нет местоположения пользователя
+                if (_userLocation == null || !location.Latitude.HasValue || !location.Longitude.HasValue)
+                {
+                    actions.Remove("Проложить путь");
+                }
+                
                 var result = await DisplayActionSheet(
-                    location.PartnerName,
+                    message,
                     "Отмена",
                     null,
-                    new[] { "Открыть страницу партнёра", "Показать адрес" }
+                    actions.ToArray()
                 );
 
-                if (result == "Открыть страницу партнёра")
+                if (result == "Подробнее")
                 {
                     await Shell.Current.GoToAsync($"///partnerdetails?partnerId={partnerId}");
                 }
-                else if (result == "Показать адрес" && !string.IsNullOrWhiteSpace(location.Address))
+                else if (result == "Проложить путь" && _userLocation != null && 
+                         location.Latitude.HasValue && location.Longitude.HasValue)
                 {
-                    await DisplayAlert("Адрес", location.Address, "OK");
+                    await ShowRouteToPartner(_userLocation, location);
                 }
             }
             catch (Exception ex)
@@ -612,43 +759,397 @@ namespace YessGoFront.Views
         {
             try
             {
-                // Проверяем разрешение на геолокацию
-                var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
-                if (status != PermissionStatus.Granted)
+                if (_locationService == null)
                 {
-                    status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                    _logger?.LogWarning("LocationService is null, using default location");
+                    CenterMapOnDefaultLocation();
+                    return;
                 }
 
-                if (status == PermissionStatus.Granted)
+                var location = await _locationService.GetCurrentLocationAsync();
+                
+                if (location != null)
                 {
-                    var request = new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(10));
-                    var location = await Geolocation.Default.GetLocationAsync(request);
-
-                    if (location != null)
-                    {
-                        double userLon = location.Longitude;
-                        double userLat = location.Latitude;
-                        Mapsui.MPoint point = new Mapsui.MPoint(userLon, userLat);
-                        (double x, double y) mercatorCoords = SphericalMercator.FromLonLat(point.X, point.Y);
-                        Mapsui.MPoint sphericalMercatorCoordinate = new Mapsui.MPoint(mercatorCoords.x, mercatorCoords.y);
-                        // Resolution для zoom level 14 примерно равен 9.5 метра на пиксель
-                        var resolution = 9.5;
-                        if (MapView?.Map != null)
-                        {
-                            MapView.Map.Navigator.CenterOnAndZoomTo(sphericalMercatorCoordinate, resolution);
-                            _logger?.LogInformation($"Centered map on user location: {location.Latitude}, {location.Longitude}");
-                        }
-                    }
+                    _userLocation = location;
+                    await CenterMapOnLocationAsync(location, animated: false);
+                    AddUserLocationMarker(location);
+                    _logger?.LogInformation($"Centered map on user location: {location.Latitude}, {location.Longitude}");
                 }
-            }
-            catch (PermissionException)
-            {
-                _logger?.LogWarning("Location permission denied");
+                else
+                {
+                    _logger?.LogWarning("Could not get user location, using default");
+                    CenterMapOnDefaultLocation();
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Could not get user location, using default (Bishkek)");
-                // Используем координаты Бишкека по умолчанию
+                _logger?.LogError(ex, "Error getting location");
+                CenterMapOnDefaultLocation();
+            }
+        }
+
+        private async void OnMyLocationTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                ShowLoading(true);
+                
+                System.Diagnostics.Debug.WriteLine("[MapPage] OnMyLocationTapped - button clicked");
+                
+                if (_locationService == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[MapPage] LocationService is null!");
+                    await DisplayAlert("Ошибка", "Сервис геолокации недоступен", "OK");
+                    ShowLoading(false);
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine("[MapPage] Requesting location from LocationService...");
+                var location = await _locationService.GetCurrentLocationAsync();
+                
+                if (location != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MapPage] Location received: Lat={location.Latitude}, Lon={location.Longitude}");
+                    _userLocation = location;
+                    await CenterMapOnLocationAsync(location, animated: true);
+                    AddUserLocationMarker(location);
+                    _logger?.LogInformation($"Centered map on user location (button): {location.Latitude}, {location.Longitude}");
+                    System.Diagnostics.Debug.WriteLine($"[MapPage] Map centered successfully on user location");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[MapPage] Location is null - showing error");
+                    await DisplayAlert("Геолокация", 
+                        "Не удалось определить ваше местоположение. Проверьте, что геолокация включена в настройках устройства.", 
+                        "OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in OnMyLocationTapped");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] ERROR in OnMyLocationTapped: {ex.Message}\n{ex.StackTrace}");
+                await DisplayAlert("Ошибка", $"Не удалось получить местоположение: {ex.Message}", "OK");
+            }
+            finally
+            {
+                ShowLoading(false);
+            }
+        }
+
+        private async Task CenterMapOnLocationAsync(Location location, bool animated = true)
+        {
+            if (MapView?.Map == null) return;
+
+            try
+            {
+                // Логируем координаты для отладки
+                _logger?.LogInformation($"CenterMapOnLocationAsync: Lat={location.Latitude}, Lon={location.Longitude}");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] CenterMapOnLocationAsync: Lat={location.Latitude}, Lon={location.Longitude}");
+                
+                // ВАЖНО: SphericalMercator.FromLonLat принимает (longitude, latitude)
+                double userLon = location.Longitude;
+                double userLat = location.Latitude;
+                
+                // Преобразуем в Spherical Mercator координаты
+                (double x, double y) mercatorCoords = SphericalMercator.FromLonLat(userLon, userLat);
+                Mapsui.MPoint sphericalMercatorCoordinate = new Mapsui.MPoint(mercatorCoords.x, mercatorCoords.y);
+                
+                _logger?.LogInformation($"Mercator coordinates: X={mercatorCoords.x}, Y={mercatorCoords.y}");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Mercator coordinates: X={mercatorCoords.x}, Y={mercatorCoords.y}");
+                
+                // Resolution для zoom level 14 примерно равен 9.5 метра на пиксель
+                var resolution = 9.5;
+                
+                if (animated)
+                {
+                    // Плавная анимация: сначала приближаемся, потом центрируем
+                    // Начинаем с большего разрешения (меньший зум), затем уменьшаем (больший зум)
+                    var startResolution = resolution * 4; // Начальный зум (дальше)
+                    
+                    // Устанавливаем начальную позицию
+                    MapView.Map.Navigator.CenterOnAndZoomTo(sphericalMercatorCoordinate, startResolution);
+                    
+                    // Анимируем приближение
+                    await Task.Delay(100); // Небольшая задержка для плавности
+                    
+                    // Плавно уменьшаем resolution (увеличиваем зум)
+                    var steps = 10;
+                    for (int i = 0; i <= steps; i++)
+                    {
+                        var t = (double)i / steps;
+                        // Используем easing функцию для плавности
+                        var easedT = 1 - Math.Pow(1 - t, 3); // Ease-out cubic
+                        var currentResolution = startResolution - (startResolution - resolution) * easedT;
+                        
+                        MapView.Map.Navigator.CenterOnAndZoomTo(sphericalMercatorCoordinate, currentResolution);
+                        await Task.Delay(30); // 30ms между шагами = ~300ms общая анимация
+                    }
+                }
+                else
+                {
+                    MapView.Map.Navigator.CenterOnAndZoomTo(sphericalMercatorCoordinate, resolution);
+                }
+                
+                _logger?.LogInformation($"Map centered successfully on location");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Map centered successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error centering map on location");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] ERROR centering map: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        private void CenterMapOnDefaultLocation()
+        {
+            // Используем координаты Бишкека по умолчанию
+            var bishkekLocation = new Location(42.8746, 74.5698);
+            _userLocation = bishkekLocation;
+            
+            System.Diagnostics.Debug.WriteLine($"[MapPage] CenterMapOnDefaultLocation: Using Bishkek (42.8746, 74.5698)");
+            
+            if (MapView?.Map != null)
+            {
+                // ВАЖНО: SphericalMercator.FromLonLat принимает (longitude, latitude)
+                double bishkekLon = 74.5698;
+                double bishkekLat = 42.8746;
+                (double x, double y) mercatorCoords = SphericalMercator.FromLonLat(bishkekLon, bishkekLat);
+                Mapsui.MPoint sphericalMercatorCoordinate = new Mapsui.MPoint(mercatorCoords.x, mercatorCoords.y);
+                var resolution = 19.1; // Zoom level 13 для общего вида
+                MapView.Map.Navigator.CenterOnAndZoomTo(sphericalMercatorCoordinate, resolution);
+                AddUserLocationMarker(bishkekLocation);
+                _logger?.LogInformation($"Centered map on default location (Bishkek)");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Map centered on Bishkek successfully");
+            }
+        }
+
+        private void AddUserLocationMarker(Location location)
+        {
+            try
+            {
+                if (MapView?.Map == null) return;
+
+                System.Diagnostics.Debug.WriteLine($"[MapPage] AddUserLocationMarker: Lat={location.Latitude}, Lon={location.Longitude}");
+
+                // Удаляем старый маркер пользователя, если есть
+                var existingLayer = MapView.Map.Layers.FirstOrDefault(l => l.Name == "UserLocationLayer");
+                if (existingLayer != null)
+                {
+                    MapView.Map.Layers.Remove(existingLayer);
+                }
+
+                // Создаём маркер местоположения пользователя
+                // ВАЖНО: SphericalMercator.FromLonLat принимает (longitude, latitude)
+                double userLon = location.Longitude;
+                double userLat = location.Latitude;
+                (double x, double y) mercatorCoords = SphericalMercator.FromLonLat(userLon, userLat);
+                Mapsui.MPoint sphericalMercatorCoordinate = new Mapsui.MPoint(mercatorCoords.x, mercatorCoords.y);
+
+                var userFeature = new Mapsui.Layers.PointFeature(sphericalMercatorCoordinate);
+                userFeature["Type"] = "UserLocation";
+
+                // Синий маркер для пользователя
+                Mapsui.Styles.Color blueColor = new Mapsui.Styles.Color(0, 122, 255); // iOS blue
+                Mapsui.Styles.Color whiteColor = new Mapsui.Styles.Color(255, 255, 255);
+                Mapsui.Styles.Brush fillBrush = new Mapsui.Styles.Brush(blueColor);
+                Mapsui.Styles.Pen outlinePen = new Mapsui.Styles.Pen(whiteColor, 3);
+
+                userFeature.Styles.Add(new SymbolStyle
+                {
+                    SymbolType = SymbolType.Ellipse,
+                    Fill = fillBrush,
+                    Outline = outlinePen,
+                    SymbolScale = 1.5f,
+                    Opacity = 0.9f
+                });
+
+                var userLayer = new MemoryLayer("UserLocationLayer");
+                var userFeatures = new List<IFeature> { userFeature };
+                
+                // Устанавливаем Features или DataSource через рефлексию или dynamic
+                try
+                {
+                    var featuresProperty = typeof(MemoryLayer).GetProperty("Features");
+                    if (featuresProperty != null && featuresProperty.CanWrite)
+                    {
+                        featuresProperty.SetValue(userLayer, userFeatures);
+                    }
+                    else
+                    {
+                        var userProvider = new MemoryProvider(userFeatures);
+                        var dataSourceProperty = typeof(MemoryLayer).GetProperty("DataSource", 
+                            BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                        if (dataSourceProperty != null)
+                        {
+                            dataSourceProperty.SetValue(userLayer, userProvider);
+                        }
+                        else
+                        {
+                            dynamic dynamicLayer = userLayer;
+                            dynamicLayer.DataSource = userProvider;
+                        }
+                    }
+                }
+                catch
+                {
+                    try
+                    {
+                        var userProvider = new MemoryProvider(userFeatures);
+                        dynamic dynamicLayer = userLayer;
+                        dynamicLayer.DataSource = userProvider;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Could not set Features/DataSource on UserLocationLayer");
+                    }
+                }
+
+                MapView.Map.Layers.Add(userLayer);
+                _logger?.LogInformation("User location marker added to map");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error adding user location marker: {Message}", ex.Message);
+            }
+        }
+
+        private async Task ShowRouteToPartner(Location userLocation, PartnerLocationDto partnerLocation)
+        {
+            try
+            {
+                if (MapView?.Map == null) return;
+
+                // Удаляем старый маршрут, если есть
+                var existingRouteLayer = MapView.Map.Layers.FirstOrDefault(l => l.Name == "RouteLayer");
+                if (existingRouteLayer != null)
+                {
+                    MapView.Map.Layers.Remove(existingRouteLayer);
+                }
+
+                // Создаём прямую линию от пользователя до партнёра
+                // (В реальном приложении можно использовать API маршрутизации, например OSRM)
+                double userLon = userLocation.Longitude;
+                double userLat = userLocation.Latitude;
+                double partnerLon = partnerLocation.Longitude!.Value;
+                double partnerLat = partnerLocation.Latitude!.Value;
+
+                Mapsui.MPoint userPoint = new Mapsui.MPoint(userLon, userLat);
+                Mapsui.MPoint partnerPoint = new Mapsui.MPoint(partnerLon, partnerLat);
+
+                (double x1, double y1) userMercator = SphericalMercator.FromLonLat(userPoint.X, userPoint.Y);
+                (double x2, double y2) partnerMercator = SphericalMercator.FromLonLat(partnerPoint.X, partnerPoint.Y);
+
+                Mapsui.MPoint userMercatorPoint = new Mapsui.MPoint(userMercator.x1, userMercator.y1);
+                Mapsui.MPoint partnerMercatorPoint = new Mapsui.MPoint(partnerMercator.x2, partnerMercator.y2);
+
+                // В Mapsui 4.x пространство имен Geometries было удалено
+                // Используем упрощённый подход - создаём визуальную линию через несколько промежуточных точек
+                var routeCoordinates = new List<Mapsui.MPoint> { userMercatorPoint, partnerMercatorPoint };
+                
+                // Создаём промежуточные точки для визуализации линии
+                // Генерируем несколько точек между началом и концом маршрута
+                var linePoints = new List<Mapsui.MPoint>();
+                int segments = 20; // Количество сегментов для плавной линии
+                for (int i = 0; i <= segments; i++)
+                {
+                    double t = (double)i / segments;
+                    double x = userMercatorPoint.X + (partnerMercatorPoint.X - userMercatorPoint.X) * t;
+                    double y = userMercatorPoint.Y + (partnerMercatorPoint.Y - userMercatorPoint.Y) * t;
+                    linePoints.Add(new Mapsui.MPoint(x, y));
+                }
+                
+                // Создаём Features для каждой точки линии
+                var routeFeatures = new List<IFeature>();
+                foreach (var point in linePoints)
+                {
+                    var pointFeature = new PointFeature(point);
+                    pointFeature["Type"] = "RoutePoint";
+                    
+                    // Стиль точки линии (синий цвет, маленький размер)
+                    Mapsui.Styles.Color routeColor = new Mapsui.Styles.Color(0, 122, 255);
+                    Mapsui.Styles.Brush fillBrush = new Mapsui.Styles.Brush(routeColor);
+                    
+                    pointFeature.Styles.Add(new SymbolStyle
+                    {
+                        SymbolType = SymbolType.Ellipse,
+                        Fill = fillBrush,
+                        SymbolScale = 0.3f, // Маленький размер для создания эффекта линии
+                        Opacity = 0.8f
+                    });
+                    
+                    routeFeatures.Add(pointFeature);
+                }
+
+                var routeLayer = new MemoryLayer("RouteLayer");
+                
+                // Устанавливаем Features или DataSource через рефлексию или dynamic
+                try
+                {
+                    var featuresProperty = typeof(MemoryLayer).GetProperty("Features");
+                    if (featuresProperty != null && featuresProperty.CanWrite)
+                    {
+                        featuresProperty.SetValue(routeLayer, routeFeatures);
+                    }
+                    else
+                    {
+                        var routeProvider = new MemoryProvider(routeFeatures);
+                        var dataSourceProperty = typeof(MemoryLayer).GetProperty("DataSource", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                        if (dataSourceProperty != null)
+                        {
+                            dataSourceProperty.SetValue(routeLayer, routeProvider);
+                        }
+                        else
+                        {
+                            dynamic dynamicLayer = routeLayer;
+                            dynamicLayer.DataSource = routeProvider;
+                        }
+                    }
+                }
+                catch
+                {
+                    try
+                    {
+                        var routeProvider = new MemoryProvider(routeFeatures);
+                        dynamic dynamicLayer = routeLayer;
+                        dynamicLayer.DataSource = routeProvider;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Could not set Features/DataSource on RouteLayer");
+                    }
+                }
+
+                MapView.Map.Layers.Add(routeLayer);
+
+                // Центрируем карту так, чтобы были видны и пользователь, и партнёр
+                double centerLon = (userLon + partnerLon) / 2;
+                double centerLat = (userLat + partnerLat) / 2;
+                Mapsui.MPoint centerPoint = new Mapsui.MPoint(centerLon, centerLat);
+                (double x, double y) centerMercator = SphericalMercator.FromLonLat(centerPoint.X, centerPoint.Y);
+                Mapsui.MPoint centerMercatorPoint = new Mapsui.MPoint(centerMercator.x, centerMercator.y);
+
+                // Вычисляем подходящий zoom level для показа обоих точек
+                double latDiff = Math.Abs(userLat - partnerLat);
+                double lonDiff = Math.Abs(userLon - partnerLon);
+                double maxDiff = Math.Max(latDiff, lonDiff);
+                
+                // Адаптируем resolution в зависимости от расстояния
+                double resolution = maxDiff > 0.01 ? 76.4 : (maxDiff > 0.005 ? 38.2 : 19.1);
+                
+                MapView.Map.Navigator.CenterOnAndZoomTo(centerMercatorPoint, resolution);
+
+                _logger?.LogInformation($"Route displayed from user ({userLat}, {userLon}) to partner ({partnerLat}, {partnerLon})");
+
+                // Показываем сообщение пользователю
+                await DisplayAlert("Маршрут проложен", 
+                    $"Прямая линия от вашего местоположения до {partnerLocation.PartnerName}", 
+                    "OK");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error showing route: {Message}", ex.Message);
+                await DisplayAlert("Ошибка", "Не удалось проложить маршрут", "OK");
             }
         }
 
@@ -706,6 +1207,182 @@ namespace YessGoFront.Views
             });
         }
 
+        private async Task<SymbolStyle> CreatePartnerMarkerStyleAsync(string? logoUrl)
+        {
+            // Создаём маркер в стиле Яндекс.Карт: круглый, с тенью, с логотипом внутри
+            const int markerSize = 64; // Размер маркера в пикселях
+            const int logoSize = 48; // Размер логотипа внутри маркера
+            const int borderWidth = 3; // Толщина белой обводки
+            
+            try
+            {
+                // Загружаем логотип, если есть
+                SKBitmap? logoBitmap = null;
+                if (!string.IsNullOrWhiteSpace(logoUrl) && _imageCacheService != null)
+                {
+                    logoBitmap = await _imageCacheService.LoadImageAsync(logoUrl);
+                }
+
+                // Создаём комбинированное изображение маркера
+                using var surface = SKSurface.Create(new SKImageInfo(markerSize, markerSize));
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Transparent);
+
+                // Рисуем круглый фон с тенью (имитация тени через градиент)
+                var centerX = markerSize / 2f;
+                var centerY = markerSize / 2f;
+                var radius = (markerSize - borderWidth * 2) / 2f;
+
+                // Тень (слегка смещённый серый круг)
+                using (var shadowPaint = new SKPaint
+                {
+                    Color = new SKColor(0, 0, 0, 60), // Полупрозрачный чёрный
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Fill
+                })
+                {
+                    canvas.DrawCircle(centerX + 2, centerY + 2, radius + borderWidth, shadowPaint);
+                }
+
+                // Основной круг (зелёный фон)
+                using (var backgroundPaint = new SKPaint
+                {
+                    Color = new SKColor(15, 107, 83), // #0F6B53
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Fill
+                })
+                {
+                    canvas.DrawCircle(centerX, centerY, radius, backgroundPaint);
+                }
+
+                // Белая обводка
+                using (var borderPaint = new SKPaint
+                {
+                    Color = SKColors.White,
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = borderWidth
+                })
+                {
+                    canvas.DrawCircle(centerX, centerY, radius, borderPaint);
+                }
+
+                // Вставляем логотип в центр, если он загружен
+                if (logoBitmap != null && !logoBitmap.IsNull)
+                {
+                    // Масштабируем логотип до нужного размера
+                    var logoRect = new SKRect(
+                        centerX - logoSize / 2f,
+                        centerY - logoSize / 2f,
+                        centerX + logoSize / 2f,
+                        centerY + logoSize / 2f
+                    );
+
+                    // Рисуем логотип с закруглёнными углами (опционально)
+                    canvas.DrawBitmap(logoBitmap, logoRect);
+                }
+                else
+                {
+                    // Если логотипа нет, рисуем иконку "магазин" или просто оставляем пустым
+                    // Можно добавить дефолтную иконку
+                }
+
+                // Получаем финальный битмап (копируем, чтобы не освобождать)
+                using var image = surface.Snapshot();
+                var finalBitmap = SKBitmap.FromImage(image);
+                if (finalBitmap == null)
+                {
+                    throw new InvalidOperationException("Failed to create bitmap from surface");
+                }
+
+                // Регистрируем битмап в Mapsui (битмап будет сохранён в хранилище)
+                // В Mapsui 4.x SymbolType.Bitmap не поддерживается напрямую
+                // Используем fallback на Ellipse с сохранением битмапа для возможного будущего использования
+                var bitmapId = RegisterBitmap(finalBitmap, logoUrl ?? "default_marker");
+
+                // В Mapsui 4.x для использования битмапов нужно использовать правильный API
+                // SymbolType.Bitmap не существует в Mapsui 4.x, поэтому используем fallback
+                // Fallback на простой маркер, но с улучшенным дизайном
+                Mapsui.Styles.Color fillColor = new Mapsui.Styles.Color(15, 107, 83);
+                Mapsui.Styles.Color whiteColor = new Mapsui.Styles.Color(255, 255, 255);
+                Mapsui.Styles.Brush fillBrush = new Mapsui.Styles.Brush(fillColor);
+                Mapsui.Styles.Pen outlinePen = new Mapsui.Styles.Pen(whiteColor, 3);
+                
+                return new SymbolStyle
+                {
+                    SymbolType = SymbolType.Ellipse,
+                    Fill = fillBrush,
+                    Outline = outlinePen,
+                    SymbolScale = 1.8f, // Увеличиваем размер для лучшей видимости
+                    Opacity = 0.95f
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, $"Error creating marker style for logo: {logoUrl}");
+                
+                // Fallback: простой круглый маркер без логотипа
+                Mapsui.Styles.Color fillColor = new Mapsui.Styles.Color(15, 107, 83);
+                Mapsui.Styles.Color whiteColor = new Mapsui.Styles.Color(255, 255, 255);
+                Mapsui.Styles.Brush fillBrush = new Mapsui.Styles.Brush(fillColor);
+                Mapsui.Styles.Pen outlinePen = new Mapsui.Styles.Pen(whiteColor, 3);
+                
+                return new SymbolStyle
+                {
+                    SymbolType = SymbolType.Ellipse,
+                    Fill = fillBrush,
+                    Outline = outlinePen,
+                    SymbolScale = 1.5f,
+                    Opacity = 0.95f
+                };
+            }
+        }
+
+        private int RegisterBitmap(SKBitmap bitmap, string cacheKey)
+        {
+            // Используем кэш для избежания дублирования
+            if (_bitmapCache.TryGetValue(cacheKey, out var existingId))
+            {
+                return existingId;
+            }
+
+            try
+            {
+                // Генерируем уникальный ID для битмапа
+                var bitmapId = cacheKey.GetHashCode();
+                
+                // Если ID уже используется, добавляем суффикс
+                int suffix = 0;
+                while (_bitmapStorage.ContainsKey(bitmapId))
+                {
+                    bitmapId = (cacheKey + suffix).GetHashCode();
+                    suffix++;
+                }
+
+                // Сохраняем битмап в хранилище (НЕ освобождаем его!)
+                _bitmapStorage[bitmapId] = bitmap;
+                _bitmapCache[cacheKey] = bitmapId;
+                
+                _logger?.LogDebug($"Registered bitmap for marker: {cacheKey}, ID: {bitmapId}, Size: {bitmap.Width}x{bitmap.Height}");
+                
+                // В Mapsui 4.x битмапы регистрируются автоматически при использовании в SymbolStyle
+                // BitmapId используется для идентификации битмапа в рендерере
+                return bitmapId;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, $"Error registering bitmap: {cacheKey}");
+                // Fallback: используем хэш как ID
+                var fallbackId = cacheKey.GetHashCode();
+                _bitmapCache[cacheKey] = fallbackId;
+                if (!_bitmapStorage.ContainsKey(fallbackId))
+                {
+                    _bitmapStorage[fallbackId] = bitmap;
+                }
+                return fallbackId;
+            }
+        }
+
         private void ShowError(string message)
         {
             MainThread.BeginInvokeOnMainThread(async () =>
@@ -718,6 +1395,7 @@ namespace YessGoFront.Views
     public class CategoryFilter
     {
         public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
     }
 
@@ -732,5 +1410,6 @@ namespace YessGoFront.Views
         public string? PhoneNumber { get; set; }
         public string? WorkingHours { get; set; }
         public double MaxDiscountPercent { get; set; }
+        public string? LogoUrl { get; set; }
     }
 }

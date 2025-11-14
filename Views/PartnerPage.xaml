@@ -4,14 +4,18 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
-    BackgroundColor="#F4F5F6">
+    Shell.NavBarIsVisible="False">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto"
+          BackgroundColor="#F4F6F8">
+
+       
 
         <!-- Поиск -->
         <StackLayout x:Name="SearchContainer"
+                     Grid.Row="1"
                      Orientation="Horizontal"
-                     Margin="16,8,16,0"
+                     Margin="16,16,16,0"
                      VerticalOptions="Center"
                      Opacity="0"
                      TranslationY="-20">
@@ -22,11 +26,13 @@
                    BackgroundColor="White"
                    HeightRequest="40"
                    HorizontalOptions="FillAndExpand">
-                <SearchBar Placeholder="Поиск по компаниям"
+                <SearchBar x:Name="SearchBar"
+                           Placeholder="Поиск по компаниям"
                            BackgroundColor="Transparent"
                            Margin="8,0"
                            VerticalOptions="Center"
-                           HeightRequest="40" />
+                           HeightRequest="40"
+                           TextChanged="OnSearchTextChanged" />
             </Frame>
 
             <ImageButton x:Name="MapButton"
@@ -44,7 +50,7 @@
 
         <!-- Категории -->
         <CollectionView x:Name="CategoriesCollection"
-                        Grid.Row="1"
+                        Grid.Row="2"
                         Margin="12,8,12,0"
                         SelectionMode="None"
                         VerticalOptions="FillAndExpand"
@@ -74,7 +80,7 @@
                         <Frame.GestureRecognizers>
                             <TapGestureRecognizer
                                 Tapped="Category_Tapped"
-                                CommandParameter="{Binding Name}" />
+                                CommandParameter="{Binding .}" />
                         </Frame.GestureRecognizers>
 
                         <VerticalStackLayout Spacing="8"
@@ -97,7 +103,7 @@
 
         <!-- Нижняя панель навигации -->
         <controls:BottomNavBar x:Name="BottomBar"
-                               Grid.Row="2"
+                               Grid.Row="3"
                                Margin="0,4,0,0"
                                Opacity="0"
                                TranslationY="30" />

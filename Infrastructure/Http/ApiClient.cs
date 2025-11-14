@@ -37,9 +37,28 @@ public abstract class ApiClient
             //    API_BASE_URL=http://YOUR_HOST_IP:8000/
             // 📌 Или отредактируйте значение по умолчанию ниже:
             
-            var isEmulator = Android.OS.Build.Fingerprint.Contains("generic");
+            // Используем ту же логику определения эмулятора, что и в MauiProgram.cs
+            var fingerprint = Android.OS.Build.Fingerprint ?? "";
+            var model = Android.OS.Build.Model ?? "";
+            var product = Android.OS.Build.Product ?? "";
+            var manufacturer = Android.OS.Build.Manufacturer ?? "";
+            
+            var isEmulator = 
+                fingerprint.Contains("generic", StringComparison.OrdinalIgnoreCase) || 
+                fingerprint.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
+                fingerprint.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("Emulator", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("gphone", StringComparison.OrdinalIgnoreCase) ||
+                product.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
+                product.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
+                product.Contains("gphone", StringComparison.OrdinalIgnoreCase) ||
+                manufacturer.Equals("unknown", StringComparison.OrdinalIgnoreCase) ||
+                manufacturer.Equals("Genymotion", StringComparison.OrdinalIgnoreCase);
+            
             var apiUrl = Environment.GetEnvironmentVariable("API_BASE_URL") 
-                ?? (isEmulator ? "http://10.0.2.2:8000/" : "http://192.168.1.1:8000/");
+                ?? (isEmulator ? "http://10.0.2.2:8000/" : "http://192.168.0.177:8000/");
             
             HttpClient.BaseAddress = new Uri(apiUrl);
             Logger?.LogWarning("[ApiClient] Android: BaseAddress установлен на: {Url} (Emulator: {IsEmulator})", 

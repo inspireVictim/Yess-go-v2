@@ -41,8 +41,22 @@ namespace YessGoFront.Views
                 );
             }
 
-            // Успешная регистрация - переходим на главную страницу
-            await Shell.Current.GoToAsync("///main");
+            // Проверяем, есть ли PIN-код
+            var domainAuthService = MauiProgram.Services.GetRequiredService<Services.Domain.IAuthService>();
+            var hasPin = await domainAuthService.HasPinAsync();
+
+            // Если PIN-кода нет - переходим на страницу создания PIN
+            if (!hasPin)
+            {
+                System.Diagnostics.Debug.WriteLine("[RegisterPage] No PIN found, navigating to PIN creation page");
+                await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
+            }
+            else
+            {
+                // Если PIN-код есть - переходим на главную страницу
+                System.Diagnostics.Debug.WriteLine("[RegisterPage] PIN exists, navigating to main/home");
+                await Shell.Current.GoToAsync("///main/home", animate: true);
+            }
         }
 
         private async void OpenLogin_Tapped(object? sender, EventArgs e)

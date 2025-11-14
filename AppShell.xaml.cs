@@ -35,39 +35,69 @@ namespace YessGoFront
                 return;
             
             // Увеличиваем задержку для гарантии полной инициализации Shell и готовности UI
-            await Task.Delay(300);
+            await Task.Delay(500);
             
             // Выполняем навигацию на главном потоке
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 try
                 {
-                    if (AccountStore.Instance.IsSignedIn)
+                    // Проверяем наличие токена аутентификации
+                    var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+                    var hasToken = authService != null && await authService.IsAuthenticatedAsync();
+                    
+                    System.Diagnostics.Debug.WriteLine($"[AppShell] Has token: {hasToken}, IsSignedIn: {AccountStore.Instance.IsSignedIn}");
+                    
+                    if (hasToken || AccountStore.Instance.IsSignedIn)
                     {
-                        System.Diagnostics.Debug.WriteLine("[AppShell] User is signed in, navigating to main/home");
+                        // Пользователь авторизован - проверяем наличие PIN-кода
+                        var domainAuthService = MauiProgram.Services?.GetService<Services.Domain.IAuthService>();
+                        if (domainAuthService != null)
+                        {
+                            var hasPin = await domainAuthService.HasPinAsync();
+                            System.Diagnostics.Debug.WriteLine($"[AppShell] Has PIN: {hasPin}");
+                            
+                            if (hasPin)
+                            {
+                                // Есть PIN - переходим на страницу ввода PIN
+                                System.Diagnostics.Debug.WriteLine("[AppShell] User authenticated, navigating to PIN login");
+                                await GoToAsync("///pinlogin", animate: false);
+                            }
+                            else
+                            {
+                                // Нет PIN - переходим на главную страницу
+                                System.Diagnostics.Debug.WriteLine("[AppShell] User authenticated, no PIN, navigating to main/home");
+                                await GoToAsync("///main/home", animate: false);
+                            }
+                        }
+                        else
+                        {
+                            // Если сервис недоступен, просто переходим на главную
+                            System.Diagnostics.Debug.WriteLine("[AppShell] User authenticated, service unavailable, navigating to main/home");
+                            await GoToAsync("///main/home", animate: false);
+                        }
                         
-                        // Используем GoToAsync для гарантированной навигации
-                        // Три слеша (///) означают абсолютную навигацию с очисткой стека
-                        await GoToAsync("///main/home", animate: false);
                         _navigationHandled = true;
-                        System.Diagnostics.Debug.WriteLine("[AppShell] Navigation to main/home completed");
-                        
-                        // Принудительно обновляем UI после небольшой задержки
-                        await Task.Delay(50);
-                        System.Diagnostics.Debug.WriteLine($"[AppShell] Current route after navigation: {this.CurrentState?.Location}");
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("[AppShell] User is not signed in, navigating to login");
+                        // Нет токена - переходим на страницу входа
+                        System.Diagnostics.Debug.WriteLine("[AppShell] User not authenticated, navigating to login");
                         await GoToAsync("///login", animate: false);
                         _navigationHandled = true;
-                        System.Diagnostics.Debug.WriteLine("[AppShell] Navigation to login completed");
                     }
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[AppShell] Navigation error: {ex.Message}");
                     System.Diagnostics.Debug.WriteLine($"[AppShell] Stack trace: {ex.StackTrace}");
+                    // В случае ошибки переходим на страницу входа
+                    try
+                    {
+                        await GoToAsync("///login", animate: false);
+                        _navigationHandled = true;
+                    }
+                    catch { }
                 }
             });
         }

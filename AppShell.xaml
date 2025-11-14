@@ -20,6 +20,11 @@
         Route="register"
         ContentTemplate="{DataTemplate views:RegisterPage}" />
 
+    <!-- Экран PIN-кода -->
+    <ShellContent
+        Route="pinlogin"
+        ContentTemplate="{DataTemplate views:PinLoginPage}" />
+
     <!-- Основное приложение -->
     <!-- 🔹 Отключаем системную TabBar, т.к. используется кастомный BottomNavBar -->
     <TabBar Route="main" Shell.TabBarIsVisible="False">

@@ -9,8 +9,14 @@ namespace YessGoFront.Services.Domain;
 public interface IAuthService
 {
     /// <summary>
-    /// Вход в систему. Поддерживает вход по Email или Phone
+    /// Вход в систему по номеру телефона
     /// </summary>
+    Task<AuthResponse> LoginWithPhoneAsync(string phone, string password, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Вход в систему (устаревший метод, используйте LoginWithPhoneAsync)
+    /// </summary>
+    [Obsolete("Use LoginWithPhoneAsync instead")]
     Task<AuthResponse> LoginAsync(string emailOrPhone, string password, CancellationToken ct = default);
     /// <summary>
     /// Регистрация. После успешной регистрации автоматически выполняет вход
@@ -30,5 +36,10 @@ public interface IAuthService
     Task<bool> RefreshTokenAsync(CancellationToken ct = default);
     Task LogoutAsync(CancellationToken ct = default);
     Task<bool> IsAuthenticatedAsync();
+
+    Task<bool> AuthenticateWithBiometricsAsync();
+    Task<bool> ValidatePinAsync(string pin);
+    Task SavePinAsync(string pin);
+    Task<bool> HasPinAsync();
 }
 

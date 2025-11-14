@@ -65,8 +65,9 @@ namespace YessGoFront.Views
                     System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: IsSignedIn is false after SignIn! This should not happen.");
                 }
                 
-                // Успешный логин - выполняем навигацию напрямую
-                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to main/home...");
+                // Проверяем, есть ли PIN-код
+                var domainAuthService = MauiProgram.Services.GetRequiredService<Services.Domain.IAuthService>();
+                var hasPin = await domainAuthService.HasPinAsync();
                 
                 // Выполняем навигацию на главном потоке
                 await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -74,83 +75,19 @@ namespace YessGoFront.Views
                     try
                     {
                         var shell = Shell.Current;
-                        if (shell != null && shell is AppShell appShell)
+                        if (shell != null)
                         {
-                            // Пробуем установить CurrentItem напрямую для более надежной навигации
-                            try
+                            if (!hasPin)
                             {
-                                var tabBar = shell.Items.FirstOrDefault(x => x.Route == "main") as TabBar;
-                                if (tabBar != null)
-                                {
-                                    var homeTab = tabBar.Items.FirstOrDefault(x => x.Route == "home");
-                                    if (homeTab != null)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine("[LoginPage] Setting CurrentItem directly");
-                                        shell.CurrentItem = tabBar;
-                                        tabBar.CurrentItem = homeTab;
-                                        
-                                        await Task.Delay(200);
-                                        
-                                        // Принудительно обновляем UI
-                                        shell.ForceLayout();
-                                        await Task.Delay(100);
-                                        
-                                        var currentRoute = shell.CurrentState?.Location?.ToString() ?? "unknown";
-                                        System.Diagnostics.Debug.WriteLine($"[LoginPage] CurrentItem set. Route: {currentRoute}");
-                                        
-                                        // Если это сработало, выходим
-                                        if (currentRoute.Contains("main/home"))
-                                        {
-                                            System.Diagnostics.Debug.WriteLine("[LoginPage] Navigation successful via CurrentItem");
-                                            return;
-                                        }
-                                    }
-                                }
+                                // Если PIN-кода нет - переходим на страницу создания PIN
+                                System.Diagnostics.Debug.WriteLine("[LoginPage] No PIN found, navigating to PIN creation page");
+                                await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
                             }
-                            catch (Exception itemEx)
+                            else
                             {
-                                System.Diagnostics.Debug.WriteLine($"[LoginPage] CurrentItem approach failed: {itemEx.Message}");
-                            }
-                            
-                            // Fallback: используем GoToAsync
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] Using GoToAsync as fallback");
-                            await shell.GoToAsync("///main/home", animate: false);
-                            await Task.Delay(300);
-                            
-                            // Принудительно обновляем UI
-                            shell.ForceLayout();
-                            await Task.Delay(100);
-                            
-                            // Проверяем результат
-                            var route = shell.CurrentState?.Location?.ToString() ?? "unknown";
-                            System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation via GoToAsync completed. Route: {route}");
-                            
-                            // Если всё ещё не работает, перезагружаем Shell
-                            if (!route.Contains("main/home"))
-                            {
-                                System.Diagnostics.Debug.WriteLine("[LoginPage] All navigation methods failed, reloading Shell");
-                                Application.Current.MainPage = new AppShell();
-                                await Task.Delay(600);
-                                
-                                var newShell = Shell.Current;
-                                if (newShell != null)
-                                {
-                                    await newShell.GoToAsync("///main/home", animate: false);
-                                    await Task.Delay(200);
-                                    System.Diagnostics.Debug.WriteLine($"[LoginPage] Shell reloaded. Route: {newShell.CurrentState?.Location}");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] Shell.Current is null, creating new Shell");
-                            Application.Current.MainPage = new AppShell();
-                            await Task.Delay(500);
-                            
-                            var newShell = Shell.Current;
-                            if (newShell != null)
-                            {
-                                await newShell.GoToAsync("///main/home", animate: false);
+                                // Если PIN-код есть - переходим на главную страницу
+                                System.Diagnostics.Debug.WriteLine("[LoginPage] PIN exists, navigating to main/home...");
+                                await shell.GoToAsync("///main/home", animate: true);
                             }
                         }
                     }
@@ -158,17 +95,6 @@ namespace YessGoFront.Views
                     {
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation error: {navEx.Message}");
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {navEx.StackTrace}");
-                        
-                        // Последняя попытка - перезагрузить Shell
-                        try
-                        {
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] Attempting Shell reload as fallback");
-                            Application.Current.MainPage = new AppShell();
-                        }
-                        catch (Exception shellEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[LoginPage] Shell reload failed: {shellEx.Message}");
-                        }
                     }
                 });
             }

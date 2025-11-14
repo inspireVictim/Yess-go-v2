@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:YessGoFront.Converters"
+    xmlns:components="clr-namespace:YessGoFront.Components"
     Title="Регистрация"
     BackgroundColor="#007A51"
     Shell.NavBarIsVisible="False">
@@ -59,15 +60,8 @@
                     </Border>
 
                     <!-- Поле Телефон -->
-                    <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-                        <Grid Padding="12,0">
-                            <Entry x:Name="PhoneEntry" 
-                                   Placeholder="+996 555 12 34 56" 
-                                   Keyboard="Telephone" 
-                                   BackgroundColor="Transparent"
-                                   Text="{Binding Phone}" />
-                        </Grid>
-                    </Border>
+                    <components:PhoneEntry x:Name="PhoneEntryControl"
+                                           FullPhoneNumber="{Binding Phone, Mode=TwoWay}" />
 
                     <!-- Ошибка телефона -->
                     <Label Text="{Binding PhoneError}" 

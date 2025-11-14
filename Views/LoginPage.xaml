@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:YessGoFront.Converters"
+    xmlns:components="clr-namespace:YessGoFront.Components"
     Title="Вход"
     BackgroundColor="#007A51"
     Shell.NavBarIsVisible="False">
@@ -35,16 +36,9 @@
 					</Label>
 				</Grid>
 
-				<!-- Поле E-mail или Телефон -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
-					<Grid Padding="12,0">
-						<Entry x:Name="EmailEntry" 
-                               Placeholder="E-mail или номер телефона" 
-                               Keyboard="Default" 
-                               BackgroundColor="Transparent"
-                               Text="{Binding EmailOrPhone}" />
-					</Grid>
-				</Border>
+				<!-- Поле Телефон -->
+				<components:PhoneEntry x:Name="PhoneEntryControl"
+                                       FullPhoneNumber="{Binding Phone, Mode=TwoWay}" />
 
 				<!-- Поле Пароль -->
 				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">

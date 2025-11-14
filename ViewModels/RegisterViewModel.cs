@@ -61,7 +61,7 @@ public partial class RegisterViewModel : ObservableObject
         var normalizedPhone = NormalizePhone(Phone);
         if (!IsPhoneValid(normalizedPhone))
         {
-            PhoneError = "Введите корректный номер телефона (например, +996555123456)";
+            PhoneError = "Введите корректный номер телефона (9 цифр)";
             HasPhoneError = true;
             return;
         }
@@ -235,17 +235,30 @@ public partial class RegisterViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(input))
             return string.Empty;
 
-        var s = input.Trim();
-        s = s.StartsWith("+") ? s : "+" + s;
-
-        var sb = new System.Text.StringBuilder(s.Length);
-        foreach (var ch in s)
+        // PhoneEntry уже гарантирует, что FullPhoneNumber содержит +996
+        // Просто проверяем и возвращаем как есть, если начинается с +996
+        if (input.StartsWith("+996"))
         {
-            if (char.IsDigit(ch) || ch == '+')
-                sb.Append(ch);
+            return input;
         }
 
-        return sb.ToString();
+        // Если по какой-то причине нет +996, извлекаем цифры и добавляем префикс
+        var digits = new string(input.Where(char.IsDigit).ToArray());
+        
+        // Убираем префикс 996 если есть (так как +996 уже в UI)
+        if (digits.StartsWith("996") && digits.Length > 3)
+        {
+            digits = digits.Substring(3);
+        }
+        
+        // Убираем ведущий 0 если есть
+        if (digits.StartsWith("0") && digits.Length > 1)
+        {
+            digits = digits.Substring(1);
+        }
+        
+        // Возвращаем с префиксом +996
+        return "+996" + digits;
     }
 
     private static bool IsPhoneValid(string phone)

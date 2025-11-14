@@ -21,16 +21,22 @@ public partial class App : Application
                 var clientFactory = MauiProgram.Services.GetRequiredService<IHttpClientFactory>();
                 var client = clientFactory.CreateClient("ApiClient");
 
-                // Проверяем корневой endpoint вместо /health
+                var baseUrl = client.BaseAddress?.ToString() ?? "unknown";
+                System.Diagnostics.Debug.WriteLine($"[App] 🔍 Testing API connection to: {baseUrl}");
+
+                // Проверяем корневой endpoint
                 var response = await client.GetAsync("");
                 var text = await response.Content.ReadAsStringAsync();
 
-                System.Diagnostics.Debug.WriteLine($"[App] API Health Check: {response.StatusCode} - {text}");
+                System.Diagnostics.Debug.WriteLine($"[App] ✅ API Health Check: {response.StatusCode} - {text.Substring(0, Math.Min(100, text.Length))}");
             }
             catch (Exception ex)
             {
-                // Только логируем, не показываем ошибку пользователю
-                System.Diagnostics.Debug.WriteLine($"[App] API Health Check failed: {ex.Message}");
+                // Логируем подробную информацию об ошибке
+                System.Diagnostics.Debug.WriteLine($"[App] ❌ API Health Check FAILED!");
+                System.Diagnostics.Debug.WriteLine($"[App] Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] ⚠️ Check if backend is running and IP address is correct!");
+                System.Diagnostics.Debug.WriteLine($"[App] ⚠️ Set API_BASE_URL environment variable if needed!");
             }
         });
 #endif

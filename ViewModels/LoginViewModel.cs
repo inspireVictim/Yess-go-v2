@@ -1,3 +1,4 @@
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ public partial class LoginViewModel : ObservableObject
     private readonly IAuthService _authService;
     private readonly ILogger<LoginViewModel>? _logger;
 
-    [ObservableProperty] private string emailOrPhone = string.Empty;
+    [ObservableProperty] private string phone = string.Empty;
     [ObservableProperty] private string password = string.Empty;
     [ObservableProperty] private bool rememberMe = false;
     [ObservableProperty] private bool isBusy = false;
@@ -31,11 +32,28 @@ public partial class LoginViewModel : ObservableObject
         if (IsBusy)
             return;
 
-        if (string.IsNullOrWhiteSpace(EmailOrPhone))
+        if (string.IsNullOrWhiteSpace(Phone))
         {
-            ShowError("Введите Email или номер телефона");
+            ShowError("Введите номер телефона");
             return;
         }
+
+        // Phone уже содержит полный номер с +996 от PhoneEntry (FullPhoneNumber)
+        // Проверяем валидность: должно быть 9 цифр после +996
+        var phoneDigits = new string(Phone.Where(char.IsDigit).ToArray());
+        // Убираем префикс 996 если есть (PhoneEntry уже добавил +996)
+        if (phoneDigits.StartsWith("996") && phoneDigits.Length > 3)
+        {
+            phoneDigits = phoneDigits.Substring(3);
+        }
+        if (phoneDigits.Length != 9)
+        {
+            ShowError("Введите корректный номер телефона (9 цифр)");
+            return;
+        }
+
+        // Phone уже содержит +996 от PhoneEntry, используем как есть
+        var normalizedPhone = Phone.StartsWith("+996") ? Phone : "+996" + phoneDigits;
 
         if (string.IsNullOrWhiteSpace(Password))
         {
@@ -49,9 +67,9 @@ public partial class LoginViewModel : ObservableObject
             HasError = false;
             ErrorMessage = null;
 
-            _logger?.LogInformation("Attempting login for: {EmailOrPhone}", EmailOrPhone);
+            _logger?.LogInformation("Attempting login for phone: {Phone}", normalizedPhone);
 
-            var response = await _authService.LoginAsync(EmailOrPhone, Password);
+            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, Password);
             _logger?.LogInformation("Login successful. UserId: {UserId}", response.UserId);
 
             if (OnLoginSuccess is not null)
@@ -98,4 +116,5 @@ public partial class LoginViewModel : ObservableObject
     }
 
     public event Func<AuthResponse, Task>? OnLoginSuccess;
+
 }

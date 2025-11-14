@@ -21,21 +21,20 @@
               ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="12"
               VerticalOptions="Start">
-            <Frame Grid.Column="0"
-                   WidthRequest="36"
-                   HeightRequest="36"
-                   CornerRadius="8"
-                   Padding="8"
-                   BackgroundColor="White"
-                   HasShadow="True"
-                   VerticalOptions="Center">
+            <Border Grid.Column="0"
+                    WidthRequest="36"
+                    HeightRequest="36"
+                    StrokeThickness="0"
+                    BackgroundColor="White"
+                    StrokeShape="RoundRectangle 8,8,8,8"
+                    VerticalOptions="Center">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped" />
+                </Border.GestureRecognizers>
                 <Image Source="back_arrow_icon.png"
-                       Aspect="AspectFit">
-                    <Image.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnBackTapped" />
-                    </Image.GestureRecognizers>
-                </Image>
-            </Frame>
+                       Aspect="AspectFit"
+                       Margin="8" />
+            </Border>
             
             <Label Grid.Column="1"
                    Text="Карта партнёров Yess!Go"
@@ -74,6 +73,29 @@
                                    HeightRequest="40"
                                    VerticalOptions="Center"
                                    HorizontalOptions="Center"/>
+                
+                <!-- Кнопка "Моё местоположение" -->
+                <Frame x:Name="MyLocationButton"
+                       Margin="0,0,16,16"
+                       WidthRequest="48"
+                       HeightRequest="48"
+                       CornerRadius="24"
+                       BackgroundColor="White"
+                       HasShadow="True"
+                       HorizontalOptions="End"
+                       VerticalOptions="End"
+                       Padding="0">
+                    <Image Source="icon_location.png"
+                           WidthRequest="24"
+                           HeightRequest="24"
+                           Aspect="AspectFit"
+                           VerticalOptions="Center"
+                           HorizontalOptions="Center">
+                        <Image.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnMyLocationTapped" />
+                        </Image.GestureRecognizers>
+                    </Image>
+                </Frame>
             </Grid>
         </Frame>
 

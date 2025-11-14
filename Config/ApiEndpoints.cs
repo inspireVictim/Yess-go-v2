@@ -49,6 +49,7 @@ public static class ApiEndpoints
         public static string ByCategory(string category)
             => $"{List}?category={Uri.EscapeDataString(category)}";
         public const string Locations = $"{Partners}/locations";
+        public const string Categories = $"{Partners}/categories";
         public static string Nearby(double latitude, double longitude, double radius = 10.0)
             => $"{Locations}?latitude={latitude}&longitude={longitude}&radius={radius}";
     }

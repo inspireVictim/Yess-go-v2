@@ -1,0 +1,479 @@
+﻿using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Graphics;
+using Microsoft.Maui.ApplicationModel;
+using System.ComponentModel;
+using YessGoFront.Services.Domain;
+using YessGoFront.Services;
+
+namespace YessGoFront.Views
+{
+    public partial class PinLoginPage : ContentPage, INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        private readonly IAuthService? _authService;
+        private string _currentPin = string.Empty;
+        private bool _isCreatingPin = false; // true - создание PIN, false - ввод PIN
+        private string? _confirmPin = null; // Для подтверждения при создании
+        private string _subtitleText = string.Empty;
+
+        // Bindable свойства
+        public string TitleText => _isCreatingPin ? "Создайте PIN-код" : "Введите PIN-код";
+        
+        public string SubtitleText
+        {
+            get => _subtitleText;
+            set
+            {
+                _subtitleText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string PinCode
+        {
+            get => _currentPin;
+            set
+            {
+                if (_currentPin != value)
+                {
+                    _currentPin = value ?? string.Empty;
+                    UpdatePinIndicators();
+                    OnPropertyChanged(nameof(PinCode));
+                    OnPropertyChanged(nameof(CanDelete));
+                }
+            }
+        }
+
+        public bool HasError { get; private set; }
+        public string ErrorMessage { get; private set; } = string.Empty;
+        public bool IsBusy { get; private set; }
+        public bool CanDelete => _currentPin.Length > 0;
+        public bool IsVerificationMode
+        {
+            get => !_isCreatingPin && _confirmPin == null;
+        }
+
+        public PinLoginPage()
+        {
+            InitializeComponent();
+            
+            // Получаем сервисы из DI
+            _authService = MauiProgram.Services?.GetService<IAuthService>();
+
+            // Устанавливаем BindingContext для команд
+            BindingContext = this;
+            
+            // Пытаемся определить режим работы из текущего состояния Shell
+            try
+            {
+                var shell = Shell.Current;
+                if (shell?.CurrentState?.Location != null)
+                {
+                    var location = shell.CurrentState.Location.ToString();
+                    if (location.Contains("isCreatingPin=true"))
+                    {
+                        _isCreatingPin = true;
+                        System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Constructor: Setting isCreatingPin=true from location: {location}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Constructor: Error checking location: {ex.Message}");
+            }
+        }
+
+        protected override async void OnAppearing()
+        {
+            base.OnAppearing();
+            
+            // Если уже начали процесс создания (есть _confirmPin), не меняем режим
+            if (_confirmPin != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Already in creation mode, _confirmPin={_confirmPin}");
+                return;
+            }
+            
+            // Обрабатываем параметр из query string
+            var shell = Shell.Current;
+            bool hasQueryParam = false;
+            if (shell?.CurrentState?.Location != null)
+            {
+                var location = shell.CurrentState.Location.ToString();
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Current location: {location}");
+                
+                // Проверяем наличие параметра isCreatingPin=true в URL
+                hasQueryParam = location.Contains("isCreatingPin=true");
+                if (hasQueryParam)
+                {
+                    _isCreatingPin = true;
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Setting isCreatingPin=true from query param");
+                }
+            }
+            
+            // Обновляем IsVerificationMode при изменении режима
+            OnPropertyChanged(nameof(IsVerificationMode));
+            OnPropertyChanged(nameof(TitleText));
+            
+            // Дополнительная проверка: если параметра нет, проверяем наличие PIN-кода
+            if (!hasQueryParam && _authService != null)
+            {
+                try
+                {
+                    var hasPin = await _authService.HasPinAsync();
+                    _isCreatingPin = !hasPin;
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Checking PIN existence. hasPin={hasPin}, setting isCreatingPin={_isCreatingPin}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Error checking PIN: {ex.Message}");
+                    // По умолчанию считаем, что это режим создания
+                    _isCreatingPin = true;
+                }
+            }
+            
+            // Обновляем IsVerificationMode при изменении режима
+            OnPropertyChanged(nameof(IsVerificationMode));
+            OnPropertyChanged(nameof(TitleText));
+            
+            // Устанавливаем начальный текст подзаголовка только если еще не начали ввод
+            if (string.IsNullOrEmpty(_currentPin))
+            {
+                SubtitleText = _isCreatingPin 
+                    ? "Придумайте 4-значный PIN-код для быстрого входа" 
+                    : "Введите 4-значный PIN-код для входа";
+            }
+
+            // Если создаем PIN и еще не начали ввод, пробуем сначала биометрию
+            if (_isCreatingPin && string.IsNullOrEmpty(_currentPin))
+            {
+                await TryBiometricFirstAsync();
+            }
+        }
+
+        private async Task TryBiometricFirstAsync()
+        {
+            try
+            {
+                if (_authService != null)
+                {
+                    // Запрашиваем разрешения на биометрию (если доступно)
+                    var biometricSuccess = await _authService.AuthenticateWithBiometricsAsync();
+                    if (biometricSuccess)
+                    {
+                        // Биометрия успешна - переходим дальше
+                        await NavigateToMainAsync();
+                    }
+                    // Если биометрия недоступна или пользователь отменил - продолжаем с PIN
+                }
+            }
+            catch
+            {
+                // Игнорируем ошибки биометрии, продолжаем с PIN
+            }
+        }
+
+        private void UpdatePinIndicators()
+        {
+            // Получаем индикаторы по имени из XAML
+            var indicator1 = this.FindByName<Frame>("PinIndicator1");
+            var indicator2 = this.FindByName<Frame>("PinIndicator2");
+            var indicator3 = this.FindByName<Frame>("PinIndicator3");
+            var indicator4 = this.FindByName<Frame>("PinIndicator4");
+
+            if (indicator1 == null || indicator2 == null || indicator3 == null || indicator4 == null)
+                return;
+
+            var indicators = new[] { indicator1, indicator2, indicator3, indicator4 };
+            var filledColor = Color.FromArgb("#0B4A3B");
+            var emptyColor = Color.FromArgb("#E0EFE9");
+
+            for (int i = 0; i < indicators.Length; i++)
+            {
+                if (i < _currentPin.Length)
+                {
+                    indicators[i].BackgroundColor = filledColor;
+                }
+                else
+                {
+                    indicators[i].BackgroundColor = emptyColor;
+                }
+            }
+
+            OnPropertyChanged(nameof(CanDelete));
+        }
+
+        [RelayCommand]
+        private void Number(string number)
+        {
+            if (_currentPin.Length >= 4)
+                return;
+
+            PinCode = _currentPin + number;
+            
+            // Автоматическая обработка при вводе 4 цифр
+            if (_currentPin.Length == 4)
+            {
+                _ = ProcessPinAsync();
+            }
+        }
+
+        [RelayCommand]
+        private void Delete()
+        {
+            if (_currentPin.Length > 0)
+            {
+                PinCode = _currentPin.Substring(0, _currentPin.Length - 1);
+                ClearError();
+            }
+        }
+
+        private void OnPinCodeChanged(object? sender, TextChangedEventArgs e)
+        {
+            // Обновляем индикаторы при изменении через скрытое поле
+            UpdatePinIndicators();
+        }
+
+        private async Task ProcessPinAsync()
+        {
+            if (_currentPin.Length != 4)
+                return;
+
+            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: START - _isCreatingPin={_isCreatingPin}, _confirmPin={_confirmPin}, _currentPin={_currentPin}");
+            
+            // ВСЕГДА проверяем наличие PIN-кода в хранилище ПЕРЕД обработкой
+            bool hasPinInStorage = false;
+            if (_authService != null)
+            {
+                try
+                {
+                    hasPinInStorage = await _authService.HasPinAsync();
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: hasPinInStorage={hasPinInStorage}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: Error checking PIN: {ex.Message}");
+                    hasPinInStorage = false; // В случае ошибки считаем, что PIN-кода нет
+                }
+            }
+            
+            // Определяем режим работы:
+            // 1. Если _confirmPin не null - мы в процессе создания (второй ввод) - ВСЕГДА создание
+            // 2. Если PIN-кода нет в хранилище - ВСЕГДА создание
+            // 3. Если _isCreatingPin = true - режим создания
+            // 4. Иначе - режим проверки
+            var isActuallyCreating = _confirmPin != null || !hasPinInStorage || _isCreatingPin;
+            
+            // Обновляем _isCreatingPin для будущих вызовов
+            if (!hasPinInStorage)
+            {
+                _isCreatingPin = true;
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: FINAL - isActuallyCreating={isActuallyCreating}, hasPinInStorage={hasPinInStorage}");
+
+            IsBusy = true;
+            OnPropertyChanged(nameof(IsBusy));
+            ClearError();
+
+            try
+            {
+                await Task.Delay(300); // Небольшая задержка для UX
+
+                if (isActuallyCreating)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Processing PIN creation...");
+                    await HandlePinCreationAsync();
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Processing PIN verification...");
+                    await HandlePinVerificationAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowError("Произошла ошибка. Попробуйте снова.");
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error: {ex.Message}");
+            }
+            finally
+            {
+                IsBusy = false;
+                OnPropertyChanged(nameof(IsBusy));
+            }
+        }
+
+        private async Task HandlePinCreationAsync()
+        {
+            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] HandlePinCreationAsync: _confirmPin={_confirmPin}, _currentPin={_currentPin}");
+            
+            if (_confirmPin == null)
+            {
+                // Первый ввод - сохраняем для подтверждения
+                _confirmPin = _currentPin;
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] First PIN entered: {_confirmPin}");
+                
+                // Очищаем поле ввода через свойство, чтобы обновить UI
+                PinCode = string.Empty;
+                
+                // Обновляем текст подзаголовка
+                SubtitleText = "Подтвердите PIN-код";
+                
+                // Очищаем ошибки если были
+                ClearError();
+            }
+            else
+            {
+                // Второй ввод - проверяем совпадение
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Second PIN entered: {_currentPin}, comparing with: {_confirmPin}");
+                
+                if (_currentPin == _confirmPin)
+                {
+                    // PIN совпадает - сохраняем
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PINs match, saving...");
+                    
+                    if (_authService != null)
+                    {
+                        await _authService.SavePinAsync(_currentPin);
+                    }
+                    else
+                    {
+                        // Fallback: сохраняем напрямую через SecureStorage
+                        await Microsoft.Maui.Storage.SecureStorage.SetAsync("user_pin", _currentPin);
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PIN saved successfully, navigating to main...");
+                    
+                    // Переходим в приложение
+                    await NavigateToMainAsync();
+                }
+                else
+                {
+                    // PIN не совпадает
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PINs don't match! First: {_confirmPin}, Second: {_currentPin}");
+                    
+                    ShowError("PIN-коды не совпадают. Попробуйте снова.");
+                    
+                    // Сбрасываем состояние
+                    _confirmPin = null;
+                    PinCode = string.Empty;
+                    
+                    // Обновляем текст подзаголовка
+                    SubtitleText = "Придумайте 4-значный PIN-код для быстрого входа";
+                }
+            }
+        }
+
+        private async Task HandlePinVerificationAsync()
+        {
+            bool isValid = false;
+
+            if (_authService != null)
+            {
+                isValid = await _authService.ValidatePinAsync(_currentPin);
+            }
+            else
+            {
+                // Fallback: проверяем напрямую через SecureStorage
+                var storedPin = await Microsoft.Maui.Storage.SecureStorage.GetAsync("user_pin");
+                isValid = storedPin == _currentPin;
+            }
+
+            if (isValid)
+            {
+                // PIN верный - переходим в приложение
+                await NavigateToMainAsync();
+            }
+            else
+            {
+                // Неверный PIN
+                ShowError("Неверный PIN-код. Попробуйте снова.");
+                PinCode = string.Empty;
+                
+                // Вибрация при ошибке (если доступна)
+                try
+                {
+                    Microsoft.Maui.Devices.HapticFeedback.Default.Perform(Microsoft.Maui.Devices.HapticFeedbackType.Click);
+                }
+                catch { }
+            }
+        }
+
+        private async Task NavigateToMainAsync()
+        {
+            try
+            {
+                // Переходим на главную страницу
+                await Shell.Current.GoToAsync("///main/home", animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Navigation error: {ex.Message}");
+                // Fallback навигация
+                await Shell.Current.GoToAsync("//main/home", animate: true);
+            }
+        }
+
+        private void ShowError(string message)
+        {
+            ErrorMessage = message;
+            HasError = true;
+            OnPropertyChanged(nameof(ErrorMessage));
+            OnPropertyChanged(nameof(HasError));
+        }
+
+        private void ClearError()
+        {
+            if (HasError)
+            {
+                HasError = false;
+                ErrorMessage = string.Empty;
+                OnPropertyChanged(nameof(HasError));
+                OnPropertyChanged(nameof(ErrorMessage));
+            }
+        }
+
+        private async void OnForgotPinClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                // Показываем подтверждение
+                var confirmed = await DisplayAlert(
+                    "Забыли PIN?",
+                    "Вы будете перенаправлены на страницу входа. PIN-код будет удалён.",
+                    "Продолжить",
+                    "Отмена");
+
+                if (!confirmed)
+                    return;
+
+                // Удаляем PIN
+                var pinService = new Services.PinStorageService();
+                await pinService.ClearPinAsync();
+                System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN cleared after 'Forgot PIN'");
+
+                // Очищаем токен и данные аккаунта
+                var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+                if (authService != null)
+                {
+                    await authService.ClearTokensAsync();
+                }
+                AccountStore.Instance.SignOut();
+
+                // Переходим на страницу входа
+                await Shell.Current.GoToAsync("///login", animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error in OnForgotPinClicked: {ex.Message}");
+                await DisplayAlert("Ошибка", "Не удалось выполнить операцию", "OK");
+            }
+        }
+    }
+}

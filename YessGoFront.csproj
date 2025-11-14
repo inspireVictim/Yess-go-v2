@@ -55,17 +55,28 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.100" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.100" />
-		<PackageReference Include="Microsoft.Maui.Controls.Maps" Version="9.0.120" />
+		<PackageReference Include="Microsoft.Maui.Controls.Maps" Version="9.0.100" />
+		<PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.100" />
+		<PackageReference Include="Plugin.Fingerprint" Version="2.1.5" />
 		<PackageReference Include="SkiaSharp" Version="2.88.9" />
 		<PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="2.88.9" />
 		<PackageReference Include="Svg.Skia" Version="1.0.0.3" />
 		<PackageReference Include="ZXing.Net.Maui.Controls" Version="0.6.0" />
+		<!-- Xamarin.AndroidX.Emoji2.ViewsHelper удален - несовместим с .NET 9 -->
+		<!-- Используем TextWatcher вместо IInputFilter для блокировки emoji -->
 	</ItemGroup>
 
 	<ItemGroup>
 		<MauiXaml Update="Views\**\*.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
+	</ItemGroup>
+
+	<!-- Исключаем тестовые файлы из компиляции основного проекта -->
+	<ItemGroup>
+		<Compile Remove="Tests\**" />
+		<EmbeddedResource Remove="Tests\**" />
+		<None Remove="Tests\**" />
 	</ItemGroup>
 
 </Project>

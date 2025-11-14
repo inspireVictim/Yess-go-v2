@@ -28,7 +28,7 @@ namespace YessGoFront.Views
         {
             try
             {
-                // 1) Вызываем LogoutAsync для очистки токенов через API и SecureStorage
+                // 1) Вызываем LogoutAsync для очистки токенов через API, SecureStorage и PIN
                 var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
                 await authService.LogoutAsync();
 
@@ -43,6 +43,13 @@ namespace YessGoFront.Views
                 // Даже если произошла ошибка, всё равно очищаем локальные данные и переходим на логин
                 try
                 {
+                    // Дополнительно очищаем PIN на случай если LogoutAsync не сработал
+                    var pinService = MauiProgram.Services?.GetService<PinStorageService>();
+                    if (pinService != null)
+                    {
+                        await pinService.ClearPinAsync();
+                    }
+                    
                     AccountStore.Instance.SignOut();
                     await Shell.Current.GoToAsync("///login");
                 }

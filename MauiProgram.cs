@@ -16,6 +16,10 @@ using YessGoFront.Infrastructure.Http.HttpMessageHandlers;
 using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
 using ZXing.Net.Maui.Controls;
+using Microsoft.Maui.Handlers;
+#if ANDROID
+using YessGoFront.Platforms.Android.Handlers;
+#endif
 
 namespace YessGoFront;
 
@@ -37,7 +41,21 @@ public static class MauiProgram
             })
             .UseBarcodeReader();
 
-        // Конфигурация приложения
+        // -----------------------------------------------
+        // ✅ Регистрируем наш Emoji-safe Entry handler
+        // Использует Android.Widget.EditText вместо AppCompatEditText
+        // Это полностью избегает EmojiCompat, который активируется только для AppCompatEditText
+        // -----------------------------------------------
+        builder.ConfigureMauiHandlers(handlers =>
+        {
+#if ANDROID
+            handlers.AddHandler<Entry, NoEmojiEntryHandler>();
+#endif
+        });
+
+        // -----------------------------------------------
+        // Твой код конфигурации — оставлен как есть
+        // -----------------------------------------------
         ConfigureSettings(builder.Services);
         ConfigureDatabase(builder.Services);
         ConfigureHttpClients(builder.Services);
@@ -48,7 +66,7 @@ public static class MauiProgram
         var app = builder.Build();
         Services = app.Services;
 
-        // 🧪 Проверка API при запуске
+        // Тест API
         _ = Task.Run(async () =>
         {
             try
@@ -75,12 +93,10 @@ public static class MauiProgram
 
     private static string GetDatabaseConnectionString()
     {
-        // Проверяем переменную окружения для SQLite
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
         if (!string.IsNullOrEmpty(connectionString))
             return connectionString;
 
-        // По умолчанию используем SQLite в локальной папке данных приложения
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, "yessgo.db");
         return $"Data Source={dbPath}";
     }
@@ -88,50 +104,38 @@ public static class MauiProgram
     private static string GetDefaultApiBaseUrl()
     {
 #if ANDROID
-        // 🤖 ANDROID: Автоматически определяем эмулятор или реальный телефон
         try
         {
-            // Попытка определить эмулятор несколькими способами
-            var isEmulator = 
-                Android.OS.Build.Fingerprint?.Contains("generic") == true || 
-                Android.OS.Build.Fingerprint?.Contains("emulator") == true ||
-                Android.OS.Build.Model?.Contains("Emulator") == true ||
-                Android.OS.Build.Model?.Contains("emulator") == true ||
-                Android.OS.Build.Product?.Contains("emulator") == true ||
-                Android.OS.Build.Manufacturer?.Equals("unknown") == true;
-            
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Emulator detection: {isEmulator}");
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Fingerprint: {Android.OS.Build.Fingerprint}");
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Model: {Android.OS.Build.Model}");
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Build.Product: {Android.OS.Build.Product}");
-            
+            var fingerprint = Android.OS.Build.Fingerprint ?? "";
+            var model = Android.OS.Build.Model ?? "";
+            var product = Android.OS.Build.Product ?? "";
+            var manufacturer = Android.OS.Build.Manufacturer ?? "";
+
+            var isEmulator =
+                fingerprint.Contains("generic", StringComparison.OrdinalIgnoreCase) ||
+                fingerprint.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
+                fingerprint.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("Emulator", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
+                model.Contains("gphone", StringComparison.OrdinalIgnoreCase) ||
+                product.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
+                manufacturer.Equals("unknown", StringComparison.OrdinalIgnoreCase) ||
+                manufacturer.Equals("Genymotion", StringComparison.OrdinalIgnoreCase);
+
             if (isEmulator)
             {
-                // 🔷 Эмулятор: используем специальный IP 10.0.2.2
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using EMULATOR address: 10.0.2.2:8000");
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using EMULATOR address");
                 return "http://10.0.2.2:8000/";
             }
         }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Error detecting emulator: {ex.Message}");
-        }
-        
-        // 📱 Реальный телефон: используем IP из переменной окружения
+        catch { }
+
         var envUrl = Environment.GetEnvironmentVariable("API_BASE_URL");
         if (!string.IsNullOrEmpty(envUrl))
-        {
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using URL from API_BASE_URL: {envUrl}");
             return envUrl;
-        }
-        
-        // 📱 Дефолт для реального телефона
-        // IP вашего компьютера в локальной сети: 192.168.2.155
-        var defaultPhoneUrl = "http://192.168.2.155:8000/";
-        System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using DEFAULT for real phone: {defaultPhoneUrl}");
-        return defaultPhoneUrl;
+
+        return "http://192.168.0.177:8000/";
 #else
-        // 🖥️ Desktop (WinUI/WPF): используем localhost
         return "http://localhost:8000/";
 #endif
     }
@@ -140,11 +144,6 @@ public static class MauiProgram
     {
         var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
             ?? GetDefaultApiBaseUrl();
-
-        // Логируем используемый URL для отладки
-        System.Diagnostics.Debug.WriteLine($"[MauiProgram] ======================================");
-        System.Diagnostics.Debug.WriteLine($"[MauiProgram] API BASE URL: {apiBaseUrl}");
-        System.Diagnostics.Debug.WriteLine($"[MauiProgram] ======================================");
 
         var dbConnectionString = GetDatabaseConnectionString();
 
@@ -185,7 +184,6 @@ public static class MauiProgram
         });
     }
 
-    // ✅ Самое важное – единый HttpClient для всех API
     private static void ConfigureHttpClients(IServiceCollection services)
     {
         services.AddTransient<AuthHandler>();
@@ -210,10 +208,10 @@ public static class MauiProgram
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        // Auth
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
+        services.AddSingleton<YessGoFront.Services.ILocationService, YessGoFront.Services.LocationService>();
+        services.AddSingleton<YessGoFront.Services.IImageCacheService, YessGoFront.Services.ImageCacheService>();
 
-        // Domain
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPartnersService, PartnersService>();
         services.AddScoped<IWalletService, WalletService>();
@@ -222,7 +220,7 @@ public static class MauiProgram
 
     private static void ConfigureViewModels(IServiceCollection services)
     {
-        // Регистрируй ViewModels при необходимости
+        // Register viewmodels here
     }
 
     private static void ConfigureLogging(MauiAppBuilder builder)

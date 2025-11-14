@@ -14,23 +14,12 @@
 
 
     <Grid RowDefinitions="Auto,*" Padding="16,16,16,24">
-		<Grid.Background>
-			<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-				<GradientStop Color="#005D45" Offset="0.0" />
-				<GradientStop Color="#00C97B" Offset="1.0" />
-			</LinearGradientBrush>
-		</Grid.Background>
-
-        <ImageButton Source="back_arrow_icon.png"
-             WidthRequest="30"
-             HeightRequest="30"
-             BackgroundColor="Transparent"
-             Command="{Binding BackCommand}"
-             VerticalOptions="Start"
-             HorizontalOptions="Start"
-             Margin="20,50,0,0"
-             AbsoluteLayout.LayoutBounds="0,0,50,50"
-             AbsoluteLayout.LayoutFlags="PositionProportional"/>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#005D45" Offset="0.0" />
+                <GradientStop Color="#00C97B" Offset="1.0" />
+            </LinearGradientBrush>
+        </Grid.Background>
 
 
         <!-- ===== Шапка ===== -->
@@ -38,15 +27,17 @@
               ColumnSpacing="12" Padding="0,0,0,12">
 
 			<!-- Назад -->
-			<Frame WidthRequest="36" HeightRequest="36"
-                   CornerRadius="8" Padding="8"
-                   BackgroundColor="#FFFFFF22" HasShadow="False">
-				<Image Source="icon_back_white.png" Aspect="AspectFit">
-					<Image.GestureRecognizers>
-						<TapGestureRecognizer Tapped="OnBackTapped" />
-					</Image.GestureRecognizers>
-				</Image>
-			</Frame>
+			<Border WidthRequest="36" HeightRequest="36"
+                    StrokeThickness="0"
+                    BackgroundColor="#FFFFFF"
+                    StrokeShape="RoundRectangle 8,8,8,8">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped" />
+                </Border.GestureRecognizers>
+                <Image Source="back_arrow_icon.png" 
+                       Aspect="AspectFit" 
+                       Margin="8" />
+			</Border>
 
 			<!-- Поиск -->
 			<Frame Grid.Column="1" BackgroundColor="White" CornerRadius="12"
@@ -61,7 +52,8 @@
                            PlaceholderColor="#6B7280"
                            TextColor="#111827"
                            FontSize="14"
-                           BackgroundColor="Transparent" />
+                           BackgroundColor="Transparent"
+                           TextChanged="OnSearchTextChanged" />
 				</Grid>
 			</Frame>
 
@@ -97,6 +89,9 @@
 				<CollectionView.ItemTemplate>
 					<DataTemplate>
 						<Grid RowDefinitions="Auto,Auto" BackgroundColor="White">
+							<Grid.GestureRecognizers>
+								<TapGestureRecognizer Tapped="OnPartnerTapped" />
+							</Grid.GestureRecognizers>
 							<!-- Контент строки -->
 							<Grid Padding="12,10"
                                   ColumnDefinitions="Auto,*,Auto"

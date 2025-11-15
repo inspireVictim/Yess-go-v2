@@ -38,7 +38,7 @@
 
 				<!-- Поле Телефон -->
 				<components:PhoneEntry x:Name="PhoneEntryControl"
-                                       FullPhoneNumber="{Binding Phone, Mode=TwoWay}" />
+                                       PhoneChanged="OnPhoneChanged" />
 
 				<!-- Поле Пароль -->
 				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">

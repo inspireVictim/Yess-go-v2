@@ -105,6 +105,14 @@ namespace YessGoFront.Views
             }
         }
 
+        // ---------------------------
+        // ОБРАБОТЧИК ТЕЛЕФОНА
+        // ---------------------------
+        private void OnPhoneChanged(object sender, string fullPhone)
+        {
+            _viewModel.Phone = fullPhone;
+        }
+
         private async void OpenRegister_Tapped(object? sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("///register");

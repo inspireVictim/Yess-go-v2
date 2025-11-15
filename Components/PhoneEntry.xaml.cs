@@ -1,115 +1,85 @@
+using System;
 using System.Text.RegularExpressions;
-using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
 
 namespace YessGoFront.Components;
 
 public partial class PhoneEntry : Border
 {
-    public static readonly BindableProperty PhoneNumberProperty =
-        BindableProperty.Create(
-            nameof(PhoneNumber),
-            typeof(string),
-            typeof(PhoneEntry),
-            string.Empty,
-            BindingMode.TwoWay,
-            propertyChanged: OnPhoneNumberChangedExternally);
+    public event EventHandler<string>? PhoneChanged;
 
-    public static readonly BindableProperty FullPhoneNumberProperty =
-        BindableProperty.Create(
-            nameof(FullPhoneNumber),
-            typeof(string),
-            typeof(PhoneEntry),
-            string.Empty,
-            BindingMode.TwoWay,
-            propertyChanged: OnFullPhoneNumberChangedExternally);
+    public string PhoneNumber { get; private set; } = "";     // только 9 цифр
+    public string FullPhoneNumber => "+996" + PhoneNumber;    // полный номер
+    public bool IsValid => PhoneNumber.Length == 9;
 
-    public string PhoneNumber
-    {
-        get => (string)GetValue(PhoneNumberProperty);
-        set => SetValue(PhoneNumberProperty, value);
-    }
-
-    public string FullPhoneNumber
-    {
-        get => (string)GetValue(FullPhoneNumberProperty);
-        set => SetValue(FullPhoneNumberProperty, value);
-    }
-
-    public bool IsValid { get; private set; }
-
-    private bool _isInternalUpdate = false;
-    private CancellationTokenSource _cts = new();
+    private bool _isUpdating;
 
     public PhoneEntry()
     {
         InitializeComponent();
-
-        PhoneNumberEntryBinding.BindingContext = this;
-        PhoneNumberEntryBinding.SetBinding(Entry.TextProperty, nameof(PhoneNumber));
+        PhoneNumberEntryBinding.Text = "";
     }
 
-    // --------------------------
-    // MAIN INPUT HANDLER (Android-safe)
-    // --------------------------
-    private async void OnPhoneNumberChanged(object sender, TextChangedEventArgs e)
+    private void OnPhoneChanged(object sender, TextChangedEventArgs e)
     {
-        if (_isInternalUpdate)
+        if (sender is not Entry entry)
             return;
 
-        var raw = e.NewTextValue ?? string.Empty;
+        if (_isUpdating)
+            return;
 
-        // Нормализация
-        var cleaned = NormalizeNumber(raw);
-        var formatted = FormatNumber(cleaned);
+        string oldRaw = e.OldTextValue ?? "";
+        string newRaw = e.NewTextValue ?? "";
 
-        // Обновляем внутренние свойства
-        _isInternalUpdate = true;
-        PhoneNumber = cleaned;
-        FullPhoneNumber = "+996" + cleaned;
-        IsValid = cleaned.Length == 9;
-        ValidationIndicator.IsVisible = IsValid;
-        _isInternalUpdate = false;
+        // Извлекаем цифры
+        string digitsOld = ExtractDigits(oldRaw);
+        string digitsNew = ExtractDigits(newRaw);
 
-        //
-        // 🔥 VERY IMPORTANT: async update to avoid EmojiCompat crash
-        //
-        _cts.Cancel();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        if (digitsOld == digitsNew)
+            return;
 
-        try
+        // Ограничиваем 9
+        if (digitsNew.Length > 9)
+            digitsNew = digitsNew[..9];
+
+        string formatted = FormatDigits(digitsNew);
+
+        // вычисляем позицию курсора (количество цифр слева)
+        int cursorPos = entry.CursorPosition;
+        int digitsBeforeCursor = CountDigits(newRaw[..Math.Min(cursorPos, newRaw.Length)]);
+
+        // Обновление UI
+        _isUpdating = true;
+
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            // Дать Android IME завершить обработку
-            await Task.Delay(1, token);
+            entry.Text = formatted;
 
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                if (!token.IsCancellationRequested &&
-                    PhoneNumberEntryBinding.Text != formatted)
-                {
-                    _isInternalUpdate = true;
-                    PhoneNumberEntryBinding.Text = formatted;
-                    _isInternalUpdate = false;
-                }
-            });
-        }
-        catch (TaskCanceledException)
-        {
-            // игнорируем
-        }
+            // восстановление позиции курсора
+            entry.CursorPosition = GetCursorPositionByDigits(formatted, digitsBeforeCursor);
+            entry.SelectionLength = 0;
+
+            PhoneNumber = digitsNew;
+            PhoneChanged?.Invoke(this, FullPhoneNumber);
+
+            if (ValidationIndicator != null)
+                ValidationIndicator.IsVisible = IsValid;
+
+            _isUpdating = false;
+        });
     }
 
-    // --------------------------
-    // NORMALIZATION
-    // --------------------------
-    private static string NormalizeNumber(string raw)
+    // ------------------------------------------
+    // Утилиты
+    // ------------------------------------------
+
+    private static string ExtractDigits(string input)
     {
-        if (string.IsNullOrEmpty(raw))
-            return string.Empty;
+        if (string.IsNullOrEmpty(input)) return "";
 
-        var digits = Regex.Replace(raw, @"[^\d]", "");
+        string digits = Regex.Replace(input, @"\D", "");
 
-        // ВСЕГДА убираем ведущий 996
+        // Убираем +996 или 996
         if (digits.StartsWith("996"))
             digits = digits[3..];
 
@@ -117,62 +87,45 @@ public partial class PhoneEntry : Border
         if (digits.StartsWith("0"))
             digits = digits[1..];
 
-        // Ограничиваем 9 цифрами
-        if (digits.Length > 9)
-            digits = digits[..9];
-
         return digits;
     }
 
-    // --------------------------
-    // FORMATTER
-    // --------------------------
-    private static string FormatNumber(string digits)
+    private static int CountDigits(string s)
     {
-        if (string.IsNullOrEmpty(digits))
-            return string.Empty;
+        int count = 0;
+        foreach (var ch in s)
+            if (char.IsDigit(ch))
+                count++;
+        return count;
+    }
 
-        return digits.Length switch
+    private static int GetCursorPositionByDigits(string formatted, int digitsBefore)
+    {
+        if (digitsBefore <= 0)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < formatted.Length; i++)
         {
-            <= 3 => digits,
-            <= 5 => $"{digits[..3]} {digits[3..]}",
-            <= 7 => $"{digits[..3]} {digits[3..5]} {digits[5..]}",
-            _ => $"{digits[..3]} {digits[3..5]} {digits[5..7]} {digits[7..]}"
-        };
+            if (char.IsDigit(formatted[i]))
+            {
+                count++;
+                if (count == digitsBefore)
+                    return i + 1;
+            }
+        }
+
+        return formatted.Length;
     }
 
-    // --------------------------
-    // PROPERTY CHANGED (EXTERNAL SET)
-    // --------------------------
-    private static void OnPhoneNumberChangedExternally(BindableObject bindable, object oldValue, object newValue)
+    private static string FormatDigits(string digits)
     {
-        if (bindable is not PhoneEntry control || control._isInternalUpdate)
-            return;
+        if (digits.Length <= 3)
+            return digits;
 
-        control._isInternalUpdate = true;
+        if (digits.Length <= 6)
+            return $"{digits[..3]} {digits[3..]}";
 
-        var digits = NormalizeNumber(newValue?.ToString() ?? string.Empty);
-        var formatted = FormatNumber(digits);
-
-        control.PhoneNumberEntryBinding.Text = formatted;
-        control.FullPhoneNumber = "+996" + digits;
-
-        control.IsValid = digits.Length == 9;
-        control.ValidationIndicator.IsVisible = control.IsValid;
-
-        control._isInternalUpdate = false;
-    }
-
-    private static void OnFullPhoneNumberChangedExternally(BindableObject bindable, object oldValue, object newValue)
-    {
-        if (bindable is not PhoneEntry control || control._isInternalUpdate)
-            return;
-
-        control._isInternalUpdate = true;
-
-        var digits = NormalizeNumber(newValue?.ToString() ?? string.Empty);
-        control.PhoneNumber = digits;
-
-        control._isInternalUpdate = false;
+        return $"{digits[..3]} {digits[3..6]} {digits[6..]}";
     }
 }

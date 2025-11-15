@@ -77,6 +77,32 @@
                            FontSize="12"
                            Margin="0,-8,0,0"/>
 
+                    <!-- Отображение кода верификации (крупным шрифтом) -->
+                    <Border BackgroundColor="#E8F5E9" 
+                            Stroke="#4CAF50" 
+                            StrokeThickness="2"
+                            StrokeShape="RoundRectangle 16" 
+                            Padding="20"
+                            Margin="0,8,0,8"
+                            IsVisible="{Binding IsCodeSent}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Код верификации:" 
+                                   TextColor="#2E7D32" 
+                                   FontSize="14"
+                                   FontAttributes="Bold"/>
+                            <Label Text="{Binding DisplayedVerificationCode}" 
+                                   TextColor="#0B4A3B" 
+                                   FontSize="32"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"/>
+                            <Label Text="Введите этот код в поле ниже" 
+                                   TextColor="#666666" 
+                                   FontSize="12"
+                                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+
                     <!-- Поле Код подтверждения (показывается только на втором шаге) -->
                     <Border BackgroundColor="#E0EFE9" 
                             Stroke="Transparent" 

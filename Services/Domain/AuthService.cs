@@ -168,56 +168,18 @@ public class AuthService : IAuthService
         return "+996" + digits;
     }
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
-    {
-        try
-        {
-            if (request == null)
-                throw new ArgumentNullException(nameof(request));
 
-            // 1) Выполняем регистрацию
-            var registeredUser = await _apiService.RegisterAsync(request, ct);
 
-            // 2) Автоматический логин
-            var loginRequest = new LoginRequest
-            {
-                Phone = request.phone_number,
-                Password = request.password
-            };
-
-            var response = await _apiService.LoginAsync(loginRequest, ct);
-
-            if (response.UserId == 0)
-                response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? registeredUser.Id;
-
-            await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
-
-            var userId = response.UserId > 0 ? response.UserId : registeredUser.Id;
-            if (userId > 0)
-                await SaveOrUpdateUserAsync(userId, registeredUser, ct);
-
-            response.User = registeredUser;
-
-            _logger?.LogInformation("User registered: {Phone}, UserId: {UserId}", request.phone_number, userId);
-            return response;
-        }
-        catch (ApiException) { throw; }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error during registration");
-            throw new NetworkException("Не удалось зарегистрироваться", ex);
-        }
-    }
-
-    public async Task SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
+    public async Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(phoneNumber))
                 throw new ArgumentException("Phone number is required");
 
-            await _apiService.SendVerificationCodeAsync(phoneNumber, ct);
+            var result = await _apiService.SendVerificationCodeAsync(phoneNumber, ct);
             _logger?.LogInformation("Verification code sent to: {Phone}", phoneNumber);
+            return result;
         }
         catch (ApiException) { throw; }
         catch (Exception ex)

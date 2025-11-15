@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Services.Domain;
 using YessGoFront.Services.Api;
-using RegisterRequestDto = YessGoFront.Services.Api.RegisterRequest;
 using VerifyCodeRequest = YessGoFront.Services.Api.VerifyCodeRequest;
 
 
@@ -31,6 +31,7 @@ public partial class RegisterViewModel : ObservableObject
     [ObservableProperty] private bool isVerificationStep = false;
     [ObservableProperty] private bool isCodeSent = false;
     [ObservableProperty] private string? successMessage;
+    [ObservableProperty] private string? displayedVerificationCode;  // Код для отображения в интерфейсе
 
     public RegisterViewModel(IAuthService authService, ILogger<RegisterViewModel>? logger = null)
     {
@@ -76,11 +77,18 @@ public partial class RegisterViewModel : ObservableObject
 
             _logger?.LogInformation("Sending verification code to: {Phone}", normalizedPhone);
 
-            await _authService.SendVerificationCodeAsync(normalizedPhone);
+            var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
+            
+            // Извлекаем код из ответа для отображения в интерфейсе
+            if (result.TryGetValue("verification_code", out var codeObj) && codeObj != null)
+            {
+                DisplayedVerificationCode = codeObj.ToString();
+                _logger?.LogInformation("Verification code received: {Code}", DisplayedVerificationCode);
+            }
             
             IsCodeSent = true;
             IsVerificationStep = true;
-            SuccessMessage = "Код отправлен на ваш номер телефона";
+            SuccessMessage = "Код сгенерирован. Используйте его для верификации.";
             
             _logger?.LogInformation("Verification code sent successfully");
         }

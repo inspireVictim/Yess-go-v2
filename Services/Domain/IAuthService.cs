@@ -4,35 +4,31 @@ using YessGoFront.Services.Api;
 namespace YessGoFront.Services.Domain;
 
 /// <summary>
-/// Domain сервис для аутентификации (бизнес-логика)
+/// Domain-level authentication contract that wraps API calls and local storage helpers.
 /// </summary>
 public interface IAuthService
 {
     /// <summary>
-    /// Вход в систему по номеру телефона
+    /// Phone-based login helper (normalizes +996 numbers automatically).
     /// </summary>
     Task<AuthResponse> LoginWithPhoneAsync(string phone, string password, CancellationToken ct = default);
-    
+
     /// <summary>
-    /// Вход в систему (устаревший метод, используйте LoginWithPhoneAsync)
+    /// Legacy login flow (kept for compatibility with old pages).
     /// </summary>
     [Obsolete("Use LoginWithPhoneAsync instead")]
     Task<AuthResponse> LoginAsync(string emailOrPhone, string password, CancellationToken ct = default);
+
     /// <summary>
-    /// Регистрация. После успешной регистрации автоматически выполняет вход
+    /// Requests an SMS verification code for the specified phone number.
     /// </summary>
-    Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default);
-    
+    Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default);
+
     /// <summary>
-    /// Отправка SMS-кода верификации на номер телефона
-    /// </summary>
-    Task SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default);
-    
-    /// <summary>
-    /// Проверка кода и завершение регистрации с автоматическим входом
+    /// Verifies the code and finalises user registration (creates the account and logs in).
     /// </summary>
     Task<AuthResponse> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default);
-    
+
     Task<bool> RefreshTokenAsync(CancellationToken ct = default);
     Task LogoutAsync(CancellationToken ct = default);
     Task<bool> IsAuthenticatedAsync();
@@ -42,4 +38,3 @@ public interface IAuthService
     Task SavePinAsync(string pin);
     Task<bool> HasPinAsync();
 }
-

@@ -57,21 +57,7 @@ namespace YessGoFront.Services.Api
             }
         }
 
-        public async Task<UserDto> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
-        {
-            try
-            {
-                return await PostAsync<RegisterRequest, UserDto>(
-                    ApiEndpoints.AuthEndpoints.Register,
-                    request,
-                    ct
-                );
-            }
-            catch (Exception ex) when (IsNetworkError(ex))
-            {
-                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
-            }
-        }
+
 
         public async Task<AuthResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
         {

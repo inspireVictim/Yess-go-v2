@@ -13,15 +13,6 @@ public interface IAuthApiService
     /// </summary>
     Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default);
 
-    /// <summary>
-    /// Регистрация
-    /// Возвращает данные пользователя (UserDto), но не токены
-    /// </summary>
-    Task<UserDto> RegisterAsync(RegisterRequest request, CancellationToken ct = default);
-
-    /// <summary>
-    /// Обновить токен
-    /// </summary>
     Task<AuthResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default);
 
     /// <summary>
@@ -68,38 +59,7 @@ public class LoginRequest
 }
 
 /// <summary>
-/// Запрос на регистрацию
-/// Соответствует UserCreate схеме бэкенда
-/// </summary>
-/// <summary>
-/// Запрос на регистрацию
-/// Соответствует UserCreate схеме бэкенда
-/// </summary>
-public class RegisterRequest
-{
-    /// <summary>
-    /// Номер телефона (обязательно)
-    /// </summary>
-    public string phone_number { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Пароль (обязательно)
-    /// </summary>
-    public string password { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Имя (обязательно)
-    /// </summary>
-    public string first_name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Фамилия (обязательно)
-    /// </summary>
-    public string last_name { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Запрос на отправку кода верификации
+/// Payload for requesting an SMS verification code.
 /// </summary>
 public class VerificationCodeRequest
 {

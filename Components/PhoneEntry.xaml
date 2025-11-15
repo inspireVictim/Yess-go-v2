@@ -9,7 +9,7 @@
 
     <Grid Padding="12,0" ColumnDefinitions="Auto,Auto,*,Auto">
 
-        <!-- Флаг Кыргызстана -->
+        <!-- Флаг -->
         <Border Grid.Column="0"
                 WidthRequest="32"
                 HeightRequest="24"
@@ -22,7 +22,7 @@
                    VerticalOptions="Center"/>
         </Border>
 
-        <!-- Префикс +996 -->
+        <!-- Префикс -->
         <Label Grid.Column="1"
                Text="+996"
                FontSize="16"
@@ -31,7 +31,7 @@
                VerticalOptions="Center"
                Margin="8,0"/>
 
-        <!-- Поле ввода номера -->
+        <!-- Поле ввода -->
         <Entry x:Name="PhoneNumberEntryBinding"
                Grid.Column="2"
                Placeholder="555 12 34 56"
@@ -40,7 +40,7 @@
                TextChanged="OnPhoneNumberChanged"
                MaxLength="12" />
 
-        <!-- Индикатор валидности -->
+        <!-- Галочка -->
         <Label x:Name="ValidationIndicator"
                Grid.Column="3"
                Text="✓"
@@ -49,6 +49,6 @@
                IsVisible="False"
                VerticalOptions="Center"
                Margin="8,0,0,0"/>
-    </Grid>
 
+    </Grid>
 </Border>

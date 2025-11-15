@@ -26,6 +26,14 @@ namespace YessGoFront.Views
             _viewModel.OnRegisterSuccess += OnRegisterSuccess;
         }
 
+        // ---------------------------
+        // ОБРАБОТЧИК ТЕЛЕФОНА
+        // ---------------------------
+        private void OnPhoneChanged(object sender, string fullPhone)
+        {
+            _viewModel.Phone = fullPhone;
+        }
+
         private async Task OnRegisterSuccess(Services.Api.AuthResponse response)
         {
             // Сохраняем данные пользователя в AccountStore

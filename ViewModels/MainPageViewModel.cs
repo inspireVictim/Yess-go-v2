@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using YessGoFront.Models;
 using YessGoFront.Services;
 using YessGoFront.Services.Api;
+using YessGoFront.Services.Domain;
 using System.Collections.Generic;
 
 namespace YessGoFront.ViewModels
@@ -62,6 +63,7 @@ namespace YessGoFront.ViewModels
         private CancellationTokenSource? _overlayCts;
         private readonly IBannerApiService? _bannerApiService;
         private readonly IPartnersApiService? _partnersApiService;
+        private readonly IWalletService? _walletService;
 
         // ====== Команды ======
         public IAsyncRelayCommand<StoryModel> OpenStoryAsyncCommand { get; }
@@ -74,10 +76,14 @@ namespace YessGoFront.ViewModels
         
         public IAsyncRelayCommand<PartnerLogoModel> OpenPartnerAsyncCommand { get; }
 
-        public MainPageViewModel(IBannerApiService? bannerApiService = null, IPartnersApiService? partnersApiService = null)
+        public MainPageViewModel(
+            IBannerApiService? bannerApiService = null,
+            IPartnersApiService? partnersApiService = null,
+            IWalletService? walletService = null)
         {
             _bannerApiService = bannerApiService;
             _partnersApiService = partnersApiService;
+            _walletService = walletService;
             
             // Подписка на изменение баланса — обновляем метку на главной
             BalanceStore.Instance.PropertyChanged += (_, e) =>
@@ -102,6 +108,9 @@ namespace YessGoFront.ViewModels
             // Команда для открытия партнёра создаётся автоматически через [RelayCommand] на методе OpenPartnerAsync
             // Но нужно явно создать её для правильной работы биндинга
             OpenPartnerAsyncCommand = new AsyncRelayCommand<PartnerLogoModel>(OpenPartnerAsync);
+
+            // Загружаем баланс кошелька текущего пользователя (если сервис доступен)
+            _ = LoadBalanceAsync();
         }
 
         // ====== ДАННЫЕ ======
@@ -156,6 +165,22 @@ namespace YessGoFront.ViewModels
                     "storiespage_bday.png",
                 }
             });
+        }
+
+        private async Task LoadBalanceAsync()
+        {
+            try
+            {
+                if (_walletService == null)
+                    return;
+
+                var balance = await _walletService.GetBalanceAsync();
+                BalanceStore.Instance.Balance = balance;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading wallet balance: {ex.Message}");
+            }
         }
 
         // ====== ДАННЫЕ Партнёров======

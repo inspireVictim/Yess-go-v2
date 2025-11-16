@@ -7,6 +7,7 @@ using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
 using YessGoFront.Services.Api;
+using YessGoFront.Services.Domain;
 using YessGoFront.ViewModels;
 using YessGoFront.Views.Controls;
 
@@ -46,7 +47,8 @@ namespace YessGoFront.Views
             // Получаем сервисы из DI и создаём ViewModel
             var bannerApiService = MauiProgram.Services.GetService<IBannerApiService>();
             var partnersApiService = MauiProgram.Services.GetService<IPartnersApiService>();
-            BindingContext = new MainPageViewModel(bannerApiService, partnersApiService);
+            var walletService = MauiProgram.Services.GetService<IWalletService>();
+            BindingContext = new MainPageViewModel(bannerApiService, partnersApiService, walletService);
 
             BindingContextChanged += (_, __) =>
             {

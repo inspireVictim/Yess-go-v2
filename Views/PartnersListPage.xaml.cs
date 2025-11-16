@@ -145,7 +145,7 @@ namespace YessGoFront.Views
         {
             try
             {
-                await Shell.Current.GoToAsync("..");
+                await Shell.Current.GoToAsync(nameof(PartnerPage));
             }
             catch (Exception ex)
             {

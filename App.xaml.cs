@@ -7,36 +7,34 @@ namespace YessGoFront;
 
 public partial class App : Application
 {
+    private const string TokenKey = "access_token";   // ✔️ Единый ключ
+
     public App()
     {
         InitializeComponent();
 
-        // ✅ Проверка соединения с API при старте (только для отладки)
 #if DEBUG
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(2000); // Ждём, пока приложение полностью запустится
+                await Task.Delay(2000);
                 var clientFactory = MauiProgram.Services.GetRequiredService<IHttpClientFactory>();
                 var client = clientFactory.CreateClient("ApiClient");
 
                 var baseUrl = client.BaseAddress?.ToString() ?? "unknown";
                 System.Diagnostics.Debug.WriteLine($"[App] 🔍 Testing API connection to: {baseUrl}");
 
-                // Проверяем корневой endpoint
                 var response = await client.GetAsync("");
                 var text = await response.Content.ReadAsStringAsync();
 
-                System.Diagnostics.Debug.WriteLine($"[App] ✅ API Health Check: {response.StatusCode} - {text.Substring(0, Math.Min(100, text.Length))}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[App] ✅ API Health Check: {response.StatusCode} - {text.Substring(0, Math.Min(100, text.Length))}");
             }
             catch (Exception ex)
             {
-                // Логируем подробную информацию об ошибке
                 System.Diagnostics.Debug.WriteLine($"[App] ❌ API Health Check FAILED!");
                 System.Diagnostics.Debug.WriteLine($"[App] Error: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[App] ⚠️ Check if backend is running and IP address is correct!");
-                System.Diagnostics.Debug.WriteLine($"[App] ⚠️ Set API_BASE_URL environment variable if needed!");
             }
         });
 #endif
@@ -44,42 +42,34 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        // Инициализируем базу данных при запуске приложения
-        _ = Task.Run(async () =>
+        var window = new Window(new AppShell());
+
+        window.Created += async (_, __) =>
         {
             try
             {
-                await Task.Delay(500); // Небольшая задержка для полной инициализации сервисов
-                await InitializeDatabaseAsync();
+                var token = await SecureStorage.GetAsync(TokenKey);
+
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    if (string.IsNullOrEmpty(token))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[App] No token → go to login");
+                        await Shell.Current.GoToAsync("//login");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[App] Token found → go to PIN login (or main if no PIN)");
+                        await Shell.Current.GoToAsync("//pinlogin");
+                    }
+                });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[App] Database initialization error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] Navigation error: {ex.Message}");
             }
-        });
+        };
 
-        return new Window(new AppShell());
-    }
-
-    private async Task InitializeDatabaseAsync()
-    {
-        try
-        {
-            var services = MauiProgram.Services;
-            if (services == null) return;
-
-            using var scope = services.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var logger = scope.ServiceProvider.GetService<Microsoft.Extensions.Logging.ILogger<DatabaseInitializer>>();
-            var initializer = new DatabaseInitializer(context, logger);
-
-            await initializer.InitializeAsync();
-            System.Diagnostics.Debug.WriteLine("[App] Database initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            // Логируем ошибку, но не прерываем работу приложения
-            System.Diagnostics.Debug.WriteLine($"[App] Database initialization error: {ex.Message}");
-        }
+        return window;
     }
 }

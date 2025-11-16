@@ -1,11 +1,12 @@
 ﻿using System;
-using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
-using YessGoFront.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using YessGoFront.Services.Domain;
 using YessGoFront.ViewModels;
+using YessGoFront.Services;
 
 namespace YessGoFront.Views
 {
@@ -19,7 +20,7 @@ namespace YessGoFront.Views
 
             // Получаем сервисы через DI
             var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
-            var logger = MauiProgram.Services.GetService<Microsoft.Extensions.Logging.ILogger<LoginViewModel>>();
+            var logger = MauiProgram.Services.GetService<ILogger<LoginViewModel>>();
 
             _viewModel = new LoginViewModel(authService, logger);
             BindingContext = _viewModel;
@@ -28,10 +29,11 @@ namespace YessGoFront.Views
         protected override void OnAppearing()
         {
             base.OnAppearing();
-            // Подписываемся на событие успешного логина при каждом появлении страницы
-            // Сначала отписываемся, чтобы избежать двойной подписки
+
+            // чтобы не было двойных подписок
             _viewModel.OnLoginSuccess -= OnLoginSuccess;
             _viewModel.OnLoginSuccess += OnLoginSuccess;
+
             System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing - subscribed to OnLoginSuccess");
         }
 
@@ -40,36 +42,43 @@ namespace YessGoFront.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response.UserId}");
-                
-                // Проверяем, что токен действительно сохранён
-                var authService = MauiProgram.Services.GetRequiredService<Infrastructure.Auth.IAuthenticationService>();
+
+                // Проверяем, что токен реально сохранён
+                var authService = MauiProgram.Services
+                    .GetRequiredService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
+
                 var savedToken = await authService.GetAccessTokenAsync();
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] Token saved: {!string.IsNullOrEmpty(savedToken)}");
-                
-                // Обновляем AccountStore для отслеживания состояния входа
+
+                // Обновляем AccountStore (учитываем rememberMe!)
                 var user = response.User;
                 var email = user?.Email ?? user?.Phone ?? string.Empty;
                 var firstName = user?.FirstName ?? string.Empty;
                 var lastName = user?.LastName ?? string.Empty;
                 var phone = user?.Phone ?? string.Empty;
                 var rememberMe = _viewModel.RememberMe;
-                
-                AccountStore.Instance.SignIn(email, firstName, lastName, rememberMe, phone);
-                
-                // Проверяем, что AccountStore действительно обновлён
+
+                AccountStore.Instance.SignIn(
+                    email,
+                    firstName,
+                    lastName,
+                    rememberMe,
+                    phone
+                );
+
                 var isSignedIn = AccountStore.Instance.IsSignedIn;
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] AccountStore updated. IsSignedIn: {isSignedIn}, Email: {AccountStore.Instance.Email}, RememberMe: {rememberMe}");
-                
+
                 if (!isSignedIn)
                 {
                     System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: IsSignedIn is false after SignIn! This should not happen.");
                 }
-                
-                // Проверяем, есть ли PIN-код
-                var domainAuthService = MauiProgram.Services.GetRequiredService<Services.Domain.IAuthService>();
+
+                // Проверяем, есть ли PIN
+                var domainAuthService = MauiProgram.Services.GetRequiredService<IAuthService>();
                 var hasPin = await domainAuthService.HasPinAsync();
-                
-                // Выполняем навигацию на главном потоке
+
+                // Навигацию делаем на главном потоке
                 await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
                     try
@@ -79,13 +88,13 @@ namespace YessGoFront.Views
                         {
                             if (!hasPin)
                             {
-                                // Если PIN-кода нет - переходим на страницу создания PIN
+                                // Если PIN-кода нет - перейти на создание PIN
                                 System.Diagnostics.Debug.WriteLine("[LoginPage] No PIN found, navigating to PIN creation page");
                                 await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
                             }
                             else
                             {
-                                // Если PIN-код есть - переходим на главную страницу
+                                // Если PIN есть - на главную
                                 System.Diagnostics.Debug.WriteLine("[LoginPage] PIN exists, navigating to main/home...");
                                 await shell.GoToAsync("///main/home", animate: true);
                             }

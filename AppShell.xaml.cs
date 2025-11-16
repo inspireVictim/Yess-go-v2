@@ -17,6 +17,7 @@ namespace YessGoFront
             // регистрация маршрутов внутренних страниц
             Routing.RegisterRoute(nameof(WalletPage), typeof(WalletPage));
             Routing.RegisterRoute(nameof(PartnersListPage), typeof(PartnersListPage));
+            Routing.RegisterRoute(nameof(PartnerPage), typeof(PartnerPage));
             // partnerdetails зарегистрирован в AppShell.xaml, поэтому здесь не нужен
 
             // Подписываемся на событие Navigated для отслеживания успешной навигации

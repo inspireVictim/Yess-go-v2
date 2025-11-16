@@ -77,8 +77,10 @@ public class AuthService : IAuthService
     {
         try
         {
-            var pin = await _pinService.GetPinAsync();
-            return !string.IsNullOrWhiteSpace(pin);
+            var hasValidPin = await _pinService.ValidateStoredPinOrReset();
+
+            System.Diagnostics.Debug.WriteLine($"[AuthService] HasPinAsync: hasValidPin={hasValidPin}");
+            return hasValidPin;
         }
         catch (Exception ex)
         {
@@ -262,10 +264,20 @@ public class AuthService : IAuthService
         }
         finally
         {
-            // ✅ ВАЖНО: токены очищаем, PIN **НЕ ТРОГАЕМ**
+            // ✅ Токены и PIN очищаем при выходе
             await _authService.ClearTokensAsync();
 
-            _logger?.LogInformation("User logged out (PIN сохранён)");
+            try
+            {
+                await _pinService.ClearPinAsync();
+                System.Diagnostics.Debug.WriteLine("[AuthService] LogoutAsync: PIN cleared on logout");
+            }
+            catch (Exception pinEx)
+            {
+                _logger?.LogWarning(pinEx, "Failed to clear PIN on logout");
+            }
+
+            _logger?.LogInformation("User logged out (tokens and PIN cleared)");
         }
     }
 

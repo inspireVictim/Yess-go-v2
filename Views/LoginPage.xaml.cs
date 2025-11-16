@@ -74,9 +74,10 @@ namespace YessGoFront.Views
                     System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: IsSignedIn is false after SignIn! This should not happen.");
                 }
 
-                // Проверяем, есть ли PIN
+                // Проверяем, есть ли валидный PIN (с очисткой старого/повреждённого)
                 var domainAuthService = MauiProgram.Services.GetRequiredService<IAuthService>();
                 var hasPin = await domainAuthService.HasPinAsync();
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] OnLoginSuccess: hasValidPin={hasPin}");
 
                 // Навигацию делаем на главном потоке
                 await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -88,15 +89,15 @@ namespace YessGoFront.Views
                         {
                             if (!hasPin)
                             {
-                                // Если PIN-кода нет - перейти на создание PIN
-                                System.Diagnostics.Debug.WriteLine("[LoginPage] No PIN found, navigating to PIN creation page");
+                                // Если валидного PIN-кода нет - перейти на создание PIN
+                                System.Diagnostics.Debug.WriteLine("[LoginPage] No valid PIN found, navigating to PIN creation page");
                                 await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
                             }
                             else
                             {
-                                // Если PIN есть - на главную
-                                System.Diagnostics.Debug.WriteLine("[LoginPage] PIN exists, navigating to main/home...");
-                                await shell.GoToAsync("///main/home", animate: true);
+                                // Если есть валидный PIN - сразу на экран ввода PIN
+                                System.Diagnostics.Debug.WriteLine("[LoginPage] Valid PIN exists, navigating to PIN login page");
+                                await shell.GoToAsync("///pinlogin", animate: true);
                             }
                         }
                     }

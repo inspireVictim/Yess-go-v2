@@ -30,7 +30,7 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    //Проверка/логин по биометрии
+    // Биометрия + PIN
     private readonly BiometricService _biometricService = new();
     private readonly PinStorageService _pinService = new();
 
@@ -113,7 +113,7 @@ public class AuthService : IAuthService
 
             // Сохраняем токены (refreshToken может быть null)
             await _authService.SaveTokensAsync(
-                response.AccessToken, 
+                response.AccessToken,
                 string.IsNullOrWhiteSpace(response.RefreshToken) ? null : response.RefreshToken);
 
             if (response.UserId > 0)
@@ -139,7 +139,7 @@ public class AuthService : IAuthService
         {
             throw new ArgumentException("Вход по email больше не поддерживается. Используйте номер телефона.");
         }
-        
+
         // Используем новый метод
         return await LoginWithPhoneAsync(emailOrPhone, password, ct);
     }
@@ -167,8 +167,6 @@ public class AuthService : IAuthService
         // Возвращаем с префиксом +996
         return "+996" + digits;
     }
-
-
 
     public async Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
     {
@@ -253,24 +251,21 @@ public class AuthService : IAuthService
 
     public async Task LogoutAsync(CancellationToken ct = default)
     {
-        try { await _apiService.LogoutAsync(ct); }
-        catch (Exception ex) { _logger?.LogWarning(ex, "Error during logout API call"); }
+        try
+        {
+            // На бэке logout пока не реализован — ок, игнорируем NotSupported
+            await _apiService.LogoutAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Error during logout API call");
+        }
         finally
         {
+            // ✅ ВАЖНО: токены очищаем, PIN **НЕ ТРОГАЕМ**
             await _authService.ClearTokensAsync();
-            
-            // Удаляем PIN-код при выходе
-            try
-            {
-                await _pinService.ClearPinAsync();
-                _logger?.LogInformation("PIN code cleared on logout");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Error clearing PIN on logout");
-            }
-            
-            _logger?.LogInformation("User logged out");
+
+            _logger?.LogInformation("User logged out (PIN сохранён)");
         }
     }
 

@@ -7,13 +7,12 @@ namespace YessGoFront;
 
 public partial class App : Application
 {
-    private const string TokenKey = "access_token";   // ✔️ Единый ключ
-
     public App()
     {
         InitializeComponent();
 
 #if DEBUG
+        // Тест здоровья API — можно оставить, не влияет на навигацию
         _ = Task.Run(async () =>
         {
             try
@@ -40,36 +39,12 @@ public partial class App : Application
 #endif
     }
 
+    /// <summary>
+    /// Создаём окно с AppShell без дополнительной навигации.
+    /// Вся логика переходов теперь в AppShell (Loaded + токен + PIN).
+    /// </summary>
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var window = new Window(new AppShell());
-
-        window.Created += async (_, __) =>
-        {
-            try
-            {
-                var token = await SecureStorage.GetAsync(TokenKey);
-
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        System.Diagnostics.Debug.WriteLine("[App] No token → go to login");
-                        await Shell.Current.GoToAsync("//login");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("[App] Token found → go to PIN login (or main if no PIN)");
-                        await Shell.Current.GoToAsync("//pinlogin");
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[App] Navigation error: {ex.Message}");
-            }
-        };
-
-        return window;
+        return new Window(new AppShell());
     }
 }

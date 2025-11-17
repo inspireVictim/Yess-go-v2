@@ -120,7 +120,57 @@
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnTransactionTapped" CommandParameter="{Binding Id}"/>
                                 </Grid.GestureRecognizers>
-                                <ContentPresenter ContentTemplate="{StaticResource TransactionItemTemplate}"/>
+                                <Grid Padding="12" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" x:DataType="models:PurchaseDto">
+                <Frame Grid.RowSpan="2"
+                       WidthRequest="40"
+                       HeightRequest="40"
+                       CornerRadius="20"
+                       Padding="0"
+                       BackgroundColor="{Binding Type, Converter={StaticResource TransactionTypeToColorConverter}}">
+                    <Label Text="₸"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           TextColor="White"
+                           FontAttributes="Bold"/>
+                </Frame>
+
+                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="{Binding Amount, StringFormat='{0:0.##}'}"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#111827"/>
+                        <Label Text="Yess!Coin"
+                               FontSize="12"
+                               TextColor="#6B7280"/>
+                    </HorizontalStackLayout>
+
+                    <Label Text="{Binding PartnerName}"
+                           FontSize="13"
+                           TextColor="#4B5563"
+                           LineBreakMode="TailTruncation"
+                           MaxLines="1"/>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="{Binding TypeLabel}"
+                               FontSize="11"
+                               TextColor="#6B7280"/>
+                        <Label Text="·"
+                               FontSize="11"
+                               TextColor="#9CA3AF"/>
+                        <Label Text="{Binding StatusLabel}"
+                               FontSize="11"
+                               TextColor="#6B7280"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+
+                <Label Grid.Column="1"
+                       Grid.Row="1"
+                       Text="{Binding CreatedAt, StringFormat='{0:dd.MM.yyyy HH:mm}'}"
+                       FontSize="11"
+                       TextColor="#9CA3AF"
+                       HorizontalOptions="End"/>
+            </Grid>
                             </Grid>
                         </Frame>
                     </DataTemplate>

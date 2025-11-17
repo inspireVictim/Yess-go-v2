@@ -47,10 +47,7 @@ public partial class TransactionDetailsViewModel : ObservableObject
 
             if (!string.IsNullOrWhiteSpace(Transaction?.PartnerId) && _partnersApiService != null)
             {
-                if (int.TryParse(Transaction.PartnerId, out var partnerId))
-                {
-                    Partner = await _partnersApiService.GetByIdAsync(partnerId);
-                }
+                Partner = await _partnersApiService.GetByIdAsync(Transaction.PartnerId);
             }
         }
         catch (Exception ex)

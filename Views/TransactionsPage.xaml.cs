@@ -23,7 +23,7 @@ namespace YessGoFront.Views
 
         private async void OnBackClicked(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("//wallet");
+            await Shell.Current.GoToAsync("//main");
         }
 
         private void OnAllFilterClicked(object? sender, EventArgs e)
@@ -55,7 +55,7 @@ namespace YessGoFront.Views
             if (sender is not VisualElement element)
                 return;
 
-            if (element.GestureRecognizers.FirstOrDefault() is TapGestureRecognizer tap && tap.CommandParameter is string id)
+            if ((element as IGestureRecognizers)?.GestureRecognizers.FirstOrDefault() is TapGestureRecognizer tap && tap.CommandParameter is string id)
             {
                 await Shell.Current.GoToAsync($"transactiondetails?id={Uri.EscapeDataString(id)}");
             }

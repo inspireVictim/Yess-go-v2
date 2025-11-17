@@ -134,7 +134,7 @@ public static class MauiProgram
         if (!string.IsNullOrEmpty(envUrl))
             return envUrl;
 
-        return "http://192.168.0.177:8000/";
+        return "http://192.168.1.7:8000/";
 #else
         return "http://localhost:8000/";
 #endif

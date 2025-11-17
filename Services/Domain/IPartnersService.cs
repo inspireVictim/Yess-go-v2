@@ -11,6 +11,11 @@ public interface IPartnersService
         string category,
         CancellationToken ct = default);
 
+    // Получить партнёров по id категории
+    Task<IReadOnlyList<PartnerDto>> GetPartnersByCategoryAsync(
+        int categoryId,
+        CancellationToken ct = default);
+
     Task<PartnerDetailDto> GetPartnerByIdAsync(
         string id,
         CancellationToken ct = default);

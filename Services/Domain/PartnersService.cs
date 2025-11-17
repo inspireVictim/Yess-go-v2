@@ -45,6 +45,27 @@ public class PartnersService : IPartnersService
         }
     }
 
+    // Новый метод: запрос по id категории
+    public async Task<IReadOnlyList<PartnerDto>> GetPartnersByCategoryAsync(
+        int categoryId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            _logger?.LogDebug("Getting partners for category id: {CategoryId}", categoryId);
+            return await _apiService.GetByCategoryIdAsync(categoryId, ct);
+        }
+        catch (ApiException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error getting partners for category id {CategoryId}", categoryId);
+            throw new NetworkException("Не удалось загрузить партнёров", ex);
+        }
+    }
+
     public async Task<PartnerDetailDto> GetPartnerByIdAsync(
         string id,
         CancellationToken ct = default)

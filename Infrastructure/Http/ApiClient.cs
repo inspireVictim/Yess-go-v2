@@ -58,7 +58,7 @@ public abstract class ApiClient
                 manufacturer.Equals("Genymotion", StringComparison.OrdinalIgnoreCase);
             
             var apiUrl = Environment.GetEnvironmentVariable("API_BASE_URL") 
-                ?? (isEmulator ? "http://10.0.2.2:8000/" : "http://192.168.1.7:8000/");
+                ?? (isEmulator ? "http://10.0.2.2:8000/" : "http://192.168.1.6:8000/");
             
             HttpClient.BaseAddress = new Uri(apiUrl);
             Logger?.LogWarning("[ApiClient] Android: BaseAddress установлен на: {Url} (Emulator: {IsEmulator})", 

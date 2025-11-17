@@ -18,6 +18,11 @@ public interface IPartnersApiService
     Task<IReadOnlyList<PartnerDto>> GetByCategoryAsync(string category, CancellationToken ct = default);
 
     /// <summary>
+    /// Получить партнёров по id категории
+    /// </summary>
+    Task<IReadOnlyList<PartnerDto>> GetByCategoryIdAsync(int categoryId, CancellationToken ct = default);
+
+    /// <summary>
     /// Получить партнёра по ID
     /// </summary>
     Task<PartnerDetailDto> GetByIdAsync(string id, CancellationToken ct = default);

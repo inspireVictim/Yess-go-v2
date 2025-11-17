@@ -17,6 +17,8 @@ namespace YessGoFront.Views
         private readonly ILogger<PartnersListPage>? _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         public ObservableCollection<PartnerListItem> Partners { get; } = new();
+        public ObservableCollection<CategoryItem> Categories { get; } = new();
+
         private string _categorySlug = string.Empty;
         private string _categoryName = string.Empty;
         private string _searchQuery = string.Empty;
@@ -32,6 +34,9 @@ namespace YessGoFront.Views
             _httpClientFactory = MauiProgram.Services.GetRequiredService<IHttpClientFactory>();
             _logger = MauiProgram.Services.GetService<ILogger<PartnersListPage>>();
             BindingContext = this;
+
+            // Добавим дефолтные категории, пока не загрузятся с API
+            LoadDefaultCategories();
         }
 
         protected override async void OnAppearing()
@@ -49,8 +54,69 @@ namespace YessGoFront.Views
                 SearchEntry.Text = _searchQuery;
             }
 
+            // Попробуем загрузить категории из API (не критично)
+            _ = LoadCategoriesAsync();
+
             // Загружаем партнёров
             await LoadPartnersAsync();
+        }
+
+        private async Task LoadCategoriesAsync()
+        {
+            try
+            {
+                var httpClient = _httpClientFactory.CreateClient("ApiClient");
+                var endpoint = ApiEndpoints.PartnersEndpoints.Categories;
+
+                var response = await httpClient.GetAsync(endpoint);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger?.LogWarning($"Failed to load categories: {response.StatusCode}");
+                    return;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var categories = JsonSerializer.Deserialize<List<CategoryDto>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (categories == null || categories.Count ==0)
+                    return;
+
+                Categories.Clear();
+                Categories.Add(new CategoryItem("Все компании", "all", true));
+                foreach (var c in categories.OrderBy(c => c.Name))
+                {
+                    Categories.Add(new CategoryItem(c.Name, c.Slug, false));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error loading categories");
+            }
+        }
+
+        private void LoadDefaultCategories()
+        {
+            Categories.Clear();
+            Categories.Add(new CategoryItem("Все компании", "all", true));
+
+            // Добавленные категории из БД (пользовательские)
+            Categories.Add(new CategoryItem("Кофейня", "coffee-shop"));
+            Categories.Add(new CategoryItem("Национальная кухня", "national-cuisine"));
+            Categories.Add(new CategoryItem("Бар", "bar"));
+            Categories.Add(new CategoryItem("Кафе", "cafe"));
+            Categories.Add(new CategoryItem("Ресторан", "restaurant"));
+            Categories.Add(new CategoryItem("Пивоварня / Паб", "brewery-pub"));
+            Categories.Add(new CategoryItem("Ночной клуб", "night-club"));
+            Categories.Add(new CategoryItem("Электроника", "electronics"));
+            Categories.Add(new CategoryItem("Спорт и отдых", "sport"));
+            Categories.Add(new CategoryItem("Всё для дома", "home"));
+            Categories.Add(new CategoryItem("Транспорт", "transport"));
+
+            // Существующие/дополнительные категории (если нужны)
+            Categories.Add(new CategoryItem("Продукты", "groceries"));
+            Categories.Add(new CategoryItem("Детское", "kids"));
+            Categories.Add(new CategoryItem("Образование", "education"));
         }
 
         private async Task LoadPartnersAsync()
@@ -79,7 +145,7 @@ namespace YessGoFront.Views
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
-                _allPartners = JsonSerializer.Deserialize<List<PartnerDto>>(json, 
+                _allPartners = JsonSerializer.Deserialize<List<PartnerDto>>(json,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<PartnerDto>();
 
                 // Применяем фильтр поиска
@@ -174,16 +240,69 @@ namespace YessGoFront.Views
                 await DisplayAlert("Ошибка", $"Не удалось открыть партнёра: {ex.Message}", "ОК");
             }
         }
-    }
 
-    // модель для строки списка
-    public class PartnerListItem
-    {
-        public int Id { get; set; }
-        public string Logo { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string CashbackText { get; set; } = "";
-        public bool IsLast { get; set; } = false;
+        // Обработчик нажатия по категории в ScrollView
+        private async void OnCategoryTapped(object? sender, TappedEventArgs e)
+        {
+            try
+            {
+                if (sender is BindableObject bindable && bindable.BindingContext is CategoryItem cat)
+                {
+                    // Сбрасываем все выделения
+                    foreach (var c in Categories)
+                        c.IsSelected = false;
+
+                    cat.IsSelected = true;
+                    _categorySlug = cat.Slug ?? string.Empty;
+                    _categoryName = cat.Name ?? string.Empty;
+
+                    // Перезагружаем партнёров по выбранной категории
+                    await LoadPartnersAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Category tap error: {ex.Message}");
+            }
+        }
+
+        // модель для строки списка
+        public class PartnerListItem
+        {
+            public int Id { get; set; }
+            public string Logo { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Category { get; set; } = "";
+            public string CashbackText { get; set; } = "";
+            public bool IsLast { get; set; } = false;
+        }
+
+        // Внутренний класс для категорий
+        public class CategoryItem : System.ComponentModel.INotifyPropertyChanged
+        {
+            private bool _isSelected;
+
+            public string Name { get; set; }
+            public string? Slug { get; set; }
+            public bool IsSelected
+            {
+                get => _isSelected;
+                set
+                {
+                    if (_isSelected == value) return;
+                    _isSelected = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+
+            public CategoryItem(string name, string slug, bool isSelected = false)
+            {
+                Name = name;
+                Slug = slug;
+                _isSelected = isSelected;
+            }
+
+            public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        }
     }
 }

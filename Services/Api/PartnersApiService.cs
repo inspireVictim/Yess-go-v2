@@ -34,6 +34,16 @@ public class PartnersApiService : ApiClient, IPartnersApiService
         return result ?? new List<PartnerDto>();
     }
 
+    // Новая реализация: запрос по categoryId через query param
+    public async Task<IReadOnlyList<PartnerDto>> GetByCategoryIdAsync(
+        int categoryId,
+        CancellationToken ct = default)
+    {
+        var endpoint = $"{ApiEndpoints.PartnersEndpoints.List}?categoryId={categoryId}";
+        var result = await GetAsync<List<PartnerDto>>(endpoint, ct);
+        return result ?? new List<PartnerDto>();
+    }
+
     public async Task<PartnerDetailDto> GetByIdAsync(
         string id,
         CancellationToken ct = default)

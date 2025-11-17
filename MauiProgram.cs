@@ -221,6 +221,8 @@ public static class MauiProgram
     private static void ConfigureViewModels(IServiceCollection services)
     {
         // Register viewmodels here
+        services.AddTransient<ViewModels.TransactionsViewModel>();
+        services.AddTransient<ViewModels.TransactionDetailsViewModel>();
     }
 
     private static void ConfigureLogging(MauiAppBuilder builder)

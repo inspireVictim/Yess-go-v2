@@ -365,6 +365,20 @@ namespace YessGoFront.Views
             }
         }
 
+        private async void OnHistoryClicked(object? sender, EventArgs e)
+        {
+            if (_isNavigating) return;
+            _isNavigating = true;
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(TransactionsPage));
+            }
+            finally
+            {
+                _isNavigating = false;
+            }
+        }
+
         private async void OnMoreTapped(object sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("//main/partner");

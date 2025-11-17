@@ -18,6 +18,8 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(PartnersListPage), typeof(PartnersListPage));
             Routing.RegisterRoute(nameof(PartnerPage), typeof(PartnerPage));
             Routing.RegisterRoute(nameof(PartnerDetailPage), typeof(PartnerDetailPage));
+            Routing.RegisterRoute(nameof(TransactionsPage), typeof(TransactionsPage));
+            Routing.RegisterRoute(nameof(TransactionDetailsPage), typeof(TransactionDetailsPage));
         }
 
         protected override async void OnAppearing()

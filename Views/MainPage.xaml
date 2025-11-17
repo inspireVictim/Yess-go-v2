@@ -82,7 +82,8 @@
                                         TextColor="#7A7A7A"
                                         Padding="10,4"
                                         CornerRadius="10"
-                                        FontSize="13"/>
+                                        FontSize="13"
+                                        Clicked="OnHistoryClicked"/>
                                 <Grid Grid.Row="1" Grid.ColumnSpan="2"
                                       ColumnDefinitions="*,Auto"
                                       VerticalOptions="End"

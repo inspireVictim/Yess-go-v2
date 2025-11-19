@@ -19,7 +19,9 @@ public class WalletApiService : ApiClient, IWalletApiService
 
     public async Task<decimal> GetBalanceAsync(CancellationToken ct = default)
     {
+        Logger?.LogDebug("Запрос баланса через endpoint: {Endpoint}", ApiEndpoints.WalletEndpoints.Balance);
         var response = await GetAsync<BalanceResponse>(ApiEndpoints.WalletEndpoints.Balance, ct);
+        Logger?.LogInformation("Получен баланс: {Balance} {Currency}", response.Balance, response.Currency ?? "KGS");
         return response.Balance;
     }
 
@@ -43,7 +45,14 @@ public class WalletApiService : ApiClient, IWalletApiService
 
     private class BalanceResponse
     {
+        [System.Text.Json.Serialization.JsonPropertyName("balance")]
         public decimal Balance { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("currency")]
+        public string? Currency { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("last_updated")]
+        public DateTime? LastUpdated { get; set; }
     }
 }
 

@@ -69,14 +69,19 @@
 
     <Grid RowDefinitions="Auto,*">
         <!-- Header -->
-        <Grid Grid.Row="0" Padding="16,44,16,8" BackgroundColor="#0F6B53">
-            <Grid ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
-                <Button Text="←"
-                        WidthRequest="40" HeightRequest="40"
-                        CornerRadius="20"
-                        BackgroundColor="#FFFFFF22"
-                        TextColor="White"
-                        Clicked="OnBackClicked"/>
+        <Grid Grid.Row="0" RowDefinitions="Auto,Auto" Padding="16,44,16,8" BackgroundColor="#0F6B53">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
+                <Border WidthRequest="36" HeightRequest="36"
+        StrokeThickness="0"
+        BackgroundColor="#FFFFFF"
+        StrokeShape="RoundRectangle8">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnBackTapped" />
+                    </Border.GestureRecognizers>
+                    <Image Source="back_arrow_icon.png" 
+           Aspect="AspectFit" 
+           Margin="8" />
+                </Border>
 
                 <Label Grid.Column="1"
                        Text="История"
@@ -88,7 +93,7 @@
             </Grid>
 
             <!-- Filters -->
-            <Grid Margin="0,52,0,0" ColumnDefinitions="*,*,*" ColumnSpacing="6">
+            <Grid Grid.Row="1" Margin="0,12,0,0" ColumnDefinitions="*,*,*" ColumnSpacing="6">
                 <Button Text="Все"
                         Command="{Binding RefreshCommand}"
                         Clicked="OnAllFilterClicked"/>

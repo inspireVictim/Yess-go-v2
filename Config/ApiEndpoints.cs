@@ -57,9 +57,10 @@ public static class ApiEndpoints
     // Wallet endpoints
     public static class WalletEndpoints
     {
-        public const string Balance = $"{Wallet}";
+        // Используем endpoint из payments, который работает с текущим пользователем из токена
+        public const string Balance = $"{ApiVersion}/payments/balance";
         public const string TopUp = $"{Wallet}/topup";
-        public static string GetBalance(int userId) => $"{Balance}?userId={userId}";
+        public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }
 
     // QR endpoints

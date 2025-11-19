@@ -66,6 +66,22 @@ public static class MauiProgram
         var app = builder.Build();
         Services = app.Services;
 
+        // Запускаем сервис периодического обновления баланса
+        try
+        {
+            var balanceRefreshService = Services.GetService<YessGoFront.Services.BalanceRefreshService>();
+            if (balanceRefreshService != null)
+            {
+                // Обновляем баланс каждые 30 секунд
+                balanceRefreshService.Start(TimeSpan.FromSeconds(30));
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Balance refresh service started");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Failed to start balance refresh service: {ex.Message}");
+        }
+
         // Тест API
         _ = Task.Run(async () =>
         {
@@ -134,7 +150,7 @@ public static class MauiProgram
         if (!string.IsNullOrEmpty(envUrl))
             return envUrl;
 
-        return "http://192.168.1.6:8000/";
+        return "http://192.168.0.177:8000/";
 #else
         return "http://localhost:8000/";
 #endif
@@ -211,6 +227,7 @@ public static class MauiProgram
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<YessGoFront.Services.ILocationService, YessGoFront.Services.LocationService>();
         services.AddSingleton<YessGoFront.Services.IImageCacheService, YessGoFront.Services.ImageCacheService>();
+        services.AddSingleton<YessGoFront.Services.BalanceRefreshService>();
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPartnersService, PartnersService>();

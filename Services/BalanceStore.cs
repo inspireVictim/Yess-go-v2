@@ -10,7 +10,7 @@ namespace YessGoFront.Services
     {
         public static BalanceStore Instance { get; } = new();
 
-        private decimal _balance = 55.7m; // стартовый баланс
+        private decimal _balance = 0m; // стартовый баланс (загружается из БД)
         public decimal Balance
         {
             get => _balance;

@@ -48,8 +48,13 @@ namespace YessGoFront.Services.Api
                     throw await MapToApiExceptionAsync(response, "Ошибка входа");
 
                 var json = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<AuthResponse>(json, JsonOptions)
+                Logger?.LogDebug("Login response JSON: {Json}", json);
+                var authResponse = JsonSerializer.Deserialize<AuthResponse>(json, JsonOptions)
                        ?? throw new ApiException("Ошибка при разборе ответа сервера");
+                Logger?.LogInformation("Login successful. AccessToken: {HasAccess}, RefreshToken: {HasRefresh}", 
+                    !string.IsNullOrEmpty(authResponse.AccessToken), 
+                    !string.IsNullOrEmpty(authResponse.RefreshToken));
+                return authResponse;
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {
@@ -61,14 +66,16 @@ namespace YessGoFront.Services.Api
 
         public async Task<AuthResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
         {
-            var endpoint = $"{ApiEndpoints.AuthEndpoints.Refresh}?refresh_token={Uri.EscapeDataString(refreshToken)}";
-
             try
             {
-                var uri = BuildUri(endpoint);
+                var requestBody = new { refresh_token = refreshToken };
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+                var uri = BuildUri(ApiEndpoints.AuthEndpoints.Refresh);
                 Logger?.LogDebug("➡️ POST {Url} (refresh token)", uri);
 
-                var response = await HttpClient.PostAsync(uri, new StringContent(string.Empty), ct);
+                var response = await HttpClient.PostAsync(uri, content, ct);
 
                 if (!response.IsSuccessStatusCode)
                     throw await MapToApiExceptionAsync(response, "Ошибка обновления токена");

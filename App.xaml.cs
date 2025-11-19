@@ -2,6 +2,8 @@
 using Microsoft.Maui.Dispatching;
 using YessGoFront.Data;
 using YessGoFront.Infrastructure.Ui;
+using YessGoFront.Services;
+using YessGoFront.Services.Domain;
 
 namespace YessGoFront;
 
@@ -46,5 +48,34 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         return new Window(new AppShell());
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+
+        // Обновляем баланс при возврате приложения в фокус
+        Task.Run(async () =>
+        {
+            try
+            {
+                var scopeFactory = MauiProgram.Services.GetService<IServiceScopeFactory>();
+                if (scopeFactory != null)
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var walletService = scope.ServiceProvider.GetService<IWalletService>();
+                    if (walletService != null)
+                    {
+                        var balance = await walletService.GetBalanceAsync();
+                        BalanceStore.Instance.Balance = balance;
+                        System.Diagnostics.Debug.WriteLine($"[App] Balance refreshed on resume: {balance}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[App] Error refreshing balance on resume: {ex.Message}");
+            }
+        });
     }
 }

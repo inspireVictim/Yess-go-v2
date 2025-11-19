@@ -14,7 +14,19 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            return await SecureStorage.GetAsync(AccessTokenKey);
+            var token = await SecureStorage.GetAsync(AccessTokenKey);
+            // Если есть access token, но нет refresh token - это старый токен, нужно перелогиниться
+            if (!string.IsNullOrEmpty(token))
+            {
+                var refreshToken = await GetRefreshTokenAsync();
+                if (string.IsNullOrEmpty(refreshToken))
+                {
+                    System.Diagnostics.Debug.WriteLine("[AuthenticationService] Access token exists but refresh token is missing - clearing tokens");
+                    await ClearTokensAsync();
+                    return null;
+                }
+            }
+            return token;
         }
         catch
         {
@@ -61,10 +73,97 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task<bool> RefreshTokenAsync()
     {
-        // TODO: Реализовать refresh token логику через API
-        // Это будет реализовано после интеграции с бэкендом
-        await Task.CompletedTask;
-        return false;
+        try
+        {
+            var refreshToken = await GetRefreshTokenAsync();
+            System.Diagnostics.Debug.WriteLine($"[AuthenticationService] RefreshTokenAsync: token exists = {!string.IsNullOrWhiteSpace(refreshToken)}");
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                System.Diagnostics.Debug.WriteLine("[AuthenticationService] Refresh token not found");
+                return false;
+            }
+
+            // Получаем HttpClient через DI
+            var httpClientFactory = MauiProgram.Services.GetService<System.Net.Http.IHttpClientFactory>();
+            if (httpClientFactory == null)
+            {
+                System.Diagnostics.Debug.WriteLine("[AuthenticationService] HttpClientFactory not found");
+                return false;
+            }
+
+            var httpClient = httpClientFactory.CreateClient("ApiClient");
+            if (httpClient == null)
+            {
+                System.Diagnostics.Debug.WriteLine("[AuthenticationService] HttpClient not found");
+                return false;
+            }
+
+            // Создаем запрос для обновления токена
+            var requestBody = System.Text.Json.JsonSerializer.Serialize(new { refresh_token = refreshToken });
+            var content = new System.Net.Http.StringContent(
+                requestBody,
+                System.Text.Encoding.UTF8,
+                "application/json"
+            );
+
+            var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://10.0.2.2:8000";
+            var request = new System.Net.Http.HttpRequestMessage(
+                System.Net.Http.HttpMethod.Post,
+                $"{baseUrl.TrimEnd('/')}/api/v1/auth/refresh"
+            )
+            {
+                Content = content
+            };
+
+            var response = await httpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(
+                    json,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }
+                );
+
+                if (tokenResponse != null && !string.IsNullOrWhiteSpace(tokenResponse.AccessToken))
+                {
+                    await SaveTokensAsync(tokenResponse.AccessToken, tokenResponse.RefreshToken);
+                    System.Diagnostics.Debug.WriteLine("[AuthenticationService] Token refreshed successfully");
+                    return true;
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[AuthenticationService] Token refresh failed: {response.StatusCode}");
+                // Если refresh token тоже истек, очищаем токены
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    await ClearTokensAsync();
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AuthenticationService] Error refreshing token: {ex.Message}");
+            return false;
+        }
+    }
+
+    private class TokenResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
+
+        [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
+        public string? RefreshToken { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("token_type")]
+        public string TokenType { get; set; } = "bearer";
     }
 
     public async Task ClearTokensAsync()

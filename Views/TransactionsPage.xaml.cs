@@ -26,6 +26,11 @@ namespace YessGoFront.Views
             await Shell.Current.GoToAsync("//main");
         }
 
+        private async void OnBackTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("//main");
+        }
+
         private void OnAllFilterClicked(object? sender, EventArgs e)
         {
             if (BindingContext is TransactionsViewModel vm)

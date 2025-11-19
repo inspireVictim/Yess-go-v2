@@ -114,9 +114,16 @@ public class AuthService : IAuthService
                 response.UserId = JwtHelper.GetUserId(response.AccessToken) ?? 0;
 
             // Сохраняем токены (refreshToken может быть null)
+            _logger?.LogDebug("Saving tokens. AccessToken: {HasAccess}, RefreshToken: {HasRefresh}", 
+                !string.IsNullOrEmpty(response.AccessToken), 
+                !string.IsNullOrEmpty(response.RefreshToken));
             await _authService.SaveTokensAsync(
                 response.AccessToken,
                 string.IsNullOrWhiteSpace(response.RefreshToken) ? null : response.RefreshToken);
+            
+            // Проверяем, что refresh token сохранился
+            var savedRefreshToken = await _authService.GetRefreshTokenAsync();
+            _logger?.LogInformation("Refresh token saved: {Saved}", !string.IsNullOrEmpty(savedRefreshToken));
 
             if (response.UserId > 0)
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);

@@ -23,6 +23,18 @@ namespace YessGoFront.Views
                 bottom.UpdateSelectedTab("More");
         }
 
+        // ✅ Обработчик тапа по "История операции"
+        private async void OnHistoryTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync(nameof(TransactionsPage));
+        }
+
+        // ✅ Обработчик тапа по "Ввести промокод"
+        private async void OnPromocodeTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync(nameof(PromocodePage));
+        }
+
         // ✅ Обработчик тапа по "Выйти"
         private async void OnLogoutTapped(object? sender, EventArgs e)
         {

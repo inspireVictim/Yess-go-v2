@@ -80,10 +80,17 @@ public partial class RegisterViewModel : ObservableObject
             var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
             
             // Извлекаем код из ответа для отображения в интерфейсе
-            if (result.TryGetValue("verification_code", out var codeObj) && codeObj != null)
+            // API возвращает объект с полями "message" и "code"
+            if (result.TryGetValue("code", out var codeObj) && codeObj != null)
             {
                 DisplayedVerificationCode = codeObj.ToString();
                 _logger?.LogInformation("Verification code received: {Code}", DisplayedVerificationCode);
+            }
+            else if (result.TryGetValue("verification_code", out var codeObj2) && codeObj2 != null)
+            {
+                // Fallback для старого формата ответа
+                DisplayedVerificationCode = codeObj2.ToString();
+                _logger?.LogInformation("Verification code received (legacy format): {Code}", DisplayedVerificationCode);
             }
             
             IsCodeSent = true;

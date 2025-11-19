@@ -150,7 +150,7 @@ public static class MauiProgram
         if (!string.IsNullOrEmpty(envUrl))
             return envUrl;
 
-        return "http://192.168.0.177:8000/";
+        return "http://192.168.0.67:8000/";
 #else
         return "http://localhost:8000/";
 #endif
@@ -234,6 +234,7 @@ public static class MauiProgram
         services.AddScoped<IPartnersService, PartnersService>();
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IQRService, QRService>();
+        services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPromoCodeService, PromoCodeService>();
     }
 
@@ -242,6 +243,7 @@ public static class MauiProgram
         // Register viewmodels here
         services.AddTransient<ViewModels.TransactionsViewModel>();
         services.AddTransient<ViewModels.TransactionDetailsViewModel>();
+        services.AddTransient<ViewModels.NotificationsViewModel>();
         services.AddTransient<ViewModels.PromocodeViewModel>();
     }
 

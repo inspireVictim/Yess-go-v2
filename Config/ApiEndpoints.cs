@@ -126,6 +126,14 @@ public static class ApiEndpoints
         public static string Active = $"{List}?status=active";
     }
 
+    // Promo Code endpoints
+    public static class PromoCodeEndpoints
+    {
+        public const string Validate = $"{Promotions}/promo-codes/validate";
+        public static string GetByCode(string code) => $"{Promotions}/promo-codes/{Uri.EscapeDataString(code)}";
+        public const string UserPromoCodes = $"{Promotions}/user/promo-codes";
+    }
+
     // Banner endpoints
     public static class BannerEndpoints
     {

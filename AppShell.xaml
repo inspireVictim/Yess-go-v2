@@ -64,4 +64,14 @@
         Route="partnerdetails"
         ContentTemplate="{DataTemplate views:PartnerDetailPage}" />
 
+    <!-- 🔹 Страница промокодов -->
+    <ShellContent
+        Route="PromocodePage"
+        ContentTemplate="{DataTemplate views:PromocodePage}" />
+
+    <!-- 🔹 Страница истории транзакций -->
+    <ShellContent
+        Route="TransactionsPage"
+        ContentTemplate="{DataTemplate views:TransactionsPage}" />
+
 </Shell>

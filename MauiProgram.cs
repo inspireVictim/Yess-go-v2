@@ -220,6 +220,7 @@ public static class MauiProgram
         services.AddHttpClient<IWalletApiService, WalletApiService>("ApiClient");
         services.AddHttpClient<IQRApiService, QRApiService>("ApiClient");
         services.AddHttpClient<IBannerApiService, BannerApiService>("ApiClient");
+        services.AddHttpClient<IPromoCodeApiService, PromoCodeApiService>("ApiClient");
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -233,6 +234,7 @@ public static class MauiProgram
         services.AddScoped<IPartnersService, PartnersService>();
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IQRService, QRService>();
+        services.AddScoped<IPromoCodeService, PromoCodeService>();
     }
 
     private static void ConfigureViewModels(IServiceCollection services)
@@ -240,6 +242,7 @@ public static class MauiProgram
         // Register viewmodels here
         services.AddTransient<ViewModels.TransactionsViewModel>();
         services.AddTransient<ViewModels.TransactionDetailsViewModel>();
+        services.AddTransient<ViewModels.PromocodeViewModel>();
     }
 
     private static void ConfigureLogging(MauiAppBuilder builder)

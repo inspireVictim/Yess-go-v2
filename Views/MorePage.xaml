@@ -69,6 +69,9 @@
 
                     <!-- Ввести промокод -->
                     <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPromocodeTapped"/>
+                        </Frame.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
                             <Image Grid.Column="0" Source="icon_promo.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="Ввести промокод" VerticalOptions="Center"/>
@@ -93,6 +96,9 @@
 
                     <!-- История операции -->
                     <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnHistoryTapped"/>
+                        </Frame.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
                             <Image Grid.Column="0" Source="icon_history.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="История операции" VerticalOptions="Center"/>

@@ -7,27 +7,150 @@
     Shell.NavBarIsVisible="False"
     BackgroundColor="#F4F6F8">
 
-    <Grid RowDefinitions="*,Auto">
-        <ScrollView Grid.Row="0">
-            <VerticalStackLayout Padding="16" Spacing="12">
-                <Frame CornerRadius="14" BackgroundColor="White" HasShadow="True" Padding="12">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="Начисление бонусов" FontAttributes="Bold"/>
-                        <Label Text="Поступили Yess!Coins за покупку в Red Sun" FontSize="12" TextColor="#6B7280"/>
-                        <Label Text="13:45" FontSize="11" TextColor="#9CA3AF"/>
-                    </VerticalStackLayout>
-                </Frame>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header with unread count -->
+        <Grid Grid.Row="0" Padding="16,12" BackgroundColor="White">
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" 
+                       Text="Уведомления" 
+                       FontSize="18" 
+                       FontAttributes="Bold"
+                       VerticalOptions="Center"/>
+                
+                <StackLayout Grid.Column="1" 
+                             Orientation="Horizontal" 
+                             Spacing="8"
+                             VerticalOptions="Center">
+                    <Button Text="Отметить все как прочитанные"
+                            Command="{Binding MarkAllAsReadCommand}"
+                            BackgroundColor="#F3F4F6"
+                            TextColor="#374151"
+                            CornerRadius="8"
+                            Padding="12,6"
+                            FontSize="12"/>
+                    
+                    <Frame BackgroundColor="#EF4444" 
+                           CornerRadius="12" 
+                           Padding="8,4"
+                           HasShadow="False"
+                           IsVisible="{Binding UnreadCount, Converter={StaticResource IntToBoolConverter}}">
+                        <Label Text="{Binding UnreadCount}" 
+                               TextColor="White" 
+                               FontSize="11" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </Frame>
+                </StackLayout>
+            </Grid>
+        </Grid>
 
-                <Frame CornerRadius="14" BackgroundColor="White" HasShadow="True" Padding="12">
-                    <VerticalStackLayout Spacing="4">
-                        <Label Text="Акции рядом с вами" FontAttributes="Bold"/>
-                        <Label Text="Burger Club — скидка 15% до конца недели" FontSize="12" TextColor="#6B7280"/>
-                        <Label Text="Вчера" FontSize="11" TextColor="#9CA3AF"/>
-                    </VerticalStackLayout>
-                </Frame>
-            </VerticalStackLayout>
-        </ScrollView>
+        <!-- Notifications list -->
+        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing}">
+            <ScrollView>
+                <VerticalStackLayout Padding="16" Spacing="12">
+                    <!-- Loading indicator -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" 
+                                     IsVisible="{Binding IsBusy}"
+                                     HorizontalOptions="Center"
+                                     VerticalOptions="Center"
+                                     HeightRequest="40"/>
 
-        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="1" />
+                    <!-- Error message -->
+                    <Frame BackgroundColor="#FEE2E2" 
+                           CornerRadius="8" 
+                           Padding="12"
+                           IsVisible="{Binding HasError}"
+                           HasShadow="False">
+                        <StackLayout Spacing="4">
+                            <Label Text="Ошибка загрузки уведомлений" 
+                                   TextColor="#991B1B" 
+                                   FontAttributes="Bold"/>
+                            <Label Text="{Binding ErrorMessage}" 
+                                   TextColor="#7F1D1D" 
+                                   FontSize="12"/>
+                        </StackLayout>
+                    </Frame>
+
+                    <!-- Empty state -->
+                    <StackLayout IsVisible="{Binding Notifications.Count, Converter={StaticResource InverseBoolConverter}}"
+                                 HorizontalOptions="Center"
+                                 VerticalOptions="Center"
+                                 Spacing="12">
+                        <Label Text="🔔" 
+                               FontSize="48" 
+                               HorizontalOptions="Center"/>
+                        <Label Text="У вас пока нет уведомлений" 
+                               TextColor="#6B7280" 
+                               HorizontalOptions="Center"/>
+                    </StackLayout>
+
+                    <!-- Notifications collection -->
+                    <CollectionView ItemsSource="{Binding Notifications}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame CornerRadius="14" 
+                                       BackgroundColor="White" 
+                                       HasShadow="True" 
+                                       Padding="12"
+                                       Margin="0,0,0,8">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MarkAsReadCommand}" 
+                                                            CommandParameter="{Binding .}"/>
+                                    </Frame.GestureRecognizers>
+                                    
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" 
+                                                   Text="{Binding Title}" 
+                                                   FontAttributes="Bold"/>
+                                            
+                                            <Frame Grid.Column="1" 
+                                                   BackgroundColor="{Binding Priority, Converter={StaticResource PriorityToColorConverter}}" 
+                                                   CornerRadius="4" 
+                                                   Padding="6,2"
+                                                   HasShadow="False">
+                                                <Label Text="{Binding Priority}" 
+                                                       TextColor="White" 
+                                                       FontSize="10"/>
+                                            </Frame>
+                                        </Grid>
+                                        
+                                        <Label Text="{Binding Message}" 
+                                               FontSize="12" 
+                                               TextColor="#6B7280"/>
+                                        
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" 
+                                                   Text="{Binding CreatedAt, Converter={StaticResource DateTimeToRelativeTimeConverter}}" 
+                                                   FontSize="11" 
+                                                   TextColor="#9CA3AF"/>
+                                            
+                                            <BoxView Grid.Column="1" 
+                                                     WidthRequest="8" 
+                                                     HeightRequest="8" 
+                                                     CornerRadius="4"
+                                                     BackgroundColor="#3B82F6"
+                                                     IsVisible="{Binding ReadAt, Converter={StaticResource NullToBoolConverter}}"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Load more button -->
+                    <Button Text="Загрузить ещё"
+                            Command="{Binding LoadMoreCommand}"
+                            IsVisible="{Binding HasMoreItems}"
+                            BackgroundColor="#F3F4F6"
+                            TextColor="#374151"
+                            CornerRadius="8"
+                            Padding="12,8"
+                            FontSize="14"/>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="2" />
     </Grid>
 </ContentPage>

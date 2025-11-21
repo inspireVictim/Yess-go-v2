@@ -12,6 +12,7 @@
             <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
             <converters:DateTimeToRelativeTimeConverter x:Key="DateTimeToRelativeTimeConverter"/>
             <converters:PriorityToColorConverter x:Key="PriorityToColorConverter"/>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
             
             <!-- глобальные ресурсы по желанию -->
         </ResourceDictionary>

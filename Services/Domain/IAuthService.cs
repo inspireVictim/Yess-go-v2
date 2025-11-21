@@ -37,4 +37,9 @@ public interface IAuthService
     Task<bool> ValidatePinAsync(string pin);
     Task SavePinAsync(string pin);
     Task<bool> HasPinAsync();
+
+    /// <summary>
+    /// Gets the current authenticated user's ID
+    /// </summary>
+    Task<int?> GetCurrentUserIdAsync();
 }

@@ -91,5 +91,24 @@ public class Notification
     // Navigation properties
     [ForeignKey(nameof(UserId))]
     public User User { get; set; } = null!;
+
+    // Helper properties for UI
+    [NotMapped]
+    public string Icon => GetNotificationIcon();
+
+    [NotMapped]
+    public bool IsRead => ReadAt.HasValue;
+
+    private string GetNotificationIcon()
+    {
+        return NotificationType switch
+        {
+            NotificationType.Push => "🔔",
+            NotificationType.Sms => "💬",
+            NotificationType.Email => "✉️",
+            NotificationType.InApp => "ℹ️",
+            _ => "🔔"
+        };
+    }
 }
 

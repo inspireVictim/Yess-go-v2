@@ -115,15 +115,91 @@ public class NotificationService : INotificationService
     {
         try
         {
-            _logger?.LogDebug("Getting unread count for user {UserId}", userId);
+            _logger?.LogDebug("Getting unread notifications count for user {UserId}", userId);
             
             return await Task.FromResult(_dbContext.Notifications
                 .Count(n => n.UserId == userId && n.ReadAt == null));
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error getting unread count for user {UserId}", userId);
+            _logger?.LogError(ex, "Error getting unread notifications count for user {UserId}", userId);
             throw new NetworkException("Не удалось получить количество непрочитанных уведомлений", ex);
         }
+    }
+
+    /// <summary>
+    /// Creates sample notifications for a user (for testing/demo purposes)
+    /// </summary>
+    public async Task CreateSampleNotificationsAsync(int userId, int count = 5, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogDebug("Creating {Count} sample notifications for user {UserId}", count, userId);
+            
+            var notifications = new List<Notification>();
+            var now = DateTime.UtcNow;
+            var random = new Random();
+            
+            var notificationTypes = Enum.GetValues<NotificationType>();
+            var priorities = Enum.GetValues<NotificationPriority>();
+            
+            for (int i = 0; i < count; i++)
+            {
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    Title = GetSampleTitle(i),
+                    Message = GetSampleMessage(i),
+                    NotificationType = notificationTypes[random.Next(notificationTypes.Length)],
+                    Priority = priorities[random.Next(priorities.Length)],
+                    Status = NotificationStatus.Delivered,
+                    CreatedAt = now.AddMinutes(-random.Next(5, 1440)), // Between 5 minutes and 24 hours ago
+                    ReadAt = random.Next(3) == 0 ? now.AddMinutes(-random.Next(5)) : (DateTime?)null,
+                    Data = new Dictionary<string, object>
+                    {
+                        ["type"] = "sample",
+                        ["sampleId"] = i + 1
+                    }
+                };
+                
+                notifications.Add(notification);
+            }
+            
+            await _dbContext.Notifications.AddRangeAsync(notifications, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error creating sample notifications for user {UserId}", userId);
+            throw new NetworkException("Не удалось создать тестовые уведомления", ex);
+        }
+    }
+    
+    private string GetSampleTitle(int index)
+    {
+        var titles = new[]
+        {
+            "Новое уведомление",
+            "Обновление статуса заказа",
+            "Специальное предложение",
+            "Важная информация",
+            "Напоминание"
+        };
+        
+        return titles[index % titles.Length];
+    }
+    
+    private string GetSampleMessage(int index)
+    {
+        var messages = new[]
+        {
+            "Ваш заказ #12345 был успешно доставлен. Надеемся, вам все понравилось!",
+            "У нас для вас специальное предложение! Скидка 20% на все товары в течение 24 часов.",
+            "Не забудьте оставить отзыв о недавнем заказе. Ваше мнение очень важно для нас.",
+            "Ваш возврат был обработан. Средства будут зачислены в течение 3-5 рабочих дней.",
+            "Спасибо за подписку на нашу рассылку! Вот ваш промокод на скидку: WELCOME10"
+        };
+        
+        return messages[index % messages.Length];
     }
 }

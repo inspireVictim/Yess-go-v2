@@ -5,17 +5,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
 using YessGoFront.Services.Domain;
-using Microsoft.EntityFrameworkCore;
 
 namespace YessGoFront.ViewModels;
 
 public partial class NotificationsViewModel : BaseViewModel
 {
     private readonly INotificationService _notificationService;
+    private readonly IAuthService _authService;
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<NotificationsViewModel>? _logger;
 
     [ObservableProperty]
     private bool isBusy;
@@ -46,170 +49,218 @@ public partial class NotificationsViewModel : BaseViewModel
     public IAsyncRelayCommand<Notification> MarkAsReadCommand { get; }
     public IAsyncRelayCommand MarkAllAsReadCommand { get; }
 
-    public NotificationsViewModel(INotificationService notificationService, AppDbContext dbContext)
+    public NotificationsViewModel(
+        INotificationService notificationService, 
+        IAuthService authService,
+        AppDbContext dbContext,
+        ILogger<NotificationsViewModel>? logger = null)
     {
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _logger = logger;
 
         LoadNotificationsCommand = new AsyncRelayCommand(LoadInitialAsync);
-        LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => hasMoreItems && !isBusy);
+        LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync, () => HasMoreItems && !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         MarkAsReadCommand = new AsyncRelayCommand<Notification?>(MarkAsReadAsync, notification => notification != null && notification.ReadAt == null);
         MarkAllAsReadCommand = new AsyncRelayCommand(MarkAllAsReadAsync, () => Notifications.Any(n => n.ReadAt == null));
     }
 
-    private async Task LoadInitialAsync()
+    public async Task LoadInitialAsync()
     {
-        if (isBusy)
+        if (IsBusy)
             return;
 
         try
         {
-            isBusy = true;
-            hasError = false;
-            errorMessage = null;
+            IsBusy = true;
+            HasError = false;
+            ErrorMessage = null;
+
+            // Get current user ID
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (!userId.HasValue)
+            {
+                _logger?.LogWarning("Cannot load notifications: user is not authenticated");
+                HasError = true;
+                ErrorMessage = "Вы не авторизованы. Пожалуйста, войдите в аккаунт.";
+                return;
+            }
 
             _currentPage = 1;
             Notifications.Clear();
-            hasMoreItems = true;
+            HasMoreItems = true;
 
             await LoadPageAsync(_currentPage);
             await LoadUnreadCountAsync();
         }
         catch (Exception ex)
         {
-            hasError = true;
-            errorMessage = ex.Message;
+            _logger?.LogError(ex, "Error loading notifications");
+            HasError = true;
+            ErrorMessage = "Не удалось загрузить уведомления. Пожалуйста, попробуйте позже.";
         }
         finally
         {
-            isBusy = false;
+            IsBusy = false;
         }
     }
 
     private async Task LoadMoreAsync()
     {
-        if (isBusy || !hasMoreItems)
+        if (IsBusy || !HasMoreItems)
             return;
 
         try
         {
-            isBusy = true;
+            IsBusy = true;
             _currentPage++;
             await LoadPageAsync(_currentPage);
         }
         catch (Exception ex)
         {
-            hasError = true;
-            errorMessage = ex.Message;
-            hasMoreItems = false;
+            _logger?.LogError(ex, "Error loading more notifications");
+            HasError = true;
+            ErrorMessage = "Не удалось загрузить больше уведомлений. Пожалуйста, попробуйте позже.";
+            HasMoreItems = false;
         }
         finally
         {
-            isBusy = false;
+            IsBusy = false;
         }
     }
 
-    private async Task RefreshAsync()
+    public async Task RefreshAsync()
     {
-        if (isBusy)
+        if (IsBusy)
             return;
 
         try
         {
-            isRefreshing = true;
+            IsRefreshing = true;
             _currentPage = 1;
             Notifications.Clear();
-            hasMoreItems = true;
+            HasMoreItems = true;
             await LoadPageAsync(_currentPage);
             await LoadUnreadCountAsync();
         }
         finally
         {
-            isRefreshing = false;
+            IsRefreshing = false;
         }
     }
 
     private async Task LoadPageAsync(int page)
     {
-        var userId = _dbContext.Users.FirstOrDefault()?.Id ?? 1; // TODO: Get from authenticated user
-
-        var notifications = await _notificationService.GetNotificationsAsync(userId, page, PageSize);
-        
-        if (!notifications.Any())
+        try
         {
-            hasMoreItems = false;
-            return;
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (!userId.HasValue)
+            {
+                _logger?.LogWarning("Cannot load notifications page: user is not authenticated");
+                throw new UnauthorizedAccessException("Вы не авторизованы. Пожалуйста, войдите в аккаунт.");
+            }
+
+            var notifications = await _notificationService.GetNotificationsAsync(userId.Value, page, PageSize);
+            
+            if (!notifications.Any())
+            {
+                HasMoreItems = false;
+                return;
+            }
+
+            foreach (var notification in notifications)
+            {
+                Notifications.Add(notification);
+            }
         }
-
-        foreach (var notification in notifications.OrderByDescending(n => n.CreatedAt))
+        catch (Exception ex)
         {
-            Notifications.Add(notification);
+            _logger?.LogError(ex, "Error loading notifications page {Page}", page);
+            throw new Exception("Не удалось загрузить уведомления. Пожалуйста, проверьте подключение к интернету.", ex);
         }
     }
 
     private async Task LoadUnreadCountAsync()
     {
-        var userId = _dbContext.Users.FirstOrDefault()?.Id ?? 1; // TODO: Get from authenticated user
+        try
+        {
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (!userId.HasValue)
+            {
+                _logger?.LogWarning("Cannot load unread count: user is not authenticated");
+                UnreadCount = 0;
+                return;
+            }
 
-        unreadCount = await _notificationService.GetUnreadCountAsync(userId);
+            UnreadCount = await _notificationService.GetUnreadCountAsync(userId.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error loading unread count");
+            UnreadCount = 0;
+        }
     }
 
     private async Task MarkAsReadAsync(Notification? notification)
     {
-        if (notification?.ReadAt != null)
+        if (notification == null || notification.ReadAt != null)
             return;
 
         try
         {
-            if (notification == null) return;
-            await _notificationService.MarkAsReadAsync(notification.Id);
-            notification.ReadAt = DateTime.UtcNow;
-            
-            // Update the notification in the collection
-            var index = Notifications.IndexOf(notification);
-            if (index >= 0)
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (!userId.HasValue)
             {
-                Notifications[index] = notification;
+                _logger?.LogWarning("Cannot mark notification as read: user is not authenticated");
+                throw new UnauthorizedAccessException("Вы не авторизованы. Пожалуйста, войдите в аккаунт.");
             }
 
-            unreadCount = Math.Max(0, unreadCount - 1);
+            // Double-check that the notification belongs to the current user
+            if (notification.UserId != userId.Value)
+            {
+                _logger?.LogWarning("User {UserId} attempted to mark notification {NotificationId} that doesn't belong to them", 
+                    userId, notification.Id);
+                throw new UnauthorizedAccessException("У вас нет прав для выполнения этого действия.");
+            }
+
+            await _notificationService.MarkAsReadAsync(notification.Id);
+            notification.ReadAt = DateTime.UtcNow;
+            UnreadCount = Math.Max(0, UnreadCount - 1);
         }
         catch (Exception ex)
         {
-            hasError = true;
-            errorMessage = ex.Message;
+            _logger?.LogError(ex, "Error marking notification {NotificationId} as read", notification?.Id);
+            throw new Exception("Не удалось отметить уведомление как прочитанное. Пожалуйста, попробуйте снова.", ex);
         }
     }
 
     private async Task MarkAllAsReadAsync()
     {
-        var unreadNotifications = Notifications.Where(n => n.ReadAt == null).ToList();
-        if (!unreadNotifications.Any())
-            return;
-
         try
         {
-            var userId = _dbContext.Users.FirstOrDefault()?.Id ?? 1; // TODO: Get from authenticated user
-
-            await _notificationService.MarkAllAsReadAsync(userId);
-
-            foreach (var notification in unreadNotifications)
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (!userId.HasValue)
             {
-                notification.ReadAt = DateTime.UtcNow;
-                var index = Notifications.IndexOf(notification);
-                if (index >= 0)
-                {
-                    Notifications[index] = notification;
-                }
+                _logger?.LogWarning("Cannot mark all notifications as read: user is not authenticated");
+                throw new UnauthorizedAccessException("Вы не авторизованы. Пожалуйста, войдите в аккаунт.");
             }
 
-            unreadCount = 0;
+            await _notificationService.MarkAllAsReadAsync(userId.Value);
+            
+            // Only update notifications that belong to the current user
+            foreach (var notification in Notifications.Where(n => n.ReadAt == null && n.UserId == userId.Value))
+            {
+                notification.ReadAt = DateTime.UtcNow;
+            }
+            
+            UnreadCount = 0;
         }
         catch (Exception ex)
         {
-            hasError = true;
-            errorMessage = ex.Message;
+            _logger?.LogError(ex, "Error marking all notifications as read");
+            throw new Exception("Не удалось отметить все уведомления как прочитанные. Пожалуйста, попробуйте снова.", ex);
         }
     }
 

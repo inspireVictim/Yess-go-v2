@@ -15,17 +15,9 @@ public class AuthenticationService : IAuthenticationService
         try
         {
             var token = await SecureStorage.GetAsync(AccessTokenKey);
-            // Если есть access token, но нет refresh token - это старый токен, нужно перелогиниться
-            if (!string.IsNullOrEmpty(token))
-            {
-                var refreshToken = await GetRefreshTokenAsync();
-                if (string.IsNullOrEmpty(refreshToken))
-                {
-                    System.Diagnostics.Debug.WriteLine("[AuthenticationService] Access token exists but refresh token is missing - clearing tokens");
-                    await ClearTokensAsync();
-                    return null;
-                }
-            }
+            // Возвращаем access token, если он есть
+            // Refresh token может отсутствовать, если бэкенд его не возвращает
+            // Это нормально - access token достаточен для аутентификации
             return token;
         }
         catch

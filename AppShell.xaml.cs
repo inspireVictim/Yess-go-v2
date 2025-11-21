@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
 using YessGoFront.Views;
+using YessGoFront.Services;
 
 namespace YessGoFront
 {
@@ -44,16 +45,53 @@ namespace YessGoFront
                     return;
                 }
 
+                // Проверяем, есть ли сохранённый аккаунт (AccountStore)
+                AccountStore.Instance.Load(); // Перечитываем данные из Preferences
+                var hasSavedAccount = AccountStore.Instance.IsSignedIn;
+                Debug.WriteLine($"[AppShell] OnAppearing: HasSavedAccount={hasSavedAccount}");
+
+                // Проверяем, есть ли токен аутентификации
                 var isAuthenticated = await authService.IsAuthenticatedAsync();
                 Debug.WriteLine($"[AppShell] OnAppearing: IsAuthenticated={isAuthenticated}");
 
-                if (!isAuthenticated)
+                // Проверяем наличие refresh_token - он необходим для автоматического обновления токенов
+                var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
+                var hasRefreshToken = false;
+                if (authenticationService != null)
                 {
-                    Debug.WriteLine("[AppShell] Decision: unauthenticated → navigating to login");
+                    var refreshToken = await authenticationService.GetRefreshTokenAsync();
+                    hasRefreshToken = !string.IsNullOrWhiteSpace(refreshToken);
+                    Debug.WriteLine($"[AppShell] OnAppearing: HasRefreshToken={hasRefreshToken}");
+                }
+
+                // Если нет refresh_token - нужно перелогиниться для получения нового
+                if (!hasRefreshToken)
+                {
+                    Debug.WriteLine("[AppShell] Decision: no refresh_token → navigating to login (need to re-login for refresh_token)");
+                    // Очищаем старые токены и PIN
+                    if (authenticationService != null)
+                    {
+                        await authenticationService.ClearTokensAsync();
+                    }
+                    var pinService = MauiProgram.Services?.GetService<Services.PinStorageService>();
+                    if (pinService != null)
+                    {
+                        await pinService.ClearPinAsync();
+                    }
+                    AccountStore.Instance.SignOut(keepProfile: false);
                     await Shell.Current.GoToAsync("///login", animate: false);
                     return;
                 }
 
+                // Если нет сохранённого аккаунта И нет токена - идём на логин
+                if (!hasSavedAccount && !isAuthenticated)
+                {
+                    Debug.WriteLine("[AppShell] Decision: no saved account and not authenticated → navigating to login");
+                    await Shell.Current.GoToAsync("///login", animate: false);
+                    return;
+                }
+
+                // Если есть сохранённый аккаунт ИЛИ токен - проверяем PIN
                 var hasValidPin = await authService.HasPinAsync();
                 Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}");
 

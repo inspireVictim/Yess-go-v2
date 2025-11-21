@@ -38,7 +38,7 @@
                                TextColor="#6B7280"/>
                     </HorizontalStackLayout>
 
-                    <Label Text="{Binding PartnerName}"
+                    <Label Text="{Binding DisplayName}"
                            FontSize="13"
                            TextColor="#4B5563"
                            LineBreakMode="TailTruncation"
@@ -94,11 +94,20 @@
 
             <!-- Filters -->
             <Grid Grid.Row="1" Margin="0,12,0,0" ColumnDefinitions="*,*,*" ColumnSpacing="6">
-                <Button Text="Все"
-                        Command="{Binding RefreshCommand}"
+                <Button x:Name="AllFilterButton"
+                        Text="Все"
+                        CornerRadius="8"
                         Clicked="OnAllFilterClicked"/>
-                <Button Grid.Column="1" Text="Доходы" Clicked="OnIncomeFilterClicked"/>
-                <Button Grid.Column="2" Text="Расходы" Clicked="OnExpenseFilterClicked"/>
+                <Button x:Name="IncomeFilterButton"
+                        Grid.Column="1" 
+                        Text="Доходы"
+                        CornerRadius="8"
+                        Clicked="OnIncomeFilterClicked"/>
+                <Button x:Name="ExpenseFilterButton"
+                        Grid.Column="2" 
+                        Text="Расходы"
+                        CornerRadius="8"
+                        Clicked="OnExpenseFilterClicked"/>
             </Grid>
         </Grid>
 
@@ -150,7 +159,7 @@
                                TextColor="#6B7280"/>
                     </HorizontalStackLayout>
 
-                    <Label Text="{Binding PartnerName}"
+                    <Label Text="{Binding DisplayName}"
                            FontSize="13"
                            TextColor="#4B5563"
                            LineBreakMode="TailTruncation"

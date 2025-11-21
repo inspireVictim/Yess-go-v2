@@ -305,6 +305,7 @@ public class AuthService : IAuthService
                     existingUser.Email = userDto.Email;
                     existingUser.Phone = userDto.Phone;
                     existingUser.CityId = userDto.CityId;
+                    existingUser.ReferralCode = userDto.ReferralCode; // Сохраняем реферальный код
                     existingUser.UpdatedAt = DateTime.UtcNow;
                 }
 
@@ -319,6 +320,7 @@ public class AuthService : IAuthService
                     Email = userDto.Email,
                     Phone = userDto.Phone,
                     CityId = userDto.CityId,
+                    ReferralCode = userDto.ReferralCode, // Сохраняем реферальный код
                     IsActive = true,
                     CreatedAt = userDto.CreatedAt != default ? userDto.CreatedAt : DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,

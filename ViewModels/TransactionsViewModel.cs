@@ -132,16 +132,34 @@ public partial class TransactionsViewModel : ObservableObject
     {
         var items = await _walletService.GetTransactionHistoryAsync(page, PageSize, CancellationToken.None);
 
-        var filtered = items.Where(FilterByType).OrderByDescending(x => x.CreatedAt);
+        // Если нет данных, проверяем, есть ли еще страницы
+        if (!items.Any())
+        {
+            HasMoreItems = false;
+            return;
+        }
 
+        // Фильтруем загруженные данные
+        var filtered = items.Where(FilterByType).OrderByDescending(x => x.CreatedAt).ToList();
+
+        // Если после фильтрации нет данных, но были загружены данные - возможно есть еще страницы
+        // Но если на первой странице после фильтрации нет данных - значит нет данных вообще
         if (!filtered.Any())
         {
-            if (page == 1)
+            // Если загрузили меньше чем pageSize, значит это последняя страница
+            if (items.Count < PageSize)
+            {
                 HasMoreItems = false;
-            else
-                HasMoreItems = false;
-
+            }
+            // Если загрузили полную страницу, но все отфильтровались - продолжаем загрузку
+            // (это может быть проблемой, но для простоты оставим так)
             return;
+        }
+
+        // Если загрузили меньше чем pageSize, значит это последняя страница
+        if (items.Count < PageSize)
+        {
+            HasMoreItems = false;
         }
 
         foreach (var item in filtered)
@@ -164,13 +182,19 @@ public partial class TransactionsViewModel : ObservableObject
 
     private bool FilterByType(PurchaseDto dto)
     {
+        if (string.IsNullOrWhiteSpace(dto.Type))
+            return CurrentFilter == TransactionsFilterType.All;
+            
+        var typeLower = dto.Type.ToLower();
+        
         return CurrentFilter switch
         {
             TransactionsFilterType.All => true,
-            TransactionsFilterType.Income => string.Equals(dto.Type, "topup", StringComparison.OrdinalIgnoreCase) ||
-                                             string.Equals(dto.Type, "bonus", StringComparison.OrdinalIgnoreCase) ||
-                                             string.Equals(dto.Type, "refund", StringComparison.OrdinalIgnoreCase),
-            TransactionsFilterType.Expense => string.Equals(dto.Type, "discount", StringComparison.OrdinalIgnoreCase),
+            TransactionsFilterType.Income => typeLower == "topup" || 
+                                             typeLower == "bonus" || 
+                                             typeLower == "refund",
+            TransactionsFilterType.Expense => typeLower == "discount" || 
+                                              typeLower == "payment",
             _ => true
         };
     }

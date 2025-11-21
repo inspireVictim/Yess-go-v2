@@ -26,7 +26,7 @@ namespace YessGoFront.Views
             BindingContext = _viewModel;
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
 
@@ -35,6 +35,30 @@ namespace YessGoFront.Views
             _viewModel.OnLoginSuccess += OnLoginSuccess;
 
             System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing - subscribed to OnLoginSuccess");
+
+            // Проверяем, залогинен ли пользователь
+            try
+            {
+                var authService = MauiProgram.Services.GetService<IAuthService>();
+                if (authService != null)
+                {
+                    var isAuthenticated = await authService.IsAuthenticatedAsync();
+                    System.Diagnostics.Debug.WriteLine($"[LoginPage] OnAppearing: IsAuthenticated={isAuthenticated}");
+
+                    // Если пользователь не залогинен - очищаем поля
+                    if (!isAuthenticated)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing: User not authenticated, clearing fields");
+                        _viewModel.ClearFields();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] OnAppearing: Error checking authentication: {ex.Message}");
+                // В случае ошибки всё равно очищаем поля для безопасности
+                _viewModel.ClearFields();
+            }
         }
 
         private async Task OnLoginSuccess(Services.Api.AuthResponse response)

@@ -23,7 +23,8 @@ namespace YessGoFront.Views
 
         private async void OnBackTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("..");
+            // Возвращаемся на страницу More
+            await Shell.Current.GoToAsync("//main/more");
         }
 
     }

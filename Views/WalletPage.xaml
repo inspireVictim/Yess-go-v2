@@ -83,7 +83,7 @@
                             <VerticalStackLayout HorizontalOptions="Center"
                                                  VerticalOptions="Center"
                                                  Spacing="6">
-                                <Image Source="badge_bronze.png" HeightRequest="38"/>
+                                <Image Source="icon_certificate.png" HeightRequest="38"/>
                                 <Label Text="Бронза"
                                        FontAttributes="Bold"
                                        TextColor="#0F6B53"

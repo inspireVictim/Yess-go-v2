@@ -19,6 +19,11 @@
     <ShellContent
         Route="register"
         ContentTemplate="{DataTemplate views:RegisterPage}" />
+    
+    <!-- Реферальная ссылка -->
+    <ShellContent
+        Route="referal"
+        ContentTemplate="{DataTemplate views:ReferalPage}" />
 
     <!-- Экран PIN-кода -->
     <ShellContent

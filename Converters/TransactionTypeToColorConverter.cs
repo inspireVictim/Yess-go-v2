@@ -19,6 +19,7 @@ public class TransactionTypeToColorConverter : IValueConverter
             "bonus" => Color.FromArgb("#16A34A"),      // бонусы
             "refund" => Color.FromArgb("#16A34A"),     // возвраты
             "discount" => Color.FromArgb("#DC2626"),   // списания
+            "payment" => Color.FromArgb("#DC2626"),    // оплата
             _ => Color.FromArgb("#6B7280")
         };
     }

@@ -115,6 +115,20 @@ public partial class LoginViewModel : ObservableObject
         _logger?.LogWarning("Login error: {Message}", message);
     }
 
+    /// <summary>
+    /// Очистить все поля формы логина
+    /// </summary>
+    public void ClearFields()
+    {
+        Phone = string.Empty;
+        Password = string.Empty;
+        RememberMe = false;
+        ErrorMessage = null;
+        HasError = false;
+        IsBusy = false;
+        _logger?.LogDebug("Login fields cleared");
+    }
+
     public event Func<AuthResponse, Task>? OnLoginSuccess;
 
 }

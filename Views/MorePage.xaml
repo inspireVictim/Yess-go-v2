@@ -78,16 +78,12 @@
                         </Grid>
                     </Frame>
 
-                    <!-- Сообщения -->
-                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
-                            <Image Grid.Column="0" Source="icon_messages.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
-                            <Label Grid.Column="1" Text="Сообщения" VerticalOptions="Center"/>
-                        </Grid>
-                    </Frame>
-
+                    
                     <!-- Реферальная ссылка -->
                     <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnReferalTapped"/>
+                        </Frame.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
                             <Image Grid.Column="0" Source="icon_referral.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="Реферальная ссылка" VerticalOptions="Center"/>

@@ -398,7 +398,7 @@ namespace YessGoFront.ViewModels
 
             var logos = new[]
             {
-                "promzona.jpg","faiza.png","navat.png","flask.png","chickenstar.jpg",
+                "promzona.jpg","faiza.png","navat.png","flask.png","chikenstar.jpg",
                 "bublik.png","sierra.jpg","ants.jpg","supara.png","teplo.png","savetheales.png"
             };
 
@@ -412,7 +412,7 @@ namespace YessGoFront.ViewModels
                 { "flask.png", "4" },
                 { "supara.png", "5" },
                 { "faiza.png", "6" },
-                { "chickenstar.jpg", "7" },
+                { "chikenstar.jpg", "7" },
                 { "savetheales.png", "8" },
                 { "promzona.jpg", "9" },
                 { "teplo.png", "10" }

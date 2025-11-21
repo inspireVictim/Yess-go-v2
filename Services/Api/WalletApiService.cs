@@ -30,9 +30,96 @@ public class WalletApiService : ApiClient, IWalletApiService
         int pageSize = 20,
         CancellationToken ct = default)
     {
-        var endpoint = $"{ApiEndpoints.TransactionEndpoints.List}?page={page}&pageSize={pageSize}";
-        var result = await GetAsync<List<PurchaseDto>>(endpoint, ct);
-        return result ?? new List<PurchaseDto>();
+        var endpoint = $"{ApiEndpoints.WalletEndpoints.Transactions}?page={page}&page_size={pageSize}";
+        var response = await GetAsync<TransactionHistoryResponse>(endpoint, ct);
+        
+        // Преобразуем TransactionHistory в PurchaseDto
+        var result = response?.Transactions?.Select(t => new PurchaseDto
+        {
+            Id = t.Id.ToString(),
+            PartnerId = t.PartnerId?.ToString() ?? string.Empty,
+            PartnerName = t.PartnerName,
+            Amount = t.Amount,
+            Type = t.Type,
+            Status = t.Status,
+            CreatedAt = t.CreatedAt,
+            DateUtc = t.CreatedAt,
+            CashbackAmount = t.YescoinEarned ?? 0m,
+            YessCoins = t.YescoinEarned ?? 0m,
+            Description = t.Description
+        }).ToList() ?? new List<PurchaseDto>();
+        
+        Logger?.LogDebug("Получено транзакций: {Count}", result.Count);
+        return result;
+    }
+    
+    private class TransactionHistoryResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("transactions")]
+        public List<TransactionHistoryItem>? Transactions { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("total_count")]
+        public int TotalCount { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("page")]
+        public int Page { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("page_size")]
+        public int PageSize { get; set; }
+    }
+    
+    private class TransactionHistoryItem
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public int Id { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("type")]
+        public string Type { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("amount")]
+        public decimal Amount { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("commission")]
+        public decimal? Commission { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("payment_method")]
+        public string? PaymentMethod { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("partner_id")]
+        public int? PartnerId { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("partner_name")]
+        public string? PartnerName { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("description")]
+        public string? Description { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("yescoin_used")]
+        public decimal? YescoinUsed { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("yescoin_earned")]
+        public decimal? YescoinEarned { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("balance_before")]
+        public decimal? BalanceBefore { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("balance_after")]
+        public decimal? BalanceAfter { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("created_at")]
+        public DateTime CreatedAt { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("processed_at")]
+        public DateTime? ProcessedAt { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("completed_at")]
+        public DateTime? CompletedAt { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("error_message")]
+        public string? ErrorMessage { get; set; }
     }
 
     public async Task<PurchaseDto> GetTransactionByIdAsync(

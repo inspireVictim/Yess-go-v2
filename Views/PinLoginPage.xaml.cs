@@ -387,7 +387,45 @@ namespace YessGoFront.Views
 
             if (isValid)
             {
-                // PIN верный - переходим в приложение
+                // PIN верный - проверяем наличие refresh_token
+                var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+                if (authService != null)
+                {
+                    var refreshToken = await authService.GetRefreshTokenAsync();
+                    if (string.IsNullOrWhiteSpace(refreshToken))
+                    {
+                        // Refresh token отсутствует - нужно перелогиниться
+                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refresh token not found, redirecting to login");
+                        await DisplayAlert(
+                            "Требуется повторный вход",
+                            "Для продолжения работы необходимо войти заново.",
+                            "OK");
+                        
+                        // Очищаем PIN и токены
+                        var pinService = new Services.PinStorageService();
+                        await pinService.ClearPinAsync();
+                        await authService.ClearTokensAsync();
+                        AccountStore.Instance.SignOut();
+                        
+                        // Переходим на страницу входа
+                        await Shell.Current.GoToAsync("///login", animate: true);
+                        return;
+                    }
+                    
+                    // Проверяем, не истек ли access_token, и если да - обновляем его
+                    var accessToken = await authService.GetAccessTokenAsync();
+                    if (!string.IsNullOrWhiteSpace(accessToken) && _authService != null)
+                    {
+                        // Пытаемся обновить токен проактивно
+                        var refreshed = await _authService.RefreshTokenAsync();
+                        if (!refreshed)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, but refresh_token exists - continuing");
+                        }
+                    }
+                }
+                
+                // Переходим в приложение
                 await NavigateToMainAsync();
             }
             else

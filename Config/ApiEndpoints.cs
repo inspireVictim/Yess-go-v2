@@ -26,6 +26,7 @@ public static class ApiEndpoints
         public const string Login = $"{Auth}/login";         // /api/v1/auth/login
         public const string Refresh = $"{Auth}/refresh";     // /api/v1/auth/refresh
         public const string Me = $"{Auth}/me";               // /api/v1/auth/me
+        public const string ReferralStats = $"{Auth}/referral-stats"; // /api/v1/auth/referral-stats
 
         // если позже появятся на backend - просто будут готовы
         public const string Logout = $"{Auth}/logout";
@@ -59,6 +60,7 @@ public static class ApiEndpoints
     {
         // Используем endpoint из payments, который работает с текущим пользователем из токена
         public const string Balance = $"{ApiVersion}/payments/balance";
+        public const string Transactions = $"{ApiVersion}/payments/transactions";
         public const string TopUp = $"{Wallet}/topup";
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }

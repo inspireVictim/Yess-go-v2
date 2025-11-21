@@ -258,7 +258,7 @@
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
-                                    <Image Source="cat_pharmacy.png"
+                                    <Image Source="cat_beauty.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
                        VerticalOptions="Fill"/>
@@ -281,7 +281,7 @@
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
-                                    <Image Source="cat_market.png"
+                                    <Image Source="cat_food.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
                        VerticalOptions="Fill"/>

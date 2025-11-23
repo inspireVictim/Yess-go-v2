@@ -78,5 +78,15 @@
 		<EmbeddedResource Remove="Tests\**" />
 		<None Remove="Tests\**" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Compile Update="Views\ContactsPage.xaml.cs">
+	    <DependentUpon>ContactsPage.xaml</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="Views\FeedbackPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </None>
+	</ItemGroup>
 
 </Project>

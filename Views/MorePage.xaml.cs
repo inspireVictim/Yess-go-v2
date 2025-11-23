@@ -12,6 +12,10 @@ namespace YessGoFront.Views
 {
     public partial class MorePage : ContentPage
     {
+        /*public MorePage()
+        {
+            InitializeComponent();
+        }*/
         private UserProfileViewModel? _userProfileViewModel;
 
         public MorePage()
@@ -42,6 +46,18 @@ namespace YessGoFront.Views
             await Shell.Current.GoToAsync(nameof(TransactionsPage));
         }
 
+        // ✅ Обработчик тапа по "Обратная связь"
+        private async void OnFeedbackTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///FeedbackPage");
+        }
+
+        // ✅ Обработчик тапа по "Сертификат"
+        private async void OnCertificateTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///CertificatePage");
+        }
+
         // ✅ Обработчик тапа по "Ввести промокод"
         private async void OnPromocodeTapped(object? sender, EventArgs e)
         {
@@ -52,6 +68,24 @@ namespace YessGoFront.Views
         private async void OnReferalTapped(object? sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("///referal");
+        }
+
+        // ✅ Обработчик тапа по "Политика конфиденциальности"
+        private async void OnPolicyTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///PolicyPage");
+        }
+
+        // ✅ Обработчик тапа по "Условия использования"
+        private async void OnConditionsTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///ConditionsPage");
+        }
+
+        // ✅ Обработчик тапа по "Контакты"
+        private async void OnContactsTapped(object? sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///ContactsPage");
         }
 
         // ✅ Обработчик тапа по "Выйти"

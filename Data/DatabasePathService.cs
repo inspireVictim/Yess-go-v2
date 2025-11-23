@@ -35,7 +35,8 @@ public class DatabaseConnectionService : IDatabaseConnectionService
 
         // По умолчанию используем SQLite в локальной папке данных приложения
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, "yessgo.db");
-        return $"Data Source={dbPath}";
+        // Включаем поддержку внешних ключей в SQLite
+        return $"Data Source={dbPath};Foreign Keys=True";
     }
 
     public bool IsSqlLoggingEnabled()

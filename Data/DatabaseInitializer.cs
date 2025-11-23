@@ -19,7 +19,7 @@ public class DatabaseInitializer
     }
 
     /// <summary>
-    /// Инициализировать базу данных (применить миграции)
+    /// Инициализировать базу данных (создать таблицы если их нет)
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -27,27 +27,27 @@ public class DatabaseInitializer
         {
             _logger?.LogInformation("Initializing database...");
             
-            // Проверить подключение к базе данных
-            if (await _context.Database.CanConnectAsync())
-            {
-                _logger?.LogInformation("Database connection successful");
-                
-                // Применить миграции, если они есть
-                await _context.MigrateAsync();
-            }
-            else
-            {
-                // Если база не существует, создать её
-                _logger?.LogWarning("Database does not exist, creating...");
-                await _context.Database.EnsureCreatedAsync();
-            }
+            // Для SQLite в мобильном приложении всегда используем EnsureCreatedAsync
+            // Это создаст таблицы если их нет, или ничего не сделает если они уже есть
+            await _context.Database.EnsureCreatedAsync();
             
             _logger?.LogInformation("Database initialized successfully");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error initializing database");
-            throw;
+            // Повторная попытка
+            try
+            {
+                _logger?.LogWarning("Retrying database initialization...");
+                await _context.Database.EnsureCreatedAsync();
+                _logger?.LogInformation("Database created successfully using retry");
+            }
+            catch (Exception fallbackEx)
+            {
+                _logger?.LogError(fallbackEx, "Failed to initialize database even with retry");
+                throw;
+            }
         }
     }
 

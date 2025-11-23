@@ -57,12 +57,62 @@ public static class JwtHelper
         if (payload == null)
             return null;
 
-        // Бэкенд хранит user_id в поле "sub" (subject)
+        // Бэкенд хранит user_id в поле "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier" или "sub"
+        if (payload.TryGetValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier", out var nameIdElement))
+        {
+            var nameId = nameIdElement.GetString();
+            if (int.TryParse(nameId, out var userId))
+                return userId;
+        }
+
+        // Также проверяем "sub" (subject) как fallback
         if (payload.TryGetValue("sub", out var subElement))
         {
             var sub = subElement.GetString();
             if (int.TryParse(sub, out var userId))
                 return userId;
+        }
+
+        // Также проверяем "user_id"
+        if (payload.TryGetValue("user_id", out var userIdElement))
+        {
+            if (userIdElement.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var userIdStr = userIdElement.GetString();
+                if (int.TryParse(userIdStr, out var userId))
+                    return userId;
+            }
+            else if (userIdElement.ValueKind == System.Text.Json.JsonValueKind.Number)
+            {
+                return userIdElement.GetInt32();
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Получить телефон из JWT токена
+    /// </summary>
+    public static string? GetPhone(string? accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return null;
+
+        var payload = DecodePayload<Dictionary<string, JsonElement>>(accessToken);
+        if (payload == null)
+            return null;
+
+        // Проверяем поле "phone"
+        if (payload.TryGetValue("phone", out var phoneElement))
+        {
+            return phoneElement.GetString();
+        }
+
+        // Проверяем поле "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+        if (payload.TryGetValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", out var nameElement))
+        {
+            return nameElement.GetString();
         }
 
         return null;

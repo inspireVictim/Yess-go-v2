@@ -48,7 +48,9 @@ namespace YessGoFront.Views
             var bannerApiService = MauiProgram.Services.GetService<IBannerApiService>();
             var partnersApiService = MauiProgram.Services.GetService<IPartnersApiService>();
             var walletService = MauiProgram.Services.GetService<IWalletService>();
-            BindingContext = new MainPageViewModel(bannerApiService, partnersApiService, walletService);
+            var authService = MauiProgram.Services.GetService<IAuthService>();
+            var authenticationService = MauiProgram.Services.GetService<Infrastructure.Auth.IAuthenticationService>();
+            BindingContext = new MainPageViewModel(bannerApiService, partnersApiService, walletService, authService, authenticationService);
 
             BindingContextChanged += (_, __) =>
             {
@@ -60,7 +62,7 @@ namespace YessGoFront.Views
             };
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
 
@@ -82,16 +84,23 @@ namespace YessGoFront.Views
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
 
-            // Подключаем обработчик SizeChanged для контейнера прогресс-бара
-            var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
-            if (progressContainer != null)
+            // Проверяем ViewModel один раз
+            if (BindingContext is MainPageViewModel viewModel)
             {
-                progressContainer.SizeChanged += OnProgressTimelineContainerSizeChanged;
-                // Обновляем ширину сразу, если она уже установлена
-                if (progressContainer.Width > 0 && BindingContext is MainPageViewModel vm)
+                // Подключаем обработчик SizeChanged для контейнера прогресс-бара
+                var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+                if (progressContainer != null)
                 {
-                    vm.ProgressTimelineContainerWidth = progressContainer.Width;
+                    progressContainer.SizeChanged += OnProgressTimelineContainerSizeChanged;
+                    // Обновляем ширину сразу, если она уже установлена
+                    if (progressContainer.Width > 0)
+                    {
+                        viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
+                    }
                 }
+
+                // Обновляем данные пользователя из локальной БД
+                await viewModel.RefreshUserAsync();
             }
         }
 

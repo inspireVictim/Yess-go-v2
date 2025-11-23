@@ -1,3 +1,4 @@
+using YessGoFront.Data.Entities;
 using YessGoFront.Models;
 using YessGoFront.Services.Api;
 
@@ -42,4 +43,19 @@ public interface IAuthService
     /// Gets the current authenticated user's ID
     /// </summary>
     Task<int?> GetCurrentUserIdAsync();
+
+    /// <summary>
+    /// Получить пользователя из локальной SQLite БД
+    /// </summary>
+    Task<User?> GetLocalUserAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Автоматический вход, если пользователь есть на сервере (есть токены), но нет в локальной БД
+    /// </summary>
+    Task<bool> AutoLoginIfNoLocalUserAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Получить профиль пользователя из API
+    /// </summary>
+    Task<UserDto?> GetUserProfileAsync(CancellationToken ct = default);
 }

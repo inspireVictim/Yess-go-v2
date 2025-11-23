@@ -45,9 +45,7 @@
 
                             <VerticalStackLayout Grid.Column="1"
                      Spacing="2"
-                     VerticalOptions="Center"
-                     x:DataType="services:AccountStore"
-                     BindingContext="{x:Static services:AccountStore.Instance}">
+                     VerticalOptions="Center">
                                 <Label FontSize="20"
            FontAttributes="Bold"
            TextColor="White"

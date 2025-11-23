@@ -34,6 +34,11 @@ public interface IAuthApiService
     /// Проверка кода и завершение регистрации
     /// </summary>
     Task<UserDto> VerifyCodeAndRegisterAsync(VerifyCodeRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Получение профиля текущего пользователя
+    /// </summary>
+    Task<UserDto> GetMeAsync(CancellationToken ct = default);
 }
 
 /// <summary>

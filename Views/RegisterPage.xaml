@@ -192,6 +192,11 @@
                                 <DataTrigger TargetType="Button" Binding="{Binding IsVerificationStep}" Value="True">
                                     <Setter Property="Text" Value="Подтвердить и зарегистрироваться" />
                                 </DataTrigger>
+                                <DataTrigger TargetType="Button" Binding="{Binding IsRegistrationSuccessful}" Value="True">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                    <Setter Property="Text" Value="Регистрация завершена" />
+                                    <Setter Property="Opacity" Value="0.6" />
+                                </DataTrigger>
                             </Button.Triggers>
                         </Button>
                         <ActivityIndicator IsRunning="{Binding IsBusy}" 

@@ -83,11 +83,18 @@ public class AuthenticationService : IAuthenticationService
                 return false;
             }
 
-            var httpClient = httpClientFactory.CreateClient("ApiClient");
+            // Используем специальный HttpClient без AuthHandler для refresh запросов
+            // Это предотвращает бесконечный цикл при получении 401 во время обновления токена
+            var httpClient = httpClientFactory.CreateClient("RefreshTokenClient");
             if (httpClient == null)
             {
-                System.Diagnostics.Debug.WriteLine("[AuthenticationService] HttpClient not found");
-                return false;
+                System.Diagnostics.Debug.WriteLine("[AuthenticationService] RefreshTokenClient not found, falling back to ApiClient");
+                httpClient = httpClientFactory.CreateClient("ApiClient");
+                if (httpClient == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[AuthenticationService] HttpClient not found");
+                    return false;
+                }
             }
 
             // Создаем запрос для обновления токена
@@ -129,10 +136,14 @@ public class AuthenticationService : IAuthenticationService
             }
             else
             {
+                var responseBody = await response.Content.ReadAsStringAsync();
                 System.Diagnostics.Debug.WriteLine($"[AuthenticationService] Token refresh failed: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"[AuthenticationService] Response body: {responseBody}");
+                
                 // Если refresh token тоже истек, очищаем токены
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
+                    System.Diagnostics.Debug.WriteLine("[AuthenticationService] Refresh token is invalid or expired, clearing tokens");
                     await ClearTokensAsync();
                 }
             }

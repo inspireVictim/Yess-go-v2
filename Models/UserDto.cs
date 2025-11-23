@@ -10,16 +10,16 @@ public class UserDto
     [JsonPropertyName("id")]
     public int Id { get; set; }
     
-    [JsonPropertyName("first_name")]
+    [JsonPropertyName("firstName")]
     public string FirstName { get; set; } = string.Empty;
     
-    [JsonPropertyName("last_name")]
+    [JsonPropertyName("lastName")]
     public string LastName { get; set; } = string.Empty;
     
     [JsonPropertyName("email")]
     public string? Email { get; set; }
     
-    [JsonPropertyName("phone_number")]
+    [JsonPropertyName("phone")]
     public string Phone { get; set; } = string.Empty;
     
     [JsonPropertyName("city_id")]

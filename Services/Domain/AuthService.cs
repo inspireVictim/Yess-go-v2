@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
 using YessGoFront.Infrastructure.Auth;
@@ -89,6 +90,26 @@ public class AuthService : IAuthService
         }
     }
 
+    public Task<int?> GetCurrentUserIdAsync()
+    {
+        try
+        {
+            int storedId = Preferences.Get("UserId", -1);
+
+            if (storedId == -1)
+                return Task.FromResult<int?>(null);
+
+            return Task.FromResult<int?>(storedId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error getting current user ID");
+            return Task.FromResult<int?>(null);
+        }
+    }
+
+
+
     public async Task<AuthResponse> LoginWithPhoneAsync(string phone, string password, CancellationToken ct = default)
     {
         try
@@ -129,6 +150,7 @@ public class AuthService : IAuthService
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
+            Preferences.Set("UserId", response.UserId);
             return response;
         }
         catch (ApiException) { throw; }
@@ -225,6 +247,24 @@ public class AuthService : IAuthService
                 await SaveOrUpdateUserAsync(userId, registeredUser, ct);
 
             response.User = registeredUser;
+
+            // Create welcome notification for the new user
+            var welcomeNotification = new Notification
+            {
+                UserId = 0, // Бросаем уведомление всем пользователям
+                Title = "Добро пожаловать в YESS!GO",
+                Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
+                NotificationType = NotificationType.InApp,
+                Priority = NotificationPriority.Normal,
+                Status = NotificationStatus.Delivered,
+                CreatedAt = DateTime.UtcNow,
+                DeliveredAt = DateTime.UtcNow
+            };
+
+            await _dbContext.Notifications.AddAsync(welcomeNotification, ct);
+            await _dbContext.SaveChangesAsync(ct);
+
+            _logger?.LogInformation("Welcome notification created for all users");
 
             _logger?.LogInformation("User registered with verification: {Phone}, UserId: {UserId}", request.phone_number, userId);
             return response;

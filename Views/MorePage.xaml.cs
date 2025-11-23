@@ -73,19 +73,67 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Политика конфиденциальности"
         private async void OnPolicyTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///PolicyPage");
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(PolicyPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к PolicyPage: {ex.Message}");
+                // Попытка использовать альтернативный маршрут
+                try
+                {
+                    await Shell.Current.GoToAsync("PolicyPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
         }
 
         // ✅ Обработчик тапа по "Условия использования"
         private async void OnConditionsTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///ConditionsPage");
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(ConditionsPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к ConditionsPage: {ex.Message}");
+                // Попытка использовать альтернативный маршрут
+                try
+                {
+                    await Shell.Current.GoToAsync("ConditionsPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
         }
 
         // ✅ Обработчик тапа по "Контакты"
         private async void OnContactsTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///ContactsPage");
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(ContactsPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к ContactsPage: {ex.Message}");
+                // Попытка использовать альтернативный маршрут
+                try
+                {
+                    await Shell.Current.GoToAsync("ContactsPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
         }
 
         // ✅ Обработчик тапа по "Выйти"

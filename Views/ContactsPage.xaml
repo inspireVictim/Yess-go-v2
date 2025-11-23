@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="YessGoFront.Views.ContactsPage">
-    <VerticalStackLayout>
+             xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+             x:Class="YessGoFront.Views.ContactsPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F4F6F8">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Верхняя панель -->
         <Grid Padding="16,44,16,8" BackgroundColor="#0F6B53">
             <Grid ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
-                <Border WidthRequest="36" HeightRequest="36"
-                    StrokeThickness="0"
-                    BackgroundColor="#FFFFFF"
-                    StrokeShape="RoundRectangle8">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnBackTapped" />
-                    </Border.GestureRecognizers>
-                    <Image Source="back_arrow_icon.png" 
-                        Aspect="AspectFit" 
-                        Margin="8" />
-                </Border>
+                <Button x:Name="BackButton"
+                        WidthRequest="40" 
+                        HeightRequest="40"
+                        CornerRadius="20"
+                        BackgroundColor="#FFFFFF22"
+                        TextColor="White"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        Text="←"
+                        Clicked="OnBackTapped"/>
 
                 <Label Grid.Column="1"
                     Text="Контакты"
@@ -26,13 +29,100 @@
                     FontSize="18"/>
             </Grid>
         </Grid>
-        <Label
-            Text
-            =""
-            TextColor="#6B7280"
-            FontSize="14"
-            FontAttributes="Bold"
-            HorizontalOptions="Center"
-            VerticalOptions="Center"/>
-    </VerticalStackLayout>
-</ContentView>
+        
+        <!-- Контент -->
+        <ScrollView Grid.Row="1" Padding="16">
+            <VerticalStackLayout Spacing="20">
+                <Label Text="СВЯЖИТЕСЬ С НАМИ"
+                       TextColor="#0F6B53"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+                
+                <Frame BackgroundColor="White" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="📧 Электронная почта"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="support@yessgo.kg"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                    </VerticalStackLayout>
+                </Frame>
+                
+                <Frame BackgroundColor="White" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="📞 Телефон"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="+996 (555) 123 456"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                    </VerticalStackLayout>
+                </Frame>
+                
+                <Frame BackgroundColor="White" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="🌐 Веб-сайт"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="www.yessgo.kg"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                    </VerticalStackLayout>
+                </Frame>
+                
+                <Frame BackgroundColor="White" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="📍 Адрес"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="г. Бишкек, Кыргызстан"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                    </VerticalStackLayout>
+                </Frame>
+                
+                <Frame BackgroundColor="#F0F9F7" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="⏰ Время работы службы поддержки"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="Понедельник - Пятница: 9:00 - 18:00"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                        <Label Text="Суббота: 10:00 - 16:00"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                        <Label Text="Воскресенье: Выходной"
+                               TextColor="#6B7280"
+                               FontSize="14"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <!-- Нижний навбар -->
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="2" />
+    </Grid>
+</ContentPage>

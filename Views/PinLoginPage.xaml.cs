@@ -155,6 +155,11 @@ namespace YessGoFront.Views
             {
                 await TryBiometricFirstAsync();
             }
+            // Если в режиме верификации (ввод PIN) и еще не начали ввод, также пробуем биометрию
+            else if (!_isCreatingPin && string.IsNullOrEmpty(_currentPin))
+            {
+                await TryBiometricFirstAsync();
+            }
         }
 
         private async Task TryBiometricFirstAsync()
@@ -348,10 +353,27 @@ namespace YessGoFront.Views
                         await Microsoft.Maui.Storage.SecureStorage.SetAsync("user_pin", _currentPin);
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PIN saved successfully, navigating to main...");
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PIN saved successfully, switching to verification mode...");
                     
-                    // Переходим в приложение
-                    await NavigateToMainAsync();
+                    // Переключаемся в режим ввода PIN (не переходим сразу в приложение)
+                    _isCreatingPin = false;
+                    _confirmPin = null;
+                    PinCode = string.Empty;
+                    
+                    // Обновляем UI для режима ввода PIN
+                    OnPropertyChanged(nameof(IsVerificationMode));
+                    OnPropertyChanged(nameof(TitleText));
+                    SubtitleText = "Введите PIN-код для входа";
+                    ClearError();
+                    
+                    // Показываем сообщение об успешном создании PIN
+                    await DisplayAlert(
+                        "PIN-код создан",
+                        "PIN-код успешно создан. Теперь введите его для входа в приложение.",
+                        "OK");
+                    
+                    // Пробуем биометрию, если доступна
+                    await TryBiometricFirstAsync();
                 }
                 else
                 {
@@ -414,52 +436,49 @@ namespace YessGoFront.Views
                         return;
                     }
                     
-                    // Если есть access token, пытаемся обновить его (если истек) с помощью refresh token
-                    if (!string.IsNullOrWhiteSpace(accessToken) && _authService != null)
+                    // Если есть access token, проверяем его валидность
+                    bool hasValidAccessToken = false;
+                    if (!string.IsNullOrWhiteSpace(accessToken))
                     {
-                        // Пытаемся обновить токен проактивно (если есть refresh token)
-                        if (!string.IsNullOrWhiteSpace(refreshToken))
+                        hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                        System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Access token exists, IsValid={hasValidAccessToken}");
+                        
+                        // Если токен валиден - сразу входим
+                        if (hasValidAccessToken)
                         {
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token is valid, navigating to main");
+                            await NavigateToMainAsync();
+                            return;
+                        }
+                        
+                        // Если токен истек, пытаемся обновить через refresh token (но не блокируем вход, если не получится)
+                        if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token expired, attempting to refresh");
                             var refreshed = await _authService.RefreshTokenAsync();
-                            if (!refreshed)
+                            if (refreshed)
                             {
-                                // Проверяем, что refresh token действительно недействителен (401)
-                                // Если refresh token вернул 401, значит токены недействительны и нужно перелогиниться
-                                var newRefreshToken = await authService.GetRefreshTokenAsync();
-                                if (string.IsNullOrWhiteSpace(newRefreshToken))
-                                {
-                                    // Refresh token был очищен (вероятно, из-за 401) - нужно перелогиниться
-                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refresh token was cleared (likely 401), redirecting to login");
-                                    await DisplayAlert(
-                                        "Требуется повторный вход",
-                                        "Сессия истекла. Пожалуйста, войдите заново.",
-                                        "OK");
-                                    
-                                    // Очищаем PIN и токены
-                                    var pinService = new Services.PinStorageService();
-                                    await pinService.ClearPinAsync();
-                                    await authService.ClearTokensAsync();
-                                    AccountStore.Instance.SignOut();
-                                    
-                                    // Переходим на страницу входа
-                                    await Shell.Current.GoToAsync("///login", animate: true);
-                                    return;
-                                }
-                                else
-                                {
-                                    // Refresh не сработал, но токен все еще есть - продолжаем с текущим access token
-                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, but access token exists - continuing");
-                                }
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Token refreshed successfully");
+                                await NavigateToMainAsync();
+                                return;
+                            }
+                            else
+                            {
+                                // Refresh не сработал, но PIN валиден - входим в приложение
+                                // Пользователь может перелогиниться позже, если токен действительно не работает
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, but PIN is valid - continuing to main");
+                                // Продолжаем - пользователь может перелогиниться позже, если токен действительно не работает
                             }
                         }
                     }
                     else if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
                     {
-                        // Если есть только refresh token (access token отсутствует или истек), пытаемся получить новый access token
+                        // Если есть только refresh token (access token отсутствует), пытаемся получить новый access token
                         System.Diagnostics.Debug.WriteLine("[PinLoginPage] Only refresh token found, attempting to refresh access token");
                         var refreshed = await _authService.RefreshTokenAsync();
                         if (!refreshed)
                         {
+                            // Если refresh не сработал - требуем перелогиниться
                             System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, redirecting to login");
                             await DisplayAlert(
                                 "Требуется повторный вход",
@@ -479,7 +498,8 @@ namespace YessGoFront.Views
                     }
                 }
                 
-                // Переходим в приложение
+                // PIN валиден - переходим в приложение (даже если токен истек, пользователь может перелогиниться позже)
+                System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN valid, navigating to main");
                 await NavigateToMainAsync();
             }
             else

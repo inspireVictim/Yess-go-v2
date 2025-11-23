@@ -21,6 +21,9 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(PartnerDetailPage), typeof(PartnerDetailPage));
             Routing.RegisterRoute(nameof(TransactionsPage), typeof(TransactionsPage));
             Routing.RegisterRoute(nameof(TransactionDetailsPage), typeof(TransactionDetailsPage));
+            Routing.RegisterRoute(nameof(PolicyPage), typeof(PolicyPage));
+            Routing.RegisterRoute(nameof(ConditionsPage), typeof(ConditionsPage));
+            Routing.RegisterRoute(nameof(ContactsPage), typeof(ContactsPage));
         }
 
         protected override async void OnAppearing()
@@ -45,14 +48,51 @@ namespace YessGoFront
                     return;
                 }
 
+                // Получаем сервис аутентификации один раз для использования во всех блоках
+                var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
+
                 // 1. Проверяем, есть ли пользователь в локальной SQLite БД
                 var localUser = await authService.GetLocalUserAsync();
                 Debug.WriteLine($"[AppShell] OnAppearing: LocalUser exists={localUser != null} (UserId={localUser?.Id ?? 0})");
 
                 if (localUser != null)
                 {
-                    // Пользователь есть в локальной БД - используем локальный PIN для входа
-                    Debug.WriteLine("[AppShell] Decision: local user found → checking PIN");
+                    // Пользователь есть в локальной БД - всегда требуем PIN или биометрию для безопасности
+                    Debug.WriteLine("[AppShell] Decision: local user found → always require PIN/biometric");
+                    
+                    // Пытаемся обновить токен в фоне, если он истек (но не пропускаем экран PIN)
+                    if (authenticationService != null)
+                    {
+                        var accessToken = await authenticationService.GetAccessTokenAsync();
+                        
+                        // Если токен истек, пытаемся обновить через refresh token (в фоне)
+                        if (!string.IsNullOrWhiteSpace(accessToken))
+                        {
+                            var isTokenValid = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                            if (!isTokenValid)
+                            {
+                                var refreshToken = await authenticationService.GetRefreshTokenAsync();
+                                if (!string.IsNullOrWhiteSpace(refreshToken))
+                                {
+                                    Debug.WriteLine("[AppShell] Access token expired, attempting to refresh in background");
+                                    // Обновляем в фоне, не ждем результата - не блокируем навигацию
+                                    _ = Task.Run(async () =>
+                                    {
+                                        try
+                                        {
+                                            await authenticationService.RefreshTokenAsync();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.WriteLine($"[AppShell] Background token refresh failed: {ex.Message}");
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Всегда проверяем PIN - даже если токен валиден, требуем PIN/биометрию
                     var hasValidPin = await authService.HasPinAsync();
                     Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}");
 
@@ -63,14 +103,13 @@ namespace YessGoFront
                     }
                     else
                     {
-                        Debug.WriteLine("[AppShell] Decision: local user WITH valid PIN → navigating to PIN login");
+                        Debug.WriteLine("[AppShell] Decision: local user WITH valid PIN → navigating to PIN login (always require PIN/biometric)");
                         await Shell.Current.GoToAsync("///pinlogin", animate: false);
                     }
                     return;
                 }
 
                 // 2. Пользователя нет в локальной БД - проверяем, есть ли токены (пользователь есть на сервере)
-                var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
                 var hasRefreshToken = false;
                 if (authenticationService != null)
                 {

@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="YessGoFront.Views.ConditionsPage">
-    <VerticalStackLayout>
+             xmlns:controls="clr-namespace:YessGoFront.Views.Controls"
+             x:Class="YessGoFront.Views.ConditionsPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F4F6F8">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Верхняя панель -->
         <Grid Padding="16,44,16,8" BackgroundColor="#0F6B53">
             <Grid ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
-                <Border WidthRequest="36" HeightRequest="36"
-                    StrokeThickness="0"
-                    BackgroundColor="#FFFFFF"
-                    StrokeShape="RoundRectangle8">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnBackTapped" />
-                    </Border.GestureRecognizers>
-                    <Image Source="back_arrow_icon.png" 
-                        Aspect="AspectFit" 
-                        Margin="8" />
-                </Border>
+                <Button x:Name="BackButton"
+                        WidthRequest="40" 
+                        HeightRequest="40"
+                        CornerRadius="20"
+                        BackgroundColor="#FFFFFF22"
+                        TextColor="White"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        Text="←"
+                        Clicked="OnBackTapped"/>
 
                 <Label Grid.Column="1"
                     Text="Условия использования"
@@ -26,13 +29,86 @@
                     FontSize="18"/>
             </Grid>
         </Grid>
-        <Label
-            Text
-            ="УСЛОВИЯ ИСПОЛЬЗОВАНИЯ"
-            TextColor="#6B7280"
-            FontSize="14"
-            FontAttributes="Bold"
-            HorizontalOptions="Center"
-            VerticalOptions="Center"/>
-    </VerticalStackLayout>
-</ContentView>
+        
+        <!-- Контент -->
+        <ScrollView Grid.Row="1" Padding="16">
+            <VerticalStackLayout Spacing="16">
+                <Label Text="УСЛОВИЯ ИСПОЛЬЗОВАНИЯ"
+                       TextColor="#0F6B53"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+                
+                <Label Text="1. ОБЩИЕ ПОЛОЖЕНИЯ
+
+1.1. Настоящие Условия использования (далее — «Условия») определяют правила использования мобильного приложения YESS!GO (далее — «Приложение», «Сервис»).
+
+1.2. Используя Приложение, вы подтверждаете, что прочитали, поняли и согласны соблюдать настоящие Условия.
+
+1.3. Если вы не согласны с какими-либо положениями настоящих Условий, вы не должны использовать Приложение.
+
+2. РЕГИСТРАЦИЯ И УЧЕТНАЯ ЗАПИСЬ
+
+2.1. Для использования Приложения необходимо пройти регистрацию и создать учетную запись.
+
+2.2. Вы обязуетесь предоставлять достоверную и актуальную информацию при регистрации.
+
+2.3. Вы несете ответственность за сохранность данных для входа в учетную запись.
+
+2.4. Запрещается передавать данные для входа третьим лицам.
+
+3. ИСПОЛЬЗОВАНИЕ ПРИЛОЖЕНИЯ
+
+3.1. Приложение предоставляется «как есть» без каких-либо гарантий.
+
+3.2. Вы обязуетесь использовать Приложение только в законных целях.
+
+3.3. Запрещается:
+   - Использовать Приложение для незаконной деятельности
+   - Нарушать права других пользователей
+   - Распространять вредоносное программное обеспечение
+   - Пытаться получить несанкционированный доступ к системе
+
+4. ИНТЕЛЛЕКТУАЛЬНАЯ СОБСТВЕННОСТЬ
+
+4.1. Все материалы Приложения (тексты, изображения, логотипы, дизайн) являются собственностью разработчиков и защищены авторским правом.
+
+4.2. Запрещается копировать, воспроизводить или распространять материалы Приложения без письменного разрешения.
+
+5. ОТВЕТСТВЕННОСТЬ
+
+5.1. Разработчики не несут ответственности за ущерб, возникший в результате использования или невозможности использования Приложения.
+
+5.2. Разработчики не гарантируют бесперебойную работу Приложения и не несут ответственности за временные сбои.
+
+6. ИЗМЕНЕНИЯ УСЛОВИЙ
+
+6.1. Разработчики оставляют за собой право изменять настоящие Условия в любое время.
+
+6.2. О значимых изменениях пользователи будут уведомлены через Приложение.
+
+6.3. Продолжение использования Приложения после внесения изменений означает согласие с новыми Условиями.
+
+7. ПРЕКРАЩЕНИЕ ИСПОЛЬЗОВАНИЯ
+
+7.1. Вы можете прекратить использование Приложения в любое время.
+
+7.2. Разработчики оставляют за собой право приостановить или прекратить доступ к Приложению для любого пользователя, нарушившего настоящие Условия.
+
+8. КОНТАКТНАЯ ИНФОРМАЦИЯ
+
+8.1. По вопросам, связанным с использованием Приложения, вы можете обращаться:
+   📧 [ваша почта поддержки]
+   🌐 [ваш сайт, если есть]"
+                       TextColor="#6B7280"
+                       FontSize="14"
+                       HorizontalOptions="Start"
+                       VerticalOptions="Start"
+                       LineBreakMode="WordWrap"/>
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <!-- Нижний навбар -->
+        <controls:BottomNavBar x:Name="BottomBar" Grid.Row="2" />
+    </Grid>
+</ContentPage>

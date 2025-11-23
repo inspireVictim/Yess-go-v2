@@ -117,5 +117,53 @@ public static class JwtHelper
 
         return null;
     }
+
+    /// <summary>
+    /// Проверить, не истек ли JWT токен
+    /// </summary>
+    public static bool IsTokenValid(string? accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return false;
+
+        try
+        {
+            var payload = DecodePayload<Dictionary<string, JsonElement>>(accessToken);
+            if (payload == null)
+                return false;
+
+            // Проверяем поле "exp" (expiration time)
+            if (payload.TryGetValue("exp", out var expElement))
+            {
+                long exp;
+                if (expElement.ValueKind == JsonValueKind.Number)
+                {
+                    exp = expElement.GetInt64();
+                }
+                else if (expElement.ValueKind == JsonValueKind.String)
+                {
+                    if (!long.TryParse(expElement.GetString(), out exp))
+                        return false;
+                }
+                else
+                {
+                    return false;
+                }
+
+                var expTime = DateTimeOffset.FromUnixTimeSeconds(exp);
+                var now = DateTimeOffset.UtcNow;
+                
+                // Токен валиден, если время истечения больше текущего времени (с запасом 1 минута)
+                return expTime > now.AddMinutes(1);
+            }
+
+            // Если нет поля exp, считаем токен валидным (но это нестандартно)
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
 

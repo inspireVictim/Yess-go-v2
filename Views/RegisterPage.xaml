@@ -163,6 +163,11 @@
                         </Grid>
                     </Border>
 
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox x:Name="acknowledged" Color="#007A51" IsChecked="{Binding IsPolicyAcknowledged}"/>
+                        <Label Text="Ознакомлен(а)" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
                     <!-- Сообщение об ошибке -->
                     <Label Text="{Binding ErrorMessage}" 
                            IsVisible="{Binding HasError}"

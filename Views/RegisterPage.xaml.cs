@@ -10,6 +10,19 @@ namespace YessGoFront.Views
     public partial class RegisterPage : ContentPage
     {
         private readonly RegisterViewModel _viewModel;
+        private bool _acknowledged;
+
+
+        //Проверка, что пользователь согласен с условиями
+        public bool Acknowledged
+        {
+            get => _acknowledged;
+            set
+            {
+                _acknowledged = value;
+                OnPropertyChanged();
+            }
+        }
 
         public RegisterPage()
         {

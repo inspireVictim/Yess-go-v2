@@ -217,8 +217,10 @@ public abstract class ApiClient
 
         try
         {
-            // Пытаемся распарсить JSON и извлечь поле "message"
+            // Пытаемся распарсить JSON и извлечь поле "message", "error" или "detail"
             using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
+            
+            // Проверяем "message"
             if (doc.RootElement.TryGetProperty("message", out var messageElement))
             {
                 var message = messageElement.GetString();
@@ -226,7 +228,15 @@ public abstract class ApiClient
                     return message;
             }
             
-            // Если нет "message", пробуем "detail"
+            // Проверяем "error" (некоторые API возвращают ошибки в этом поле)
+            if (doc.RootElement.TryGetProperty("error", out var errorElement))
+            {
+                var error = errorElement.GetString();
+                if (!string.IsNullOrWhiteSpace(error))
+                    return error;
+            }
+            
+            // Проверяем "detail"
             if (doc.RootElement.TryGetProperty("detail", out var detailElement))
             {
                 var detail = detailElement.GetString();

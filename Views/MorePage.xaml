@@ -34,7 +34,7 @@
                                 FontSize="14"
                                 FontAttributes="Bold"
                                 TextColor="DarkGreen"
-                                Text="{Binding Source={x:Static services:AccountStore.Instance}, Path=DisplayName}" />
+                                Text="{Binding DisplayName}" />
                             <Label Text="Профиль"
                                    TextColor="#6B7280"
                                    FontSize="12"/>

@@ -150,6 +150,86 @@ namespace YessGoFront.Services.Api
             }
         }
 
+        public async Task<UserDto> GetMeAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                // Получаем JSON ответ напрямую для отладки
+                var uri = BuildUri($"{ApiEndpoints.AuthEndpoints.Base}/me");
+                Logger?.LogDebug("GET {Url}", uri);
+                
+                var response = await HttpClient.GetAsync(uri, ct);
+                var jsonContent = await response.Content.ReadAsStringAsync(ct);
+                
+                // Логируем ответ независимо от статуса
+                Logger?.LogInformation("GetMeAsync response: Status={StatusCode}, Body={Json}", response.StatusCode, jsonContent);
+                
+                // Проверяем статус код после логирования
+                await EnsureSuccessStatusCode(response);
+                
+                // Десериализуем вручную - используем DefaultJsonSerializerOptions без PropertyNamingPolicy
+                // Это позволит использовать только JsonPropertyName атрибуты
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = null // Отключаем camelCase, используем только JsonPropertyName атрибуты
+                };
+                
+                var userDto = System.Text.Json.JsonSerializer.Deserialize<UserDto>(jsonContent, jsonOptions);
+                
+                if (userDto == null)
+                {
+                    throw new ApiException("Не удалось десериализовать ответ /me");
+                }
+                
+                // Логируем полученные данные для отладки
+                Logger?.LogInformation("GetMeAsync deserialized: Id={Id}, FirstName='{FirstName}', LastName='{LastName}', Phone='{Phone}'", 
+                    userDto.Id, userDto.FirstName ?? "null", userDto.LastName ?? "null", userDto.Phone ?? "null");
+                
+                // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: если FirstName/LastName пустые, попробуем прочитать напрямую из JSON
+                if (string.IsNullOrWhiteSpace(userDto.FirstName) && string.IsNullOrWhiteSpace(userDto.LastName))
+                {
+                    try
+                    {
+                        using var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonContent);
+                        var root = jsonDoc.RootElement;
+                        
+                        if (root.TryGetProperty("firstName", out var firstNameProp))
+                        {
+                            userDto.FirstName = firstNameProp.GetString() ?? string.Empty;
+                            Logger?.LogWarning("GetMeAsync: Manually extracted firstName from JSON: '{FirstName}'", userDto.FirstName);
+                        }
+                        
+                        if (root.TryGetProperty("lastName", out var lastNameProp))
+                        {
+                            userDto.LastName = lastNameProp.GetString() ?? string.Empty;
+                            Logger?.LogWarning("GetMeAsync: Manually extracted lastName from JSON: '{LastName}'", userDto.LastName);
+                        }
+                        
+                        if (root.TryGetProperty("phone", out var phoneProp))
+                        {
+                            var phoneValue = phoneProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(phoneValue) && string.IsNullOrWhiteSpace(userDto.Phone))
+                            {
+                                userDto.Phone = phoneValue;
+                                Logger?.LogWarning("GetMeAsync: Manually extracted phone from JSON: '{Phone}'", userDto.Phone);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogWarning(ex, "GetMeAsync: Failed to manually extract properties from JSON");
+                    }
+                }
+                
+                return userDto;
+            }
+            catch (Exception ex) when (IsNetworkError(ex))
+            {
+                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+            }
+        }
+
 
         // ----------------- Helpers -----------------
 

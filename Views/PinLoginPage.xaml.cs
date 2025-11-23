@@ -387,15 +387,17 @@ namespace YessGoFront.Views
 
             if (isValid)
             {
-                // PIN верный - проверяем наличие refresh_token
+                // PIN верный - проверяем наличие токенов
                 var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
                 if (authService != null)
                 {
+                    var accessToken = await authService.GetAccessTokenAsync();
                     var refreshToken = await authService.GetRefreshTokenAsync();
-                    if (string.IsNullOrWhiteSpace(refreshToken))
+                    
+                    // Если нет ни access token, ни refresh token - нужно перелогиниться
+                    if (string.IsNullOrWhiteSpace(accessToken) && string.IsNullOrWhiteSpace(refreshToken))
                     {
-                        // Refresh token отсутствует - нужно перелогиниться
-                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refresh token not found, redirecting to login");
+                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] No tokens found, redirecting to login");
                         await DisplayAlert(
                             "Требуется повторный вход",
                             "Для продолжения работы необходимо войти заново.",
@@ -412,15 +414,67 @@ namespace YessGoFront.Views
                         return;
                     }
                     
-                    // Проверяем, не истек ли access_token, и если да - обновляем его
-                    var accessToken = await authService.GetAccessTokenAsync();
+                    // Если есть access token, пытаемся обновить его (если истек) с помощью refresh token
                     if (!string.IsNullOrWhiteSpace(accessToken) && _authService != null)
                     {
-                        // Пытаемся обновить токен проактивно
+                        // Пытаемся обновить токен проактивно (если есть refresh token)
+                        if (!string.IsNullOrWhiteSpace(refreshToken))
+                        {
+                            var refreshed = await _authService.RefreshTokenAsync();
+                            if (!refreshed)
+                            {
+                                // Проверяем, что refresh token действительно недействителен (401)
+                                // Если refresh token вернул 401, значит токены недействительны и нужно перелогиниться
+                                var newRefreshToken = await authService.GetRefreshTokenAsync();
+                                if (string.IsNullOrWhiteSpace(newRefreshToken))
+                                {
+                                    // Refresh token был очищен (вероятно, из-за 401) - нужно перелогиниться
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refresh token was cleared (likely 401), redirecting to login");
+                                    await DisplayAlert(
+                                        "Требуется повторный вход",
+                                        "Сессия истекла. Пожалуйста, войдите заново.",
+                                        "OK");
+                                    
+                                    // Очищаем PIN и токены
+                                    var pinService = new Services.PinStorageService();
+                                    await pinService.ClearPinAsync();
+                                    await authService.ClearTokensAsync();
+                                    AccountStore.Instance.SignOut();
+                                    
+                                    // Переходим на страницу входа
+                                    await Shell.Current.GoToAsync("///login", animate: true);
+                                    return;
+                                }
+                                else
+                                {
+                                    // Refresh не сработал, но токен все еще есть - продолжаем с текущим access token
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, but access token exists - continuing");
+                                }
+                            }
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
+                    {
+                        // Если есть только refresh token (access token отсутствует или истек), пытаемся получить новый access token
+                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Only refresh token found, attempting to refresh access token");
                         var refreshed = await _authService.RefreshTokenAsync();
                         if (!refreshed)
                         {
-                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, but refresh_token exists - continuing");
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh token, redirecting to login");
+                            await DisplayAlert(
+                                "Требуется повторный вход",
+                                "Не удалось обновить токен доступа. Пожалуйста, войдите заново.",
+                                "OK");
+                            
+                            // Очищаем PIN и токены
+                            var pinService = new Services.PinStorageService();
+                            await pinService.ClearPinAsync();
+                            await authService.ClearTokensAsync();
+                            AccountStore.Instance.SignOut();
+                            
+                            // Переходим на страницу входа
+                            await Shell.Current.GoToAsync("///login", animate: true);
+                            return;
                         }
                     }
                 }

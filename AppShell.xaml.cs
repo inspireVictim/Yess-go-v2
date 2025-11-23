@@ -45,16 +45,31 @@ namespace YessGoFront
                     return;
                 }
 
-                // Проверяем, есть ли сохранённый аккаунт (AccountStore)
-                AccountStore.Instance.Load(); // Перечитываем данные из Preferences
-                var hasSavedAccount = AccountStore.Instance.IsSignedIn;
-                Debug.WriteLine($"[AppShell] OnAppearing: HasSavedAccount={hasSavedAccount}");
+                // 1. Проверяем, есть ли пользователь в локальной SQLite БД
+                var localUser = await authService.GetLocalUserAsync();
+                Debug.WriteLine($"[AppShell] OnAppearing: LocalUser exists={localUser != null} (UserId={localUser?.Id ?? 0})");
 
-                // Проверяем, есть ли токен аутентификации
-                var isAuthenticated = await authService.IsAuthenticatedAsync();
-                Debug.WriteLine($"[AppShell] OnAppearing: IsAuthenticated={isAuthenticated}");
+                if (localUser != null)
+                {
+                    // Пользователь есть в локальной БД - используем локальный PIN для входа
+                    Debug.WriteLine("[AppShell] Decision: local user found → checking PIN");
+                    var hasValidPin = await authService.HasPinAsync();
+                    Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}");
 
-                // Проверяем наличие refresh_token - он необходим для автоматического обновления токенов
+                    if (!hasValidPin)
+                    {
+                        Debug.WriteLine("[AppShell] Decision: local user but NO valid PIN → navigating to PIN creation");
+                        await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[AppShell] Decision: local user WITH valid PIN → navigating to PIN login");
+                        await Shell.Current.GoToAsync("///pinlogin", animate: false);
+                    }
+                    return;
+                }
+
+                // 2. Пользователя нет в локальной БД - проверяем, есть ли токены (пользователь есть на сервере)
                 var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
                 var hasRefreshToken = false;
                 if (authenticationService != null)
@@ -64,47 +79,44 @@ namespace YessGoFront
                     Debug.WriteLine($"[AppShell] OnAppearing: HasRefreshToken={hasRefreshToken}");
                 }
 
-                // Если нет refresh_token - нужно перелогиниться для получения нового
-                if (!hasRefreshToken)
+                if (hasRefreshToken)
                 {
-                    Debug.WriteLine("[AppShell] Decision: no refresh_token → navigating to login (need to re-login for refresh_token)");
-                    // Очищаем старые токены и PIN
-                    if (authenticationService != null)
+                    // Есть токены на сервере, но нет локального пользователя - выполняем автоматический вход
+                    Debug.WriteLine("[AppShell] Decision: no local user but has refresh token → attempting auto-login");
+                    var autoLoginSuccess = await authService.AutoLoginIfNoLocalUserAsync();
+                    
+                    if (autoLoginSuccess)
                     {
-                        await authenticationService.ClearTokensAsync();
+                        Debug.WriteLine("[AppShell] Auto-login successful, checking PIN");
+                        var hasValidPin = await authService.HasPinAsync();
+                        
+                        if (!hasValidPin)
+                        {
+                            Debug.WriteLine("[AppShell] Decision: auto-login successful but NO valid PIN → navigating to PIN creation");
+                            await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[AppShell] Decision: auto-login successful WITH valid PIN → navigating to PIN login");
+                            await Shell.Current.GoToAsync("///pinlogin", animate: false);
+                        }
                     }
-                    var pinService = MauiProgram.Services?.GetService<Services.PinStorageService>();
-                    if (pinService != null)
+                    else
                     {
-                        await pinService.ClearPinAsync();
+                        Debug.WriteLine("[AppShell] Auto-login failed → navigating to login");
+                        // Очищаем токены, если автоматический вход не удался
+                        if (authenticationService != null)
+                        {
+                            await authenticationService.ClearTokensAsync();
+                        }
+                        await Shell.Current.GoToAsync("///login", animate: false);
                     }
-                    AccountStore.Instance.SignOut(keepProfile: false);
-                    await Shell.Current.GoToAsync("///login", animate: false);
                     return;
                 }
 
-                // Если нет сохранённого аккаунта И нет токена - идём на логин
-                if (!hasSavedAccount && !isAuthenticated)
-                {
-                    Debug.WriteLine("[AppShell] Decision: no saved account and not authenticated → navigating to login");
-                    await Shell.Current.GoToAsync("///login", animate: false);
-                    return;
-                }
-
-                // Если есть сохранённый аккаунт ИЛИ токен - проверяем PIN
-                var hasValidPin = await authService.HasPinAsync();
-                Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}");
-
-                if (!hasValidPin)
-                {
-                    Debug.WriteLine("[AppShell] Decision: authenticated but NO valid PIN → navigating to PIN creation");
-                    await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
-                }
-                else
-                {
-                    Debug.WriteLine("[AppShell] Decision: authenticated WITH valid PIN → navigating to PIN login");
-                    await Shell.Current.GoToAsync("///pinlogin", animate: false);
-                }
+                // 3. Нет ни локального пользователя, ни токенов - показываем экран логина
+                Debug.WriteLine("[AppShell] Decision: no local user and no tokens → navigating to login");
+                await Shell.Current.GoToAsync("///login", animate: false);
             }
             catch (Exception ex)
             {

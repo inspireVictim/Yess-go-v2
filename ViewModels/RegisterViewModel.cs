@@ -32,6 +32,9 @@ public partial class RegisterViewModel : ObservableObject
     [ObservableProperty] private bool isCodeSent = false;
     [ObservableProperty] private string? successMessage;
     [ObservableProperty] private string? displayedVerificationCode;
+    
+    // Флаг успешной регистрации - предотвращает повторный вызов verify-code
+    [ObservableProperty] private bool isRegistrationSuccessful = false;
 
     public RegisterViewModel(IAuthService authService, ILogger<RegisterViewModel>? logger = null)
     {
@@ -42,6 +45,13 @@ public partial class RegisterViewModel : ObservableObject
     [RelayCommand]
     private async Task RegisterAsync()
     {
+        // Защита от повторного вызова после успешной регистрации
+        if (IsRegistrationSuccessful)
+        {
+            _logger?.LogWarning("Registration already completed, ignoring duplicate call");
+            return;
+        }
+
         if (IsBusy)
             return;
 
@@ -93,7 +103,16 @@ public partial class RegisterViewModel : ObservableObject
         }
         catch (BadRequestException ex)
         {
-            ShowError(ParseApiError(ex.Message));
+            // Проверяем, не является ли ошибка о том, что пользователь уже зарегистрирован
+            if (ex.Message != null && ex.Message.Contains("уже зарегистрирован", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа или используйте код для восстановления доступа.");
+                _logger?.LogInformation("User already registered, suggesting login page");
+            }
+            else
+            {
+                ShowError(ParseApiError(ex.Message));
+            }
         }
         catch (ApiException ex)
         {
@@ -111,6 +130,19 @@ public partial class RegisterViewModel : ObservableObject
 
     private async Task VerifyCodeAndRegisterAsync()
     {
+        // Защита от повторного вызова после успешной регистрации
+        if (IsRegistrationSuccessful)
+        {
+            _logger?.LogWarning("Registration already completed, ignoring duplicate verify-code call");
+            return;
+        }
+
+        if (IsBusy)
+        {
+            _logger?.LogWarning("Registration already in progress, ignoring duplicate call");
+            return;
+        }
+
         // Validate code
         if (string.IsNullOrWhiteSpace(VerificationCode) || VerificationCode.Length < 4)
         {
@@ -182,6 +214,11 @@ public partial class RegisterViewModel : ObservableObject
 
             var response = await _authService.VerifyCodeAndRegisterAsync(request);
 
+            // Устанавливаем флаг успешной регистрации ПЕРЕД вызовом OnRegisterSuccess
+            // чтобы предотвратить повторный вызов, если пользователь быстро нажмет кнопку
+            IsRegistrationSuccessful = true;
+            _logger?.LogInformation("Registration successful for phone: {Phone}, preventing duplicate calls", normalizedPhone);
+
             if (OnRegisterSuccess is not null)
                 await OnRegisterSuccess.Invoke(response);
         }
@@ -192,7 +229,16 @@ public partial class RegisterViewModel : ObservableObject
         }
         catch (BadRequestException ex)
         {
-            ShowError(ParseApiError(ex.Message));
+            // Проверяем, не является ли ошибка о том, что пользователь уже зарегистрирован
+            if (ex.Message != null && ex.Message.Contains("уже зарегистрирован", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа или используйте код для восстановления доступа.");
+                _logger?.LogInformation("User already registered during registration, suggesting login page");
+            }
+            else
+            {
+                ShowError(ParseApiError(ex.Message));
+            }
         }
         catch (ApiException ex)
         {

@@ -12,6 +12,8 @@ using YessGoFront.Services;
 using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
 using System.Collections.Generic;
+using YessGoFront.Infrastructure.Auth;
+using YessGoFront.Infrastructure;
 
 namespace YessGoFront.ViewModels
 {
@@ -60,10 +62,16 @@ namespace YessGoFront.ViewModels
         // Баланс берём из общего BalanceStore
         public string Balance => BalanceStore.Instance.Balance.ToString("0.##");
 
+        // Данные пользователя из локальной БД
+        [ObservableProperty] private string displayName = string.Empty;
+        [ObservableProperty] private string phone = string.Empty;
+
         private CancellationTokenSource? _overlayCts;
         private readonly IBannerApiService? _bannerApiService;
         private readonly IPartnersApiService? _partnersApiService;
         private readonly IWalletService? _walletService;
+        private readonly IAuthService? _authService;
+        private readonly Infrastructure.Auth.IAuthenticationService? _authenticationService;
 
         // ====== Команды ======
         public IAsyncRelayCommand<StoryModel> OpenStoryAsyncCommand { get; }
@@ -79,11 +87,15 @@ namespace YessGoFront.ViewModels
         public MainPageViewModel(
             IBannerApiService? bannerApiService = null,
             IPartnersApiService? partnersApiService = null,
-            IWalletService? walletService = null)
+            IWalletService? walletService = null,
+            IAuthService? authService = null,
+            Infrastructure.Auth.IAuthenticationService? authenticationService = null)
         {
             _bannerApiService = bannerApiService;
             _partnersApiService = partnersApiService;
             _walletService = walletService;
+            _authService = authService;
+            _authenticationService = authenticationService;
             
             // Подписка на изменение баланса — обновляем метку на главной
             BalanceStore.Instance.PropertyChanged += (_, e) =>
@@ -111,6 +123,9 @@ namespace YessGoFront.ViewModels
 
             // Загружаем баланс кошелька текущего пользователя (если сервис доступен)
             _ = LoadBalanceAsync();
+            
+            // Загружаем данные пользователя из локальной БД
+            _ = LoadUserAsync();
         }
 
         // ====== ДАННЫЕ ======
@@ -181,6 +196,175 @@ namespace YessGoFront.ViewModels
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading wallet balance: {ex.Message}");
             }
+        }
+
+        private async Task LoadUserAsync()
+        {
+            try
+            {
+                if (_authService == null)
+                    return;
+
+                var localUser = await _authService.GetLocalUserAsync();
+                if (localUser != null)
+                {
+                    // Если телефон пустой в локальной БД, пытаемся получить его из токена
+                    var phone = localUser.Phone;
+                    if (string.IsNullOrWhiteSpace(phone) && _authenticationService != null)
+                    {
+                        try
+                        {
+                            var accessToken = await _authenticationService.GetAccessTokenAsync();
+                            if (!string.IsNullOrWhiteSpace(accessToken))
+                            {
+                                var phoneFromToken = JwtHelper.GetPhone(accessToken);
+                                if (!string.IsNullOrWhiteSpace(phoneFromToken))
+                                {
+                                    phone = phoneFromToken;
+                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token: {phone}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Failed to get phone from token: {ex.Message}");
+                        }
+                    }
+
+                    // DisplayName всегда показывает ФИО из БД
+                    var displayName = localUser.Name;
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadUserAsync: Initial displayName from DB = '{displayName}'");
+                    
+                    // Если ФИО пустое в БД, пытаемся загрузить профиль из API
+                    if (string.IsNullOrWhiteSpace(displayName))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Name is empty in DB, loading profile from API...");
+                        try
+                        {
+                            var userProfile = await _authService.GetUserProfileAsync();
+                            if (userProfile != null)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Got profile from API: FirstName='{userProfile.FirstName}', LastName='{userProfile.LastName}'");
+                                
+                                // Формируем ФИО из FirstName и LastName напрямую (не используем DisplayName, так как он может вернуть телефон)
+                                var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
+                                var lastName = userProfile.LastName?.Trim() ?? string.Empty;
+                                var fullName = $"{firstName} {lastName}".Trim();
+                                
+                                if (!string.IsNullOrWhiteSpace(fullName))
+                                {
+                                    displayName = fullName;
+                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                    
+                                    // Перезагружаем пользователя из БД, чтобы получить обновленное имя
+                                    var updatedUser = await _authService.GetLocalUserAsync();
+                                    if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name))
+                                    {
+                                        displayName = updatedUser.Name;
+                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Updated displayName from DB after profile load: {displayName}");
+                                    }
+                                }
+                                else
+                                {
+                                    displayName = "Пользователь";
+                                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ FirstName and LastName are empty in API response");
+                                }
+                            }
+                            else
+                            {
+                                displayName = "Пользователь";
+                                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ API returned null profile");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ❌ Failed to load profile from API: {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Stack trace: {ex.StackTrace}");
+                            displayName = "Пользователь";
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Using Name from DB: {displayName}");
+                    }
+
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        DisplayName = displayName;
+                        Phone = phone ?? string.Empty;
+                    });
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded user: DisplayName={DisplayName}, Phone={Phone}");
+                }
+                else
+                {
+                    // Если нет локального пользователя, пытаемся получить данные из токена
+                    string? phone = null;
+                    string displayName = "Пользователь";
+                    
+                    if (_authenticationService != null)
+                    {
+                        try
+                        {
+                            var accessToken = await _authenticationService.GetAccessTokenAsync();
+                            if (!string.IsNullOrWhiteSpace(accessToken))
+                            {
+                                phone = JwtHelper.GetPhone(accessToken);
+                                // Пытаемся загрузить профиль из API
+                                try
+                                {
+                                    var userProfile = await _authService.GetUserProfileAsync();
+                                    if (userProfile != null)
+                                    {
+                                        // Формируем ФИО из FirstName и LastName напрямую
+                                        var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
+                                        var lastName = userProfile.LastName?.Trim() ?? string.Empty;
+                                        var fullName = $"{firstName} {lastName}".Trim();
+                                        
+                                        if (!string.IsNullOrWhiteSpace(fullName))
+                                        {
+                                            displayName = fullName;
+                                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded Name from API (no local user): FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // Оставляем "Пользователь"
+                                }
+                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token (no local user): {phone}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Failed to get data from token: {ex.Message}");
+                        }
+                    }
+
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        DisplayName = displayName;
+                        Phone = phone ?? string.Empty;
+                    });
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] No local user found");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading user: {ex.Message}");
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    DisplayName = "Пользователь";
+                    Phone = string.Empty;
+                });
+            }
+        }
+
+        /// <summary>
+        /// Обновить данные пользователя (можно вызвать после изменения профиля)
+        /// </summary>
+        public async Task RefreshUserAsync()
+        {
+            await LoadUserAsync();
         }
 
         // ====== ДАННЫЕ Партнёров======

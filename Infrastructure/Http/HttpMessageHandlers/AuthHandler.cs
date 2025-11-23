@@ -49,7 +49,10 @@ public class AuthHandler : DelegatingHandler
         var response = await base.SendAsync(request, cancellationToken);
 
         // Обработка 401 - попытка обновить токен (fallback)
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        // НЕ пытаемся обновить токен, если запрос уже к endpoint refresh - это предотвращает бесконечный цикл
+        var isRefreshRequest = request.RequestUri?.AbsolutePath.Contains("/auth/refresh", StringComparison.OrdinalIgnoreCase) ?? false;
+        
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !isRefreshRequest)
         {
             _logger?.LogWarning("Received 401 Unauthorized, attempting token refresh");
             

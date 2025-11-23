@@ -1,6 +1,7 @@
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Maui.Storage;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
 using YessGoFront.Infrastructure.Auth;
@@ -147,7 +148,41 @@ public class AuthService : IAuthService
             _logger?.LogInformation("Refresh token saved: {Saved}", !string.IsNullOrEmpty(savedRefreshToken));
 
             if (response.UserId > 0)
+            {
+                // Сначала сохраняем данные из response.User (если есть)
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
+                
+                    // Затем пытаемся получить полный профиль пользователя через API /me
+                    // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
+                    try
+                    {
+                        _logger?.LogDebug("Fetching full user profile from /me endpoint...");
+                        var userProfile = await _apiService.GetMeAsync(ct);
+                        if (userProfile != null)
+                        {
+                            _logger?.LogDebug("Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
+                                userProfile.Id, userProfile.FirstName, userProfile.LastName, userProfile.Phone);
+                            await SaveOrUpdateUserAsync(response.UserId, userProfile, ct);
+                            
+                            // Проверяем, что данные сохранились
+                            var savedUser = await _dbContext.Users.FindAsync(new object[] { response.UserId }, ct);
+                            if (savedUser != null)
+                            {
+                                _logger?.LogInformation("User profile saved: Id={Id}, Name={Name}, Phone={Phone}", 
+                                    savedUser.Id, savedUser.Name, savedUser.Phone);
+                            }
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("GetMeAsync returned null profile");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Не критично - используем данные из response.User
+                        _logger?.LogWarning(ex, "Failed to fetch full user profile, using data from login response");
+                    }
+            }
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
             Preferences.Set("UserId", response.UserId);
@@ -249,22 +284,25 @@ public class AuthService : IAuthService
             response.User = registeredUser;
 
             // Create welcome notification for the new user
-            var welcomeNotification = new Notification
+            if (userId > 0)
             {
-                UserId = 0, // Бросаем уведомление всем пользователям
-                Title = "Добро пожаловать в YESS!GO",
-                Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
-                NotificationType = NotificationType.InApp,
-                Priority = NotificationPriority.Normal,
-                Status = NotificationStatus.Delivered,
-                CreatedAt = DateTime.UtcNow,
-                DeliveredAt = DateTime.UtcNow
-            };
+                var welcomeNotification = new Notification
+                {
+                    UserId = userId, // Уведомление для нового пользователя
+                    Title = "Добро пожаловать в YESS!GO",
+                    Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
+                    NotificationType = NotificationType.InApp,
+                    Priority = NotificationPriority.Normal,
+                    Status = NotificationStatus.Delivered,
+                    CreatedAt = DateTime.UtcNow,
+                    DeliveredAt = DateTime.UtcNow
+                };
 
-            await _dbContext.Notifications.AddAsync(welcomeNotification, ct);
-            await _dbContext.SaveChangesAsync(ct);
-
-            _logger?.LogInformation("Welcome notification created for all users");
+                await _dbContext.Notifications.AddAsync(welcomeNotification, ct);
+                await _dbContext.SaveChangesAsync(ct);
+                
+                _logger?.LogInformation("Welcome notification created for user {UserId}", userId);
+            }
 
             _logger?.LogInformation("User registered with verification: {Phone}, UserId: {UserId}", request.phone_number, userId);
             return response;
@@ -337,28 +375,99 @@ public class AuthService : IAuthService
         {
             var existingUser = await _dbContext.Users.FindAsync(new object[] { userId }, ct);
 
+            // Если Phone пустой в userDto, пытаемся получить его из токена
+            string? phone = userDto?.Phone;
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                try
+                {
+                    var accessToken = await _authService.GetAccessTokenAsync();
+                    if (!string.IsNullOrWhiteSpace(accessToken))
+                    {
+                        var phoneFromToken = JwtHelper.GetPhone(accessToken);
+                        if (!string.IsNullOrWhiteSpace(phoneFromToken))
+                        {
+                            phone = phoneFromToken;
+                            _logger?.LogDebug("Using phone from token: {Phone}", phone);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to get phone from token");
+                }
+            }
+
+            // Формируем имя из FirstName и LastName (не используем DisplayName, так как он может вернуть телефон)
+            string? fullName = null;
+            if (userDto != null)
+            {
+                var firstName = userDto.FirstName?.Trim() ?? string.Empty;
+                var lastName = userDto.LastName?.Trim() ?? string.Empty;
+                fullName = $"{firstName} {lastName}".Trim();
+                // Если ФИО пустое, оставляем null (не сохраняем пустую строку)
+                if (string.IsNullOrWhiteSpace(fullName))
+                {
+                    fullName = null;
+                }
+                _logger?.LogDebug("SaveOrUpdateUserAsync: FirstName={FirstName}, LastName={LastName}, FullName={FullName}", 
+                    firstName, lastName, fullName ?? "null");
+            }
+
             if (existingUser != null)
             {
                 if (userDto != null)
                 {
-                    existingUser.Name = userDto.DisplayName;
+                    // Всегда обновляем Name если есть реальное ФИО (даже если в БД уже было имя)
+                    if (!string.IsNullOrWhiteSpace(fullName))
+                    {
+                        existingUser.Name = fullName;
+                        _logger?.LogDebug("Updated user Name from FirstName/LastName: {Name}", fullName);
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("Name not updated: FirstName and LastName are empty");
+                    }
+                    
                     existingUser.Email = userDto.Email;
-                    existingUser.Phone = userDto.Phone;
+                    // Обновляем Phone только если он не пустой (либо из userDto, либо из токена)
+                    if (!string.IsNullOrWhiteSpace(phone))
+                    {
+                        existingUser.Phone = phone;
+                        _logger?.LogDebug("Updated user Phone: {Phone}", phone);
+                    }
                     existingUser.CityId = userDto.CityId;
                     existingUser.ReferralCode = userDto.ReferralCode; // Сохраняем реферальный код
                     existingUser.UpdatedAt = DateTime.UtcNow;
+                    
+                    // НЕ нужно явно помечать как Modified - EF автоматически отслеживает изменения отслеживаемых сущностей
+                    // Но проверим, что сущность отслеживается
+                    var entry = _dbContext.Entry(existingUser);
+                    if (entry.State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+                    {
+                        // Если сущность не отслеживается, прикрепляем её
+                        _dbContext.Users.Attach(existingUser);
+                        entry.State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+                        _logger?.LogDebug("Attached and marked user entity as Modified in EF Change Tracker");
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("User entity is already tracked with state: {State}", entry.State);
+                    }
                 }
 
                 existingUser.LastLoginAt = DateTime.UtcNow;
+                _logger?.LogDebug("User updated in local DB: Id={Id}, Name={Name}, Phone={Phone}", 
+                    existingUser.Id, existingUser.Name ?? "empty", existingUser.Phone ?? "empty");
             }
             else if (userDto != null)
             {
                 _dbContext.Users.Add(new User
                 {
                     Id = userId,
-                    Name = userDto.DisplayName,
+                    Name = fullName ?? string.Empty, // Сохраняем ФИО или пустую строку
                     Email = userDto.Email,
-                    Phone = userDto.Phone,
+                    Phone = phone ?? string.Empty, // Используем phone из токена, если он был пустой
                     CityId = userDto.CityId,
                     ReferralCode = userDto.ReferralCode, // Сохраняем реферальный код
                     IsActive = true,
@@ -366,13 +475,205 @@ public class AuthService : IAuthService
                     UpdatedAt = DateTime.UtcNow,
                     LastLoginAt = DateTime.UtcNow
                 });
+                _logger?.LogDebug("Created new user in local DB: Name={Name}, Phone={Phone}", fullName ?? "empty", phone);
             }
 
-            await _dbContext.SaveChangesAsync(ct);
+            // Сохраняем изменения в БД
+            var savedChanges = await _dbContext.SaveChangesAsync(ct);
+            _logger?.LogInformation("SaveOrUpdateUserAsync: Saved {Count} changes to database", savedChanges);
+            
+            // Отслеживаем изменения для отладки
+            var changedEntries = _dbContext.ChangeTracker.Entries()
+                .Where(e => e.State != Microsoft.EntityFrameworkCore.EntityState.Unchanged)
+                .ToList();
+            
+            if (changedEntries.Any())
+            {
+                _logger?.LogWarning("SaveOrUpdateUserAsync: After SaveChangesAsync, {Count} entities still have pending changes!", changedEntries.Count);
+            }
+            
+            // Перезагружаем сущность из БД, чтобы убедиться, что изменения сохранены
+            // Сначала отключаем отслеживание, если сущность была найдена
+            if (existingUser != null)
+            {
+                // Если сущность отслеживается, отключаем отслеживание
+                var entry = _dbContext.Entry(existingUser);
+                if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
+                {
+                    entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                }
+            }
+            var verifyUser = await _dbContext.Users.FindAsync(new object[] { userId }, ct);
+            if (verifyUser != null)
+            {
+                _logger?.LogInformation("SaveOrUpdateUserAsync: ✅ Verified saved user - Id={Id}, Name='{Name}', Phone='{Phone}'", 
+                    verifyUser.Id, verifyUser.Name ?? "empty", verifyUser.Phone ?? "empty");
+            }
+            else
+            {
+                _logger?.LogError("SaveOrUpdateUserAsync: ❌ User not found after save! UserId={UserId}", userId);
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to save user to local DB");
+        }
+    }
+
+    /// <summary>
+    /// Получить пользователя из локальной SQLite БД
+    /// </summary>
+    public async Task<User?> GetLocalUserAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            // Получаем первого активного пользователя из локальной БД
+            var localUser = await _dbContext.Users
+                .Where(u => u.IsActive && !u.IsBlocked)
+                .OrderByDescending(u => u.LastLoginAt ?? u.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (localUser != null)
+            {
+                _logger?.LogInformation("Local user found: ID={UserId}, Phone={Phone}", localUser.Id, localUser.Phone);
+            }
+            else
+            {
+                _logger?.LogInformation("No local user found in SQLite database");
+            }
+
+            return localUser;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error getting local user from SQLite database");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Автоматический вход, если пользователь есть на сервере (есть токены), но нет в локальной БД
+    /// </summary>
+    public async Task<bool> AutoLoginIfNoLocalUserAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            // Проверяем, есть ли уже локальный пользователь
+            var localUser = await GetLocalUserAsync(ct);
+            if (localUser != null)
+            {
+                _logger?.LogInformation("Local user already exists (ID={UserId}), skipping auto-login", localUser.Id);
+                return true;
+            }
+
+            // Проверяем, есть ли refresh token (пользователь есть на сервере)
+            var refreshToken = await _authService.GetRefreshTokenAsync();
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                _logger?.LogInformation("No refresh token found, cannot auto-login");
+                return false;
+            }
+
+            // Пробуем обновить токены
+            var tokenRefreshed = await RefreshTokenAsync(ct);
+            if (!tokenRefreshed)
+            {
+                _logger?.LogWarning("Failed to refresh token during auto-login");
+                return false;
+            }
+
+            // Получаем информацию о пользователе из токена
+            try
+            {
+                var accessToken = await _authService.GetAccessTokenAsync();
+                var userIdFromToken = JwtHelper.GetUserId(accessToken);
+                if (userIdFromToken == null || userIdFromToken <= 0)
+                {
+                    _logger?.LogWarning("Cannot get user ID from token");
+                    return false;
+                }
+
+                var phoneFromToken = JwtHelper.GetPhone(accessToken);
+                if (string.IsNullOrWhiteSpace(phoneFromToken))
+                {
+                    _logger?.LogWarning("Cannot get phone from token");
+                    phoneFromToken = "Unknown";
+                }
+
+                // Сохраняем пользователя локально с минимальными данными из токена
+                // Более полные данные будут обновлены при следующем запросе профиля или при следующем входе
+                var tempUserDto = new UserDto
+                {
+                    Id = userIdFromToken.Value,
+                    Phone = phoneFromToken,
+                    Email = null,
+                    FirstName = string.Empty,
+                    LastName = string.Empty,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await SaveOrUpdateUserAsync(userIdFromToken.Value, tempUserDto, ct);
+                
+                // Сохраняем UserId в Preferences для совместимости
+                Preferences.Set("UserId", userIdFromToken.Value);
+                
+                _logger?.LogInformation("Auto-login successful, user saved to local DB: UserId={UserId}, Phone={Phone}", 
+                    userIdFromToken, phoneFromToken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error during auto-login: failed to get user info from token");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during auto-login check");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Получить профиль пользователя из API
+    /// </summary>
+    public async Task<UserDto?> GetUserProfileAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            _logger?.LogDebug("GetUserProfileAsync: Fetching profile from API...");
+            var userProfile = await _apiService.GetMeAsync(ct);
+            if (userProfile != null && userProfile.Id > 0)
+            {
+                _logger?.LogInformation("GetUserProfileAsync: Received profile - Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
+                    userProfile.Id, userProfile.FirstName ?? "null", userProfile.LastName ?? "null", userProfile.Phone ?? "null");
+                
+                // Сохраняем обновленный профиль в локальную БД
+                await SaveOrUpdateUserAsync(userProfile.Id, userProfile, ct);
+                
+                // Проверяем, что данные сохранились в БД
+                var savedUser = await _dbContext.Users.FindAsync(new object[] { userProfile.Id }, ct);
+                if (savedUser != null)
+                {
+                    _logger?.LogInformation("GetUserProfileAsync: ✅ Profile saved to local DB - Id={Id}, Name={Name}, Phone={Phone}", 
+                        savedUser.Id, savedUser.Name ?? "empty", savedUser.Phone ?? "empty");
+                }
+                
+                return userProfile;
+            }
+            _logger?.LogWarning("GetUserProfileAsync: API returned null or invalid profile");
+            return null;
+        }
+        catch (UnauthorizedException ex)
+        {
+            _logger?.LogWarning(ex, "GetUserProfileAsync: ❌ Unauthorized - tokens may be expired or invalid. Message: {Message}", ex.Message);
+            // Токены истекли или недействительны - не критично, просто не сможем загрузить профиль
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "GetUserProfileAsync: ❌ Failed to load user profile from API: {Message}", ex.Message);
+            return null;
         }
     }
 }

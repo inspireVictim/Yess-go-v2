@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
@@ -66,6 +67,27 @@ public static class MauiProgram
         var app = builder.Build();
         Services = app.Services;
 
+        // Инициализируем базу данных при запуске приложения
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var logger = scope.ServiceProvider.GetService<ILogger<DatabaseInitializer>>();
+                var initializer = new DatabaseInitializer(dbContext, logger);
+                
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing database...");
+                await initializer.InitializeAsync();
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] ❌ Failed to initialize database: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] StackTrace: {ex.StackTrace}");
+            }
+        });
+
         // Запускаем сервис периодического обновления баланса
         try
         {
@@ -114,7 +136,8 @@ public static class MauiProgram
             return connectionString;
 
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, "yessgo.db");
-        return $"Data Source={dbPath}";
+        // Включаем поддержку внешних ключей в SQLite
+        return $"Data Source={dbPath};Foreign Keys=True";
     }
 
     private static string GetDefaultApiBaseUrl()
@@ -214,6 +237,16 @@ public static class MauiProgram
         })
         .AddHttpMessageHandler<AuthHandler>()
         .AddHttpMessageHandler<LoggingHandler>();
+
+        // Отдельный HttpClient для refresh token запросов (без AuthHandler, чтобы избежать бесконечного цикла)
+        services.AddHttpClient("RefreshTokenClient", (sp, client) =>
+        {
+            var settings = sp.GetRequiredService<AppSettings>();
+            client.BaseAddress = new Uri(settings.Api.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(settings.Api.RequestTimeoutSeconds);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .AddHttpMessageHandler<LoggingHandler>(); // Только LoggingHandler, без AuthHandler
 
         services.AddHttpClient<IAuthApiService, AuthApiService>("ApiClient");
         services.AddHttpClient<IPartnersApiService, PartnersApiService>("ApiClient");

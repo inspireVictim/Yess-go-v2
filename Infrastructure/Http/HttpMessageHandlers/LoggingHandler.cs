@@ -30,11 +30,19 @@ namespace YessGoFront.Infrastructure.Http.HttpMessageHandlers
                 request.Method, request.RequestUri);
 
             // Логируем тело запроса, если оно есть
+            // Все запросы теперь используют JSON, поэтому можно безопасно читать тело
             if (request.Content != null)
             {
-                var requestBody = await request.Content.ReadAsStringAsync();
-                if (!string.IsNullOrWhiteSpace(requestBody))
-                    _logger.LogInformation("📤 Request Body: {Body}", requestBody);
+                try
+                {
+                    var requestBody = await request.Content.ReadAsStringAsync();
+                    if (!string.IsNullOrWhiteSpace(requestBody))
+                        _logger.LogInformation("📤 Request Body: {Body}", requestBody);
+                }
+                catch
+                {
+                    // Игнорируем ошибки чтения тела запроса
+                }
             }
 
             try

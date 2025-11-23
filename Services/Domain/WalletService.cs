@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using YessGoFront.Infrastructure.Auth;
 using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Models;
 using YessGoFront.Services.Api;
@@ -11,13 +12,16 @@ namespace YessGoFront.Services.Domain;
 public class WalletService : IWalletService
 {
     private readonly IWalletApiService _apiService;
+    private readonly IAuthenticationService _authService;
     private readonly ILogger<WalletService>? _logger;
 
     public WalletService(
         IWalletApiService apiService,
+        IAuthenticationService authService,
         ILogger<WalletService>? logger = null)
     {
         _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _logger = logger;
     }
 
@@ -25,6 +29,13 @@ public class WalletService : IWalletService
     {
         try
         {
+            // Если пользователь не аутентифицирован — не выполняем защищённый запрос
+            if (!await _authService.IsAuthenticatedAsync())
+            {
+                _logger?.LogWarning("GetBalanceAsync called while user is not authenticated. Skipping API call.");
+                return 0m;
+            }
+
             _logger?.LogDebug("Getting wallet balance");
             return await _apiService.GetBalanceAsync(ct);
         }
@@ -46,6 +57,13 @@ public class WalletService : IWalletService
     {
         try
         {
+            // Если пользователь не аутентифицирован — не выполняем защищённый запрос
+            if (!await _authService.IsAuthenticatedAsync())
+            {
+                _logger?.LogWarning("GetTransactionHistoryAsync called while user is not authenticated. Skipping API call.");
+                return Array.Empty<PurchaseDto>();
+            }
+
             _logger?.LogDebug("Getting transaction history, page: {Page}, pageSize: {PageSize}", 
                 page, pageSize);
             return await _apiService.GetHistoryAsync(page, pageSize, ct);
@@ -69,6 +87,17 @@ public class WalletService : IWalletService
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Id cannot be empty", nameof(id));
+
+            // Если пользователь не аутентифицирован — не выполняем защищённый запрос
+            if (!await _authService.IsAuthenticatedAsync())
+            {
+                _logger?.LogWarning("GetTransactionByIdAsync called while user is not authenticated. Skipping API call.");
+                // Возвращаем минимальный DTO без обращения к API
+                return new PurchaseDto
+                {
+                    Id = id
+                };
+            }
 
             _logger?.LogDebug("Getting transaction by id: {Id}", id);
             return await _apiService.GetTransactionByIdAsync(id, ct);

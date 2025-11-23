@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using YessGoFront.Infrastructure.Exceptions;
+using YessGoFront.Infrastructure.Ui;
 using YessGoFront.Models;
 using YessGoFront.Services.Domain;
 
@@ -75,6 +77,13 @@ public partial class TransactionsViewModel : ObservableObject
 
             await LoadPageAsync(_currentPage, reset: true);
         }
+        catch (UnauthorizedException ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            // При потере авторизации отправляем пользователя на экран логина, не падая
+            await AppUiHelper.NavigateToLoginPageAsync();
+        }
         catch (Exception ex)
         {
             HasError = true;
@@ -96,6 +105,13 @@ public partial class TransactionsViewModel : ObservableObject
             IsBusy = true;
             _currentPage++;
             await LoadPageAsync(_currentPage, reset: false);
+        }
+        catch (UnauthorizedException ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            HasMoreItems = false;
+            await AppUiHelper.NavigateToLoginPageAsync();
         }
         catch (Exception ex)
         {
@@ -121,6 +137,12 @@ public partial class TransactionsViewModel : ObservableObject
             Groups.Clear();
             HasMoreItems = true;
             await LoadPageAsync(_currentPage, reset: true);
+        }
+        catch (UnauthorizedException ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            await AppUiHelper.NavigateToLoginPageAsync();
         }
         finally
         {

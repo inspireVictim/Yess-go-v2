@@ -28,29 +28,31 @@ namespace YessGoFront.Services.Api
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
         {
-            var formData = new List<KeyValuePair<string, string>>
-            {
-                new("username", request.Username),
-                new("password", request.Password)
-            };
-
-            var formContent = new FormUrlEncodedContent(formData);
-            formContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
-
             try
             {
-                var uri = BuildUri(ApiEndpoints.AuthEndpoints.Login);
-                Logger?.LogDebug("➡️ POST {Url} (OAuth2 login)", uri);
+                // Используем JSON для логина (backend принимает JSON на /api/v1/auth/login)
+                var loginDto = new UserLoginDto
+                {
+                    Phone = request.Username,  // Backend ожидает поле "phone" в JSON
+                    Password = request.Password
+                };
 
-                var response = await HttpClient.PostAsync(uri, formContent, ct);
+                // Используем базовый метод PostAsync, который отправляет JSON
+                // Endpoint: /api/v1/auth/login (без /json суффикса)
+                var tokenResponse = await PostAsync<UserLoginDto, TokenResponseDto>(
+                    ApiEndpoints.AuthEndpoints.Login,
+                    loginDto,
+                    ct
+                );
 
-                if (!response.IsSuccessStatusCode)
-                    throw await MapToApiExceptionAsync(response, "Ошибка входа");
-
-                var json = await response.Content.ReadAsStringAsync(ct);
-                Logger?.LogDebug("Login response JSON: {Json}", json);
-                var authResponse = JsonSerializer.Deserialize<AuthResponse>(json, JsonOptions)
-                       ?? throw new ApiException("Ошибка при разборе ответа сервера");
+                // Конвертируем TokenResponseDto в AuthResponse
+                var authResponse = new AuthResponse
+                {
+                    AccessToken = tokenResponse.AccessToken,
+                    RefreshToken = tokenResponse.RefreshToken,
+                    TokenType = tokenResponse.TokenType ?? "bearer"
+                };
+                
                 Logger?.LogInformation("Login successful. AccessToken: {HasAccess}, RefreshToken: {HasRefresh}", 
                     !string.IsNullOrEmpty(authResponse.AccessToken), 
                     !string.IsNullOrEmpty(authResponse.RefreshToken));
@@ -60,6 +62,18 @@ namespace YessGoFront.Services.Api
             {
                 throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
             }
+        }
+
+        /// <summary>
+        /// DTO для отправки логина в JSON формате
+        /// </summary>
+        private class UserLoginDto
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("phone")]
+            public string Phone { get; set; } = string.Empty;
+            
+            [System.Text.Json.Serialization.JsonPropertyName("password")]
+            public string Password { get; set; } = string.Empty;
         }
 
 
@@ -138,6 +152,24 @@ namespace YessGoFront.Services.Api
 
 
         // ----------------- Helpers -----------------
+
+        /// <summary>
+        /// Промежуточный класс для десериализации ответа от backend (camelCase)
+        /// </summary>
+        private class TokenResponseDto
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("accessToken")]
+            public string AccessToken { get; set; } = string.Empty;
+            
+            [System.Text.Json.Serialization.JsonPropertyName("refreshToken")]
+            public string RefreshToken { get; set; } = string.Empty;
+            
+            [System.Text.Json.Serialization.JsonPropertyName("tokenType")]
+            public string? TokenType { get; set; }
+            
+            [System.Text.Json.Serialization.JsonPropertyName("expiresIn")]
+            public int ExpiresIn { get; set; }
+        }
 
         private static bool IsNetworkError(Exception ex) =>
             ex is HttpRequestException

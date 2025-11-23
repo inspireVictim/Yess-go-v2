@@ -174,8 +174,13 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task<bool> IsAuthenticatedAsync()
     {
-        var token = await GetAccessTokenAsync();
-        return !string.IsNullOrWhiteSpace(token);
+        // Пользователь считается аутентифицированным, если есть access_token ИЛИ refresh_token
+        var accessToken = await GetAccessTokenAsync();
+        if (!string.IsNullOrWhiteSpace(accessToken))
+            return true;
+
+        var refreshToken = await GetRefreshTokenAsync();
+        return !string.IsNullOrWhiteSpace(refreshToken);
     }
 }
 

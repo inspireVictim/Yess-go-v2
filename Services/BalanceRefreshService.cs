@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Services.Domain;
+using YessGoFront.Infrastructure.Exceptions;
+using YessGoFront.Infrastructure.Ui;
 
 namespace YessGoFront.Services;
 
@@ -68,13 +70,35 @@ public class BalanceRefreshService : IDisposable
         {
             // Создаем scope для получения Scoped сервисов
             using var scope = _serviceScopeFactory.CreateScope();
+
+            // Не запускаем обновление, если пользователь не аутентифицирован
+            var authService = scope.ServiceProvider.GetService<IAuthService>();
+            if (authService != null)
+            {
+                var isAuthenticated = await authService.IsAuthenticatedAsync();
+                if (!isAuthenticated)
+                {
+                    _logger?.LogDebug("User is not authenticated, skipping balance refresh");
+                    return;
+                }
+            }
+
             var walletService = scope.ServiceProvider.GetService<IWalletService>();
             
             if (walletService != null)
             {
-                var balance = await walletService.GetBalanceAsync();
-                BalanceStore.Instance.Balance = balance;
-                _logger?.LogDebug("Balance refreshed: {Balance}", balance);
+                try
+                {
+                    var balance = await walletService.GetBalanceAsync();
+                    BalanceStore.Instance.Balance = balance;
+                    _logger?.LogDebug("Balance refreshed: {Balance}", balance);
+                }
+                catch (UnauthorizedException ex)
+                {
+                    _logger?.LogWarning(ex, "Unauthorized while refreshing balance. Navigating to login page.");
+                    // Переходим на страницу логина, не давая приложению упасть
+                    await AppUiHelper.NavigateToLoginPageAsync();
+                }
             }
             else
             {

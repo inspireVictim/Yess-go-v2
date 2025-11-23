@@ -228,7 +228,11 @@ namespace YessGoFront.Views
                     if (_referralCodeLabel != null)
                         _referralCodeLabel.Text = referralCode;
                     if (_referralLinkLabel != null)
-                        _referralLinkLabel.Text = $"https://yessgo.app/register?ref={referralCode}";
+                    {
+                        // URL-кодируем реферальный код для безопасной передачи в ссылке
+                        var encodedCode = Uri.EscapeDataString(referralCode);
+                        _referralLinkLabel.Text = $"https://yessgo.app/register?ref={encodedCode}";
+                    }
                     System.Diagnostics.Debug.WriteLine($"[ReferalPage] ✅ ReferralCode установлен: {referralCode}");
                 }
                 else
@@ -295,7 +299,39 @@ namespace YessGoFront.Views
 
         private async void OnBackTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("..");
+            try
+            {
+                // Отключаем кнопку на время навигации, чтобы избежать двойных нажатий
+                if (BackButton != null)
+                {
+                    BackButton.IsEnabled = false;
+                }
+                
+                // Возвращаемся на страницу More, откуда обычно открывается реферальная страница
+                await Shell.Current.GoToAsync("//main/more", animate: true);
+                System.Diagnostics.Debug.WriteLine("[ReferalPage] Успешно вернулись на страницу More");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Ошибка навигации: {ex.Message}");
+                // Попытка использовать альтернативный маршрут
+                try
+                {
+                    await Shell.Current.GoToAsync("..", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ReferalPage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+            finally
+            {
+                // Включаем кнопку обратно
+                if (BackButton != null)
+                {
+                    BackButton.IsEnabled = true;
+                }
+            }
         }
 
         private async void OnCopyCodeClicked(object? sender, EventArgs e)

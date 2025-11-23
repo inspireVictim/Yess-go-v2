@@ -12,17 +12,16 @@
         <!-- Верхняя панель -->
         <Grid Padding="16,44,16,8" BackgroundColor="#0F6B53">
             <Grid ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
-                <Border WidthRequest="36" HeightRequest="36"
-                        StrokeThickness="0"
-                        BackgroundColor="#FFFFFF"
-                        StrokeShape="RoundRectangle8">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnBackTapped" />
-                    </Border.GestureRecognizers>
-                    <Image Source="back_arrow_icon.png" 
-                           Aspect="AspectFit" 
-                           Margin="8" />
-                </Border>
+                <Button x:Name="BackButton"
+                        WidthRequest="40" 
+                        HeightRequest="40"
+                        CornerRadius="20"
+                        BackgroundColor="#FFFFFF22"
+                        TextColor="White"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        Text="←"
+                        Clicked="OnBackTapped"/>
 
                 <Label Grid.Column="1"
                        Text="Реферальная ссылка"

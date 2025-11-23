@@ -7,10 +7,33 @@ using YessGoFront.Services;
 
 namespace YessGoFront.Views
 {
+    [QueryProperty(nameof(ReferralCode), "ref")]
     public partial class RegisterPage : ContentPage
     {
         private readonly RegisterViewModel _viewModel;
         private bool _acknowledged;
+        private string? _pendingReferralCode; // Временное хранение реферального кода до инициализации ViewModel
+        
+        // Реферальный код из URL параметра
+        public string? ReferralCode
+        {
+            get => _viewModel?.ReferralCode;
+            set
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    _pendingReferralCode = value;
+                    System.Diagnostics.Debug.WriteLine($"[RegisterPage] Referral code from URL: {value}");
+                    
+                    // Если ViewModel уже инициализирован, устанавливаем значение сразу
+                    if (_viewModel != null)
+                    {
+                        _viewModel.ReferralCode = value;
+                        _pendingReferralCode = null;
+                    }
+                }
+            }
+        }
 
 
         //Проверка, что пользователь согласен с условиями
@@ -37,6 +60,14 @@ namespace YessGoFront.Views
 
             // Подписываемся на событие успешной регистрации
             _viewModel.OnRegisterSuccess += OnRegisterSuccess;
+            
+            // Если реферальный код был установлен до инициализации ViewModel, устанавливаем его сейчас
+            if (!string.IsNullOrWhiteSpace(_pendingReferralCode))
+            {
+                _viewModel.ReferralCode = _pendingReferralCode;
+                _pendingReferralCode = null;
+                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Referral code applied to ViewModel: {_viewModel.ReferralCode}");
+            }
         }
 
         private async Task OnRegisterSuccess(Services.Api.AuthResponse response)

@@ -33,6 +33,9 @@ public partial class RegisterViewModel : ObservableObject
     [ObservableProperty] private string? successMessage;
     [ObservableProperty] private string? displayedVerificationCode;
     
+    // Реферальный код из URL
+    [ObservableProperty] private string? referralCode;
+    
     // Флаг успешной регистрации - предотвращает повторный вызов verify-code
     [ObservableProperty] private bool isRegistrationSuccessful = false;
 
@@ -207,7 +210,8 @@ public partial class RegisterViewModel : ObservableObject
                 code = VerificationCode,
                 password = Password,
                 first_name = FirstName.Trim(),
-                last_name = LastName.Trim()
+                last_name = LastName.Trim(),
+                referral_code = !string.IsNullOrWhiteSpace(ReferralCode) ? ReferralCode.Trim() : null
             };
 
             _logger?.LogInformation("Attempting registration for phone: {Phone}", normalizedPhone);

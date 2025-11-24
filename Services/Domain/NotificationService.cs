@@ -14,7 +14,7 @@ namespace YessGoFront.Services.Domain;
 
 /// <summary>
 /// Реализация сервиса уведомлений
-/// Получает данные из API и кэширует в локальной БД
+/// Получает данные напрямую из API (PostgreSQL)
 /// </summary>
 public class NotificationService : INotificationService
 {
@@ -44,88 +44,16 @@ public class NotificationService : INotificationService
             _logger?.LogDebug("Getting notifications for user {UserId}, page: {Page}, pageSize: {PageSize}", 
                 userId, page, pageSize);
             
-            // Сначала пытаемся получить данные из API (PostgreSQL)
-            try
-            {
-                var apiNotifications = await _apiService.GetNotificationsAsync(page, pageSize, cancellationToken);
-                
-                if (apiNotifications.Any())
-                {
-                    _logger?.LogInformation("Received {Count} notifications from API, syncing to local DB", apiNotifications.Count());
-                    
-                    // Синхронизируем с локальной БД
-                    await SyncNotificationsToLocalDbAsync(userId, apiNotifications, cancellationToken);
-                    
-                    // Возвращаем из локальной БД (после синхронизации)
-                    return await _dbContext.Notifications
-                        .Where(n => n.UserId == userId)
-                        .OrderByDescending(n => n.CreatedAt)
-                        .Skip((page - 1) * pageSize)
-                        .Take(pageSize)
-                        .ToListAsync(cancellationToken);
-                }
-            }
-            catch (Exception apiEx)
-            {
-                _logger?.LogWarning(apiEx, "Failed to fetch notifications from API, falling back to local DB");
-            }
+            // Получаем данные напрямую из API (PostgreSQL)
+            var apiNotifications = await _apiService.GetNotificationsAsync(page, pageSize, cancellationToken);
             
-            // Если API недоступен или вернул пустой результат, используем локальную БД
-            _logger?.LogDebug("Using local DB for notifications");
-            return await _dbContext.Notifications
-                .Where(n => n.UserId == userId)
-                .OrderByDescending(n => n.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync(cancellationToken);
+            _logger?.LogInformation("Received {Count} notifications from API", apiNotifications.Count());
+            return apiNotifications;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error getting notifications for user {UserId}, page: {Page}", userId, page);
             throw new NetworkException("Не удалось загрузить уведомления", ex);
-        }
-    }
-    
-    private async Task SyncNotificationsToLocalDbAsync(
-        int userId, 
-        IEnumerable<Notification> apiNotifications, 
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            foreach (var apiNotification in apiNotifications)
-            {
-                // Проверяем, существует ли уже это уведомление в локальной БД
-                var existing = await _dbContext.Notifications
-                    .FirstOrDefaultAsync(n => n.Id == apiNotification.Id && n.UserId == userId, cancellationToken);
-                
-                if (existing == null)
-                {
-                    // Создаём новое уведомление
-                    apiNotification.UserId = userId; // Убеждаемся, что UserId правильный
-                    await _dbContext.Notifications.AddAsync(apiNotification, cancellationToken);
-                }
-                else
-                {
-                    // Обновляем существующее уведомление
-                    existing.Title = apiNotification.Title;
-                    existing.Message = apiNotification.Message;
-                    existing.NotificationType = apiNotification.NotificationType;
-                    existing.Priority = apiNotification.Priority;
-                    existing.Status = apiNotification.Status;
-                    existing.ReadAt = apiNotification.ReadAt;
-                    existing.DeliveredAt = apiNotification.DeliveredAt;
-                    existing.Data = apiNotification.Data;
-                }
-            }
-            
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            _logger?.LogDebug("Synced {Count} notifications to local DB", apiNotifications.Count());
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error syncing notifications to local DB");
-            // Не пробрасываем исключение, чтобы не прервать основной поток
         }
     }
 
@@ -135,25 +63,9 @@ public class NotificationService : INotificationService
         {
             _logger?.LogDebug("Marking notification {NotificationId} as read", notificationId);
             
-            // Сначала обновляем в API
-            try
-            {
-                await _apiService.MarkAsReadAsync(notificationId, cancellationToken);
-            }
-            catch (Exception apiEx)
-            {
-                _logger?.LogWarning(apiEx, "Failed to mark notification as read in API, updating local DB only");
-            }
-            
-            // Затем обновляем в локальной БД
-            var notification = await _dbContext.Notifications
-                .FirstOrDefaultAsync(n => n.Id == notificationId, cancellationToken);
-            if (notification != null)
-            {
-                notification.ReadAt = DateTime.UtcNow;
-                notification.Status = NotificationStatus.Read;
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
+            // Обновляем только в API (PostgreSQL)
+            await _apiService.MarkAsReadAsync(notificationId, cancellationToken);
+            _logger?.LogInformation("Notification {NotificationId} marked as read", notificationId);
         }
         catch (Exception ex)
         {
@@ -168,28 +80,9 @@ public class NotificationService : INotificationService
         {
             _logger?.LogDebug("Marking all notifications as read for user {UserId}", userId);
             
-            // Сначала обновляем в API
-            try
-            {
-                await _apiService.MarkAllAsReadAsync(userId, cancellationToken);
-            }
-            catch (Exception apiEx)
-            {
-                _logger?.LogWarning(apiEx, "Failed to mark all notifications as read in API, updating local DB only");
-            }
-            
-            // Затем обновляем в локальной БД
-            var unreadNotifications = await _dbContext.Notifications
-                .Where(n => n.UserId == userId && n.ReadAt == null)
-                .ToListAsync(cancellationToken);
-
-            foreach (var notification in unreadNotifications)
-            {
-                notification.ReadAt = DateTime.UtcNow;
-                notification.Status = NotificationStatus.Read;
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            // Обновляем только в API (PostgreSQL)
+            await _apiService.MarkAllAsReadAsync(userId, cancellationToken);
+            _logger?.LogInformation("All notifications for user {UserId} marked as read", userId);
         }
         catch (Exception ex)
         {
@@ -204,21 +97,10 @@ public class NotificationService : INotificationService
         {
             _logger?.LogDebug("Getting unread notifications count for user {UserId}", userId);
             
-            // Сначала пытаемся получить из API
-            try
-            {
-                var apiCount = await _apiService.GetUnreadCountAsync(userId, cancellationToken);
-                _logger?.LogDebug("Unread count from API: {Count}", apiCount);
-                return apiCount;
-            }
-            catch (Exception apiEx)
-            {
-                _logger?.LogWarning(apiEx, "Failed to get unread count from API, using local DB");
-            }
-            
-            // Если API недоступен, используем локальную БД
-            return await _dbContext.Notifications
-                .CountAsync(n => n.UserId == userId && n.ReadAt == null, cancellationToken);
+            // Получаем количество напрямую из API (PostgreSQL)
+            var apiCount = await _apiService.GetUnreadCountAsync(userId, cancellationToken);
+            _logger?.LogDebug("Unread count from API: {Count}", apiCount);
+            return apiCount;
         }
         catch (Exception ex)
         {

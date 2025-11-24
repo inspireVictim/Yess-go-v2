@@ -41,6 +41,7 @@ public partial class TransactionsViewModel : ObservableObject
 
     private int _currentPage = 1;
     private const int PageSize = 20;
+    private List<PurchaseDto> _allLoadedTransactions = new(); // Храним все загруженные транзакции
 
     public IAsyncRelayCommand LoadTransactionsCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
@@ -57,7 +58,12 @@ public partial class TransactionsViewModel : ObservableObject
 
     partial void OnCurrentFilterChanged(TransactionsFilterType value)
     {
-        _ = RefreshAsync();
+        // При изменении фильтра пересобираем группы из уже загруженных данных
+        // Не загружаем заново с сервера, просто применяем фильтр к уже загруженным данным
+        if (_allLoadedTransactions.Any())
+        {
+            RebuildGroupsFromLoadedTransactions();
+        }
     }
 
     private async Task LoadInitialAsync()
@@ -161,22 +167,12 @@ public partial class TransactionsViewModel : ObservableObject
             return;
         }
 
-        // Фильтруем загруженные данные
-        var filtered = items.Where(FilterByType).OrderByDescending(x => x.CreatedAt).ToList();
-
-        // Если после фильтрации нет данных, но были загружены данные - возможно есть еще страницы
-        // Но если на первой странице после фильтрации нет данных - значит нет данных вообще
-        if (!filtered.Any())
+        // Сохраняем все загруженные транзакции
+        if (reset)
         {
-            // Если загрузили меньше чем pageSize, значит это последняя страница
-            if (items.Count < PageSize)
-            {
-                HasMoreItems = false;
-            }
-            // Если загрузили полную страницу, но все отфильтровались - продолжаем загрузку
-            // (это может быть проблемой, но для простоты оставим так)
-            return;
+            _allLoadedTransactions.Clear();
         }
+        _allLoadedTransactions.AddRange(items);
 
         // Если загрузили меньше чем pageSize, значит это последняя страница
         if (items.Count < PageSize)
@@ -184,6 +180,22 @@ public partial class TransactionsViewModel : ObservableObject
             HasMoreItems = false;
         }
 
+        // Пересобираем группы из всех загруженных транзакций с учетом текущего фильтра
+        RebuildGroupsFromLoadedTransactions();
+    }
+
+    private void RebuildGroupsFromLoadedTransactions()
+    {
+        // Очищаем группы
+        Groups.Clear();
+
+        // Фильтруем все загруженные транзакции по текущему фильтру
+        var filtered = _allLoadedTransactions
+            .Where(FilterByType)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToList();
+
+        // Группируем по датам
         foreach (var item in filtered)
         {
             var date = item.CreatedAt.Date;
@@ -198,7 +210,11 @@ public partial class TransactionsViewModel : ObservableObject
                 Groups.Add(group);
             }
 
-            group.Items.Add(item);
+            // Проверяем, нет ли уже этой транзакции в группе (избегаем дубликатов)
+            if (!group.Items.Any(i => i.Id == item.Id))
+            {
+                group.Items.Add(item);
+            }
         }
     }
 

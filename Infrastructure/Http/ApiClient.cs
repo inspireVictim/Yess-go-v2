@@ -171,6 +171,43 @@ public abstract class ApiClient
         }
     }
 
+    protected async Task<TResponse> PatchAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("PATCH {Url}", uri);
+
+            var content = JsonContent.Create(request, options: JsonOptions);
+            var response = await HttpClient.PatchAsync(uri, content, ct);
+            await EnsureSuccessStatusCode(response);
+
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+                   ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
+    protected async Task PatchAsync<TRequest>(string endpoint, TRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogDebug("PATCH {Url}", uri);
+
+            var content = JsonContent.Create(request, options: JsonOptions);
+            var response = await HttpClient.PatchAsync(uri, content, ct);
+            await EnsureSuccessStatusCode(response);
+        }
+        catch (Exception ex) when (NetworkException.IsNetworkError(ex))
+        {
+            throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+        }
+    }
+
     protected async Task DeleteAsync(string endpoint, CancellationToken ct = default)
     {
         try

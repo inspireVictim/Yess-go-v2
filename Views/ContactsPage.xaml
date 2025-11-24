@@ -89,13 +89,30 @@
                        HasShadow="True" 
                        Padding="20">
                     <VerticalStackLayout Spacing="16">
-                        <Label Text="📍 Адрес"
+                        <Label Text="📍 Юридический адрес"
                                TextColor="#0F6B53"
                                FontSize="16"
                                FontAttributes="Bold"/>
-                        <Label Text="г. Бишкек, Кыргызстан"
+                        <Label Text="[Указать полный юридический адрес, не 'до востребования']"
                                TextColor="#6B7280"
-                               FontSize="14"/>
+                               FontSize="14"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Frame>
+                
+                <Frame BackgroundColor="White" 
+                       CornerRadius="16" 
+                       HasShadow="True" 
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="📍 Фактический адрес"
+                               TextColor="#0F6B53"
+                               FontSize="16"
+                               FontAttributes="Bold"/>
+                        <Label Text="[Указать полный фактический адрес]"
+                               TextColor="#6B7280"
+                               FontSize="14"
+                               LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Frame>
                 

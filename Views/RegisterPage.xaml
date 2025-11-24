@@ -163,6 +163,27 @@
                         </Grid>
                     </Border>
 
+                    <!-- Текст с ссылкой на политику конфиденциальности -->
+                    <Label x:Name="PolicyLinkLabel" 
+                           FontSize="13" 
+                           TextColor="#666666"
+                           Margin="0,0,0,8">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Я согласен(а) с " />
+                                <Span x:Name="PolicyLinkSpan" 
+                                      Text="политикой конфиденциальности" 
+                                      TextColor="#007A51"
+                                      TextDecorations="Underline"
+                                      FontAttributes="Bold">
+                                    <Span.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnPolicyLinkTapped"/>
+                                    </Span.GestureRecognizers>
+                                </Span>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+
                     <HorizontalStackLayout Spacing="8">
                         <CheckBox x:Name="acknowledged" Color="#007A51" IsChecked="{Binding IsPolicyAcknowledged}"/>
                         <Label Text="Ознакомлен(а)" VerticalOptions="Center"/>

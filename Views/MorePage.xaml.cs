@@ -114,6 +114,90 @@ namespace YessGoFront.Views
             }
         }
 
+        // ✅ Обработчик тапа по "Публичная оферта"
+        private async void OnPublicOfferTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(PublicOfferPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к PublicOfferPage: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("PublicOfferPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+        }
+
+        // ✅ Обработчик тапа по "Политика возврата"
+        private async void OnRefundPolicyTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(RefundPolicyPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к RefundPolicyPage: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("RefundPolicyPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+        }
+
+        // ✅ Обработчик тапа по "Безопасность платежей"
+        private async void OnPaymentSecurityTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(PaymentSecurityPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к PaymentSecurityPage: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("PaymentSecurityPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+        }
+
+        // ✅ Обработчик тапа по "Условия доставки"
+        private async void OnDeliveryTermsTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(DeliveryTermsPage), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к DeliveryTermsPage: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("DeliveryTermsPage", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+        }
+
         // ✅ Обработчик тапа по "Контакты"
         private async void OnContactsTapped(object? sender, EventArgs e)
         {

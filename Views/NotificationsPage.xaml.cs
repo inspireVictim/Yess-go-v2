@@ -60,44 +60,39 @@ public partial class NotificationsPage : ContentPage
     {
         try
         {
-            // Show loading indicator
-            _viewModel.IsBusy = true;
-            
             // Get current user ID
             var userId = await _authService.GetCurrentUserIdAsync();
             if (userId == null)
             {
-                Console.WriteLine("User is not authenticated");
+                System.Diagnostics.Debug.WriteLine("[NotificationsPage] User is not authenticated");
+                _viewModel.HasError = true;
+                _viewModel.ErrorMessage = "Вы не авторизованы. Пожалуйста, войдите в аккаунт.";
                 return;
             }
             
-            // Debug: Check notifications in database
-            var notificationsCount = await _dbContext.Notifications
-                .Where(n => n.UserId == userId)
-                .CountAsync();
-                
-            Console.WriteLine($"Found {notificationsCount} notifications in database for user {userId}");
-            
-            // If no notifications, create sample ones
-            if (notificationsCount == 0)
-            {
-                Console.WriteLine("No notifications found, creating sample notifications...");
-                await _notificationService.CreateSampleNotificationsAsync(userId.Value, 5);
-            }
+            // Уведомления загружаются из API (PostgreSQL) и кэшируются в локальной БД
+            System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Loading notifications from API for user {userId}");
 
-            // Load notifications through ViewModel
+            // Load notifications through ViewModel (он сам управляет IsBusy)
+            System.Diagnostics.Debug.WriteLine("[NotificationsPage] Calling ViewModel.LoadInitialAsync()");
             await _viewModel.LoadInitialAsync();
             
             // Debug: Log the number of notifications loaded
-            Console.WriteLine($"Loaded {_viewModel.Notifications.Count} notifications");
+            System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Loaded {_viewModel.Notifications.Count} notifications after LoadInitialAsync");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading initial data: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Error loading initial data: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Stack trace: {ex.StackTrace}");
             if (ex.InnerException != null)
             {
-                Console.WriteLine($"Inner exception: {ex.InnerException}");
+                System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Inner exception: {ex.InnerException}");
             }
+            
+            // Убеждаемся, что состояние загрузки сброшено
+            _viewModel.IsBusy = false;
+            _viewModel.HasError = true;
+            _viewModel.ErrorMessage = "Не удалось загрузить уведомления. Пожалуйста, попробуйте позже.";
         }
     }
 }

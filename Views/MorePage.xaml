@@ -145,6 +145,50 @@
                         </Grid>
                     </Frame>
 
+                    <!-- Публичная оферта -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPublicOfferTapped"/>
+                        </Frame.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_certificate.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Публичная оферта" TextColor="#6B7280" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Политика возврата -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnRefundPolicyTapped"/>
+                        </Frame.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_certificate.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Политика возврата" TextColor="#6B7280" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Безопасность платежей -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPaymentSecurityTapped"/>
+                        </Frame.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_certificate.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Безопасность платежей" TextColor="#6B7280" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Условия доставки -->
+                    <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnDeliveryTermsTapped"/>
+                        </Frame.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" FlowDirection="LeftToRight">
+                            <Image Grid.Column="0" Source="icon_certificate.png" WidthRequest="20" HeightRequest="20" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="Условия доставки" TextColor="#6B7280" VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
                     <!-- Контакты -->
                     <Frame BackgroundColor="White" CornerRadius="12" HasShadow="True" Padding="12">
                         <Frame.GestureRecognizers>

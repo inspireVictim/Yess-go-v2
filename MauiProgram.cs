@@ -80,6 +80,11 @@ public static class MauiProgram
                 System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing database...");
                 await initializer.InitializeAsync();
                 System.Diagnostics.Debug.WriteLine("[MauiProgram] Database initialized successfully");
+                
+                // Заполняем базу данных начальными данными
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Seeding database...");
+                await initializer.SeedAsync();
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database seeded successfully");
             }
             catch (Exception ex)
             {
@@ -254,6 +259,7 @@ public static class MauiProgram
         services.AddHttpClient<IQRApiService, QRApiService>("ApiClient");
         services.AddHttpClient<IBannerApiService, BannerApiService>("ApiClient");
         services.AddHttpClient<IPromoCodeApiService, PromoCodeApiService>("ApiClient");
+        services.AddHttpClient<INotificationApiService, NotificationApiService>("ApiClient");
     }
 
     private static void ConfigureServices(IServiceCollection services)

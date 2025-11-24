@@ -20,4 +20,11 @@ public interface INotificationService
     /// <param name="count">Number of sample notifications to create</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task CreateSampleNotificationsAsync(int userId, int count = 5, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Deletes sample/test notifications, keeping only the welcome notification
+    /// </summary>
+    /// <param name="userId">ID of the user</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task DeleteSampleNotificationsAsync(int userId, CancellationToken cancellationToken = default);
 }

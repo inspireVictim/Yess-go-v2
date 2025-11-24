@@ -70,10 +70,14 @@ public partial class NotificationsViewModel : BaseViewModel
     public async Task LoadInitialAsync()
     {
         if (IsBusy)
+        {
+            System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] LoadInitialAsync: Already busy, skipping");
             return;
+        }
 
         try
         {
+            System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] LoadInitialAsync: Starting");
             IsBusy = true;
             HasError = false;
             ErrorMessage = null;
@@ -83,27 +87,33 @@ public partial class NotificationsViewModel : BaseViewModel
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot load notifications: user is not authenticated");
+                System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] LoadInitialAsync: User not authenticated");
                 HasError = true;
                 ErrorMessage = "Вы не авторизованы. Пожалуйста, войдите в аккаунт.";
                 return;
             }
 
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] LoadInitialAsync: User ID = {userId.Value}");
             _currentPage = 1;
             Notifications.Clear();
             HasMoreItems = true;
 
             await LoadPageAsync(_currentPage);
             await LoadUnreadCountAsync();
+            
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] LoadInitialAsync: Completed. Notifications count = {Notifications.Count}");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error loading notifications");
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] LoadInitialAsync: Error - {ex}");
             HasError = true;
             ErrorMessage = "Не удалось загрузить уведомления. Пожалуйста, попробуйте позже.";
         }
         finally
         {
             IsBusy = false;
+            System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] LoadInitialAsync: IsBusy set to false");
         }
     }
 
@@ -159,13 +169,18 @@ public partial class NotificationsViewModel : BaseViewModel
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot load notifications page: user is not authenticated");
+                System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] Cannot load notifications: user is not authenticated");
                 throw new UnauthorizedAccessException("Вы не авторизованы. Пожалуйста, войдите в аккаунт.");
             }
 
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] Loading notifications for user {userId.Value}, page {page}, pageSize {PageSize}");
             var notifications = await _notificationService.GetNotificationsAsync(userId.Value, page, PageSize);
+            
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] Received {notifications.Count()} notifications from service");
             
             if (!notifications.Any())
             {
+                System.Diagnostics.Debug.WriteLine("[NotificationsViewModel] No notifications returned, setting HasMoreItems = false");
                 HasMoreItems = false;
                 return;
             }
@@ -174,10 +189,13 @@ public partial class NotificationsViewModel : BaseViewModel
             {
                 Notifications.Add(notification);
             }
+            
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] Added {notifications.Count()} notifications to collection. Total: {Notifications.Count}");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error loading notifications page {Page}", page);
+            System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] Error loading notifications page {page}: {ex}");
             throw new Exception("Не удалось загрузить уведомления. Пожалуйста, проверьте подключение к интернету.", ex);
         }
     }

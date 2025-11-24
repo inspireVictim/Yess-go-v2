@@ -101,6 +101,53 @@ public class Notification
 
     private string GetNotificationIcon()
     {
+        // Сначала проверяем категорию из Data, если есть
+        if (Data != null && Data.TryGetValue("category", out var categoryObj))
+        {
+            var category = categoryObj?.ToString()?.ToLower();
+            return category switch
+            {
+                "achievement" => "🏆", // Достижения
+                "finance" => "💰",     // Финансы/кешбэк
+                "promotion" => "🎁",   // Акции/промо
+                "referral" => "🎯",    // Рефералы
+                _ => GetIconByTitle()
+            };
+        }
+        
+        return GetIconByTitle();
+    }
+    
+    private string GetIconByTitle()
+    {
+        var titleLower = Title.ToLower();
+        
+        // Проверяем по ключевым словам в заголовке
+        if (titleLower.Contains("достижен") || titleLower.Contains("уровен") || titleLower.Contains("бронз") || titleLower.Contains("серебр") || titleLower.Contains("золот"))
+            return "🏆";
+        
+        if (titleLower.Contains("кешбэк") || titleLower.Contains("начислен") || titleLower.Contains("баланс") || titleLower.Contains("пополнен"))
+            return "💰";
+        
+        if (titleLower.Contains("акци") || titleLower.Contains("предложен") || titleLower.Contains("скидк") || titleLower.Contains("промокод"))
+            return "🎁";
+        
+        if (titleLower.Contains("приглашен") || titleLower.Contains("реферал") || titleLower.Contains("друг"))
+            return "🎯";
+        
+        if (titleLower.Contains("партнёр") || titleLower.Contains("новый"))
+            return "⭐";
+        
+        if (titleLower.Contains("напоминан") || titleLower.Contains("не забудь"))
+            return "⏰";
+        
+        if (titleLower.Contains("день рожден"))
+            return "🎂";
+        
+        if (titleLower.Contains("отчёт") || titleLower.Contains("статистик"))
+            return "📊";
+        
+        // По умолчанию по типу
         return NotificationType switch
         {
             NotificationType.Push => "🔔",

@@ -8,7 +8,8 @@
     Shell.NavBarIsVisible="False"
     BackgroundColor="#F4F6F8"
     x:DataType="viewModel:NotificationsViewModel"
-    xmlns:viewModel="clr-namespace:YessGoFront.ViewModels">
+    xmlns:viewModel="clr-namespace:YessGoFront.ViewModels"
+    xmlns:entities="clr-namespace:YessGoFront.Data.Entities">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -63,56 +64,45 @@
                     <!-- Notifications collection -->
                     <CollectionView ItemsSource="{Binding Notifications}">
                         <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Frame CornerRadius="14" 
-                                       BackgroundColor="{Binding IsRead, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF:#F9FAFB'}" 
+                            <DataTemplate x:DataType="entities:Notification">
+                                <Frame CornerRadius="12" 
+                                       BackgroundColor="#F9FAFB" 
                                        HasShadow="True" 
-                                       Padding="12"
-                                       Margin="0,0,0,8">
+                                       Padding="0"
+                                       Margin="0,0,0,12">
                                     <Frame.GestureRecognizers>
                                         <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MarkAsReadCommand}" 
                                                             CommandParameter="{Binding .}"/>
                                     </Frame.GestureRecognizers>
                                     
-                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Grid Padding="16" ColumnDefinitions="Auto,*" ColumnSpacing="16">
                                         <!-- Notification Icon -->
                                         <Frame Grid.Column="0" 
-                                               BackgroundColor="{Binding Priority, Converter={StaticResource PriorityToColorConverter}}" 
-                                               CornerRadius="10" 
-                                               Padding="10"
-                                               HeightRequest="44"
-                                               WidthRequest="44"
-                                               VerticalOptions="Center">
+                                               BackgroundColor="#F3F4F6" 
+                                               CornerRadius="12" 
+                                               Padding="12"
+                                               HeightRequest="56"
+                                               WidthRequest="56"
+                                               VerticalOptions="Start"
+                                               HasShadow="False">
                                             <Label Text="{Binding Icon}" 
-                                                   FontSize="20"
+                                                   FontSize="28"
                                                    HorizontalTextAlignment="Center"
                                                    VerticalTextAlignment="Center"/>
                                         </Frame>
                                         
                                         <!-- Notification Content -->
-                                        <StackLayout Grid.Column="1" Spacing="4">
-                                            <Label Text="{Binding Title}" 
-                                                   FontSize="14" 
-                                                   FontAttributes="Bold"
-                                                   TextColor="{Binding IsRead, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#111827:#6B7280'}"/>
+                                        <StackLayout Grid.Column="1" Spacing="6" VerticalOptions="Start">
                                             <Label Text="{Binding Message}" 
-                                                   FontSize="13" 
-                                                   TextColor="{Binding IsRead, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#4B5563:#9CA3AF'}"
-                                                   MaxLines="2" 
-                                                   LineBreakMode="TailTruncation"/>
-                                            <Label Text="{Binding CreatedAt, StringFormat='{0:dd MMM yyyy, HH:mm}'}" 
-                                                   FontSize="11" 
-                                                   TextColor="#9CA3AF"/>
+                                                   FontSize="14" 
+                                                   TextColor="#111827"
+                                                   LineBreakMode="WordWrap"
+                                                   VerticalOptions="Start"/>
+                                            <Label Text="{Binding CreatedAt, StringFormat='{0:dd.MM.yyyy, HH:mm}'}" 
+                                                   FontSize="12" 
+                                                   TextColor="#9CA3AF"
+                                                   Margin="0,4,0,0"/>
                                         </StackLayout>
-                                        
-                                        <!-- Unread indicator -->
-                                        <BoxView Grid.Column="2" 
-                                                 WidthRequest="8" 
-                                                 HeightRequest="8" 
-                                                 CornerRadius="4"
-                                                 Color="#3B82F6"
-                                                 VerticalOptions="Center"
-                                                 IsVisible="{Binding IsRead, Converter={StaticResource InverseBoolConverter}}"/>
                                     </Grid>
                                 </Frame>
                             </DataTemplate>

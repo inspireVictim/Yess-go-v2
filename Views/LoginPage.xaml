@@ -72,7 +72,7 @@
 				<!-- Запомнить меня -->
 				<HorizontalStackLayout Spacing="8">
 					<CheckBox x:Name="RememberCheck" Color="#007A51" IsChecked="{Binding RememberMe}"/>
-					<Label Text="Запомнить меня" VerticalOptions="Center"/>
+                    <Label Text="Запомнить меня" TextColor="#B0B0B0" VerticalOptions="Center"/>
 				</HorizontalStackLayout>
 
 				<!-- Кнопка входа -->

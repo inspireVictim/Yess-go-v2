@@ -20,28 +20,9 @@ public partial class PaymentSecurityPage : ContentPage
         }
     }
 
-    private async void OnBackTapped(object? sender, EventArgs e)
+    public async void OnBackTapped(object sender, EventArgs e)
     {
-        try
-        {
-            if (sender is Button button)
-            {
-                button.IsEnabled = false;
-            }
-            
-            await Shell.Current.GoToAsync("///main/more", animate: true);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[PaymentSecurityPage] Ошибка навигации: {ex.Message}");
-        }
-        finally
-        {
-            if (sender is Button button)
-            {
-                button.IsEnabled = true;
-            }
-        }
+        await Shell.Current.GoToAsync("///more");
     }
 }
 

@@ -145,8 +145,27 @@ namespace YessGoFront.Views
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
-                _allPartners = JsonSerializer.Deserialize<List<PartnerDto>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<PartnerDto>();
+                
+                try
+                {
+                    var options = new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true
+                    };
+                    _allPartners = JsonSerializer.Deserialize<List<PartnerDto>>(json, options) ?? new List<PartnerDto>();
+                }
+                catch (InvalidCastException ex)
+                {
+                    _logger?.LogError(ex, "InvalidCastException при десериализации партнёров. JSON: {Json}", json.Substring(0, Math.Min(500, json.Length)));
+                    ShowError("Ошибка при обработке данных партнёров");
+                    return;
+                }
+                catch (JsonException ex)
+                {
+                    _logger?.LogError(ex, "JsonException при десериализации партнёров. JSON: {Json}", json.Substring(0, Math.Min(500, json.Length)));
+                    ShowError("Ошибка формата данных");
+                    return;
+                }
 
                 // Применяем фильтр поиска
                 ApplyFilters();
@@ -182,16 +201,24 @@ namespace YessGoFront.Views
                                   "Без категории";
                 
                 var cashbackText = partner.CashbackPercent > 0 
-                    ? $"до {partner.CashbackPercent}%" 
+                    ? $"до {partner.CashbackPercent:F2}%" 
                     : "—";
+
+                // Используем CoverImageUrl из БД, если нет - используем LogoUrl
+                var coverImage = !string.IsNullOrEmpty(partner.CoverImageUrl) 
+                    ? partner.CoverImageUrl 
+                    : (!string.IsNullOrEmpty(partner.LogoUrl) ? partner.LogoUrl : "partner_default.png");
 
                 Partners.Add(new PartnerListItem
                 {
                     Id = partner.Id,
                     Logo = partner.LogoUrl ?? "partner_default.png",
+                    CoverImage = coverImage,
                     Name = partner.Name ?? "Без названия",
                     Category = categoryName,
-                    CashbackText = cashbackText
+                    Description = partner.Description ?? string.Empty,
+                    CashbackText = cashbackText,
+                    HasDescription = !string.IsNullOrEmpty(partner.Description)
                 });
             }
 
@@ -229,13 +256,32 @@ namespace YessGoFront.Views
         {
             try
             {
-                if (sender is BindableObject bindable && bindable.BindingContext is PartnerListItem item)
+                if (sender == null) return;
+                
+                object? context = null;
+                if (sender is BindableObject bindable)
+                {
+                    context = bindable.BindingContext;
+                }
+                
+                if (context is PartnerListItem item)
                 {
                     await Shell.Current.GoToAsync($"///PartnerDetailPage?partnerId={item.Id}");
                 }
+                else
+                {
+                    _logger?.LogWarning($"OnPartnerTapped: Invalid BindingContext type: {context?.GetType().Name ?? "null"}");
+                }
+            }
+            catch (InvalidCastException ex)
+            {
+                _logger?.LogError(ex, "InvalidCastException in OnPartnerTapped");
+                Debug.WriteLine($"InvalidCastException: {ex.Message}");
+                await DisplayAlert("Ошибка", $"Ошибка приведения типа: {ex.Message}", "ОК");
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, "Navigation error in OnPartnerTapped");
                 Debug.WriteLine($"Navigation error: {ex.Message}");
                 await DisplayAlert("Ошибка", $"Не удалось открыть партнёра: {ex.Message}", "ОК");
             }
@@ -246,7 +292,15 @@ namespace YessGoFront.Views
         {
             try
             {
-                if (sender is BindableObject bindable && bindable.BindingContext is CategoryItem cat)
+                if (sender == null) return;
+                
+                object? context = null;
+                if (sender is BindableObject bindable)
+                {
+                    context = bindable.BindingContext;
+                }
+                
+                if (context is CategoryItem cat)
                 {
                     // Сбрасываем все выделения
                     foreach (var c in Categories)
@@ -259,9 +313,19 @@ namespace YessGoFront.Views
                     // Перезагружаем партнёров по выбранной категории
                     await LoadPartnersAsync();
                 }
+                else
+                {
+                    _logger?.LogWarning($"OnCategoryTapped: Invalid BindingContext type: {context?.GetType().Name ?? "null"}");
+                }
+            }
+            catch (InvalidCastException ex)
+            {
+                _logger?.LogError(ex, "InvalidCastException in OnCategoryTapped");
+                Debug.WriteLine($"InvalidCastException: {ex.Message}");
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, "Category tap error");
                 Debug.WriteLine($"Category tap error: {ex.Message}");
             }
         }
@@ -271,9 +335,12 @@ namespace YessGoFront.Views
         {
             public int Id { get; set; }
             public string Logo { get; set; } = "";
+            public string CoverImage { get; set; } = "";
             public string Name { get; set; } = "";
             public string Category { get; set; } = "";
+            public string Description { get; set; } = "";
             public string CashbackText { get; set; } = "";
+            public bool HasDescription { get; set; } = false;
             public bool IsLast { get; set; } = false;
         }
 

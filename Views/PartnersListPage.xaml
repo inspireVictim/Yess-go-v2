@@ -101,57 +101,121 @@
         </Grid>
 
 		<!-- ===== Список партнёров ===== -->
-		<Frame Grid.Row="1" BackgroundColor="White" CornerRadius="16" Padding="0">
+		<Frame Grid.Row="1" BackgroundColor="White" CornerRadius="16" Padding="0" HasShadow="True">
 			<CollectionView x:Name="PartnersListView"
                             ItemsSource="{Binding Partners}"
                             SelectionMode="None">
 				<CollectionView.ItemsLayout>
-					<LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
+					<LinearItemsLayout Orientation="Vertical" ItemSpacing="12"/>
 				</CollectionView.ItemsLayout>
 
 				<CollectionView.ItemTemplate>
 					<DataTemplate>
-						<Grid RowDefinitions="Auto,Auto" BackgroundColor="White">
-							<Grid.GestureRecognizers>
+						<!-- Стильный кликабельный блок -->
+						<Border StrokeThickness="0"
+                                BackgroundColor="White"
+                                StrokeShape="RoundRectangle 12"
+                                Padding="0"
+                                Margin="12,0">
+							<Border.GestureRecognizers>
 								<TapGestureRecognizer Tapped="OnPartnerTapped" />
-							</Grid.GestureRecognizers>
-							<!-- Контент строки -->
-							<Grid Padding="12,10"
-                                  ColumnDefinitions="Auto,*,Auto"
-                                  ColumnSpacing="12">
-								<Frame Grid.Column="0"
-                                       WidthRequest="36" HeightRequest="36"
-                                       CornerRadius="18" Padding="0"
-                                       BackgroundColor="#F2F2F2" HasShadow="False">
-									<Image Source="{Binding Logo}" Aspect="AspectFill" />
-								</Frame>
+							</Border.GestureRecognizers>
+							
+							<Border.Shadow>
+								<Shadow Brush="#1A000000" 
+                                        Offset="0,2" 
+                                        Radius="8" 
+                                        Opacity="0.1"/>
+							</Border.Shadow>
 
-								<VerticalStackLayout Grid.Column="1"
-                                                     Spacing="2"
-                                                     VerticalOptions="Center">
-									<Label Text="{Binding Name}"
+							<Grid RowDefinitions="Auto,Auto" RowSpacing="0">
+								
+								<!-- Главное изображение партнёра -->
+								<Grid Grid.Row="0" HeightRequest="180">
+									<Image Source="{Binding CoverImage}"
+                                           Aspect="AspectFill"
+                                           BackgroundColor="#F2F2F2">
+										<Image.Source>
+											<OnPlatform x:TypeArguments="ImageSource">
+												<On Platform="Default" Value="{Binding CoverImage, TargetNullValue='partner_default.png'}" />
+											</OnPlatform>
+										</Image.Source>
+									</Image>
+									
+									<!-- Градиентный оверлей снизу для читаемости текста -->
+									<BoxView>
+										<BoxView.Background>
+											<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+												<GradientStop Color="Transparent" Offset="0.5" />
+												<GradientStop Color="#80000000" Offset="1.0" />
+											</LinearGradientBrush>
+										</BoxView.Background>
+									</BoxView>
+
+									<!-- Логотип в правом верхнем углу -->
+									<Frame HorizontalOptions="End"
+                                           VerticalOptions="Start"
+                                           Margin="12"
+                                           WidthRequest="56"
+                                           HeightRequest="56"
+                                           CornerRadius="28"
+                                           Padding="4"
+                                           BackgroundColor="White"
+                                           HasShadow="True">
+										<Image Source="{Binding Logo}"
+                                               Aspect="AspectFill" />
+									</Frame>
+
+									<!-- Бейдж кешбэка в левом верхнем углу -->
+									<Frame HorizontalOptions="Start"
+                                           VerticalOptions="Start"
+                                           Margin="12"
+                                           Padding="8,4"
+                                           CornerRadius="12"
+                                           BackgroundColor="#0F6B53"
+                                           HasShadow="False">
+										<Label Text="{Binding CashbackText}"
+                                               FontSize="12"
+                                               FontAttributes="Bold"
+                                               TextColor="White" />
+									</Frame>
+								</Grid>
+
+								<!-- Информация о партнёре -->
+								<Grid Grid.Row="1" Padding="16,12" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+									
+									<!-- Название партнёра -->
+									<Label Grid.Row="0"
+                                           Text="{Binding Name}"
+                                           FontSize="18"
                                            FontAttributes="Bold"
-                                           FontSize="14"
-                                           TextColor="#111827" />
-									<Label Text="{Binding Category}"
+                                           TextColor="#111827"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="1" />
+
+									<!-- Сфера деятельности (категория) -->
+									<HorizontalStackLayout Grid.Row="1" Spacing="6">
+										<Label Text="●"
+                                               FontSize="8"
+                                               TextColor="#6B7280"
+                                               VerticalOptions="Center" />
+										<Label Text="{Binding Category}"
+                                               FontSize="14"
+                                               TextColor="#6B7280"
+                                               VerticalOptions="Center" />
+									</HorizontalStackLayout>
+
+									<!-- Описание (если есть) -->
+									<Label Grid.Row="2"
+                                           Text="{Binding Description}"
                                            FontSize="12"
-                                           TextColor="#6B7280" />
-								</VerticalStackLayout>
-
-								<Label Grid.Column="2"
-                                       Text="{Binding CashbackText}"
-                                       FontAttributes="Bold"
-                                       TextColor="#008C5D"
-                                       VerticalOptions="Center" />
+                                           TextColor="#9CA3AF"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="2"
+                                           IsVisible="{Binding HasDescription}" />
+								</Grid>
 							</Grid>
-
-							<!-- Разделитель -->
-							<BoxView Grid.Row="1"
-                                     HeightRequest="1"
-                                     BackgroundColor="#E5E7EB"
-                                     Margin="12,0"
-                                     IsVisible="{Binding IsLast, Converter={StaticResource InverseBoolConverter}}" />
-						</Grid>
+						</Border>
 					</DataTemplate>
 				</CollectionView.ItemTemplate>
 			</CollectionView>

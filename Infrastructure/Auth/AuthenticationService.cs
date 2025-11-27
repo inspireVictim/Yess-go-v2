@@ -1,4 +1,5 @@
 using Microsoft.Maui.Storage;
+using YessGoFront.Config;
 
 namespace YessGoFront.Infrastructure.Auth;
 
@@ -105,7 +106,9 @@ public class AuthenticationService : IAuthenticationService
                 "application/json"
             );
 
-            var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://10.0.2.2:8000";
+            // Используем централизованную конфигурацию из ApiConfiguration
+            var baseUrl = httpClient.BaseAddress?.ToString() 
+                ?? ApiConfiguration.GetBaseUrlWithTrailingSlash();
             var request = new System.Net.Http.HttpRequestMessage(
                 System.Net.Http.HttpMethod.Post,
                 $"{baseUrl.TrimEnd('/')}/api/v1/auth/refresh"

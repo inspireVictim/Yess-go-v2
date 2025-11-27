@@ -147,56 +147,23 @@ public static class MauiProgram
 
     private static string GetDefaultApiBaseUrl()
     {
-#if ANDROID
-        try
-        {
-            var fingerprint = Android.OS.Build.Fingerprint ?? "";
-            var model = Android.OS.Build.Model ?? "";
-            var product = Android.OS.Build.Product ?? "";
-            var manufacturer = Android.OS.Build.Manufacturer ?? "";
-
-            var isEmulator =
-                fingerprint.Contains("generic", StringComparison.OrdinalIgnoreCase) ||
-                fingerprint.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
-                fingerprint.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
-                model.Contains("Emulator", StringComparison.OrdinalIgnoreCase) ||
-                model.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
-                model.Contains("gphone", StringComparison.OrdinalIgnoreCase) ||
-                product.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
-                manufacturer.Equals("unknown", StringComparison.OrdinalIgnoreCase) ||
-                manufacturer.Equals("Genymotion", StringComparison.OrdinalIgnoreCase);
-
-            if (isEmulator)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using EMULATOR address");
-                return "http://10.0.2.2:8000/";
-            }
-        }
-        catch { }
-
-        var envUrl = Environment.GetEnvironmentVariable("API_BASE_URL");
-        if (!string.IsNullOrEmpty(envUrl))
-            return envUrl;
-
-        return "http://192.168.0.67:8000/";
-#else
-        return "http://localhost:8000/";
-#endif
+        // Используем централизованную конфигурацию из ApiConfiguration
+        // Это обеспечивает единый BaseAddress для всех платформ (Android, iOS, Windows)
+        return ApiConfiguration.GetBaseUrlWithTrailingSlash();
     }
 
     private static void ConfigureSettings(IServiceCollection services)
     {
-        var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
-            ?? GetDefaultApiBaseUrl();
-
+        // Используем централизованную конфигурацию из ApiConfiguration
+        var apiBaseUrl = ApiConfiguration.GetBaseUrlWithTrailingSlash();
         var dbConnectionString = GetDatabaseConnectionString();
 
         services.AddSingleton<AppSettings>(_ => new AppSettings
         {
             Api = new ApiSettings
             {
-                BaseUrl = apiBaseUrl,
-                ApiVersion = "v1",
+                BaseUrl = apiBaseUrl, // Использует ApiConfiguration.GetBaseUrlWithTrailingSlash()
+                ApiVersion = ApiConfiguration.API_VERSION,
                 RequestTimeoutSeconds = 30
             },
             Timeouts = new TimeoutSettings

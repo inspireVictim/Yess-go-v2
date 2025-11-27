@@ -26,14 +26,16 @@ public class DatabaseSettings
 public class ApiSettings
 {
     /// <summary>
-    /// Базовый URL API (будет установлен после клонирования репозитория бэкенда)
+    /// Базовый URL API.
+    /// По умолчанию используется значение из ApiConfiguration.BASE_URL.
+    /// Может быть переопределено через переменную окружения API_BASE_URL.
     /// </summary>
-    public string BaseUrl { get; set; } = "https://api.yessgo.com";
+    public string BaseUrl { get; set; } = ApiConfiguration.GetBaseUrlWithTrailingSlash();
     
     /// <summary>
     /// Версия API
     /// </summary>
-    public string ApiVersion { get; set; } = "v1";
+    public string ApiVersion { get; set; } = ApiConfiguration.API_VERSION;
     
     /// <summary>
     /// Таймаут запросов в секундах

@@ -227,6 +227,16 @@
                                           HorizontalOptions="Center" />
                     </Grid>
 
+                    <Label Text="У вас есть аккаунт"
+				        TextColor="#0B4A3B"
+				        FontSize="16"
+				        TextDecorations="Underline"
+				        HorizontalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnLoginsPage" />
+                        </Label.GestureRecognizers>
+                    </Label>
+
                     <BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
 
                     <!-- Вход через Google -->

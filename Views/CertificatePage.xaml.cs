@@ -1,10 +1,15 @@
 namespace YessGoFront.Views;
 
-public partial class CertificatePage : ContentView
+public partial class CertificatePage : ContentPage
 {
-	
 
-	public async void OnBackTapped(object sender, EventArgs e)
+	public CertificatePage()
+	{
+		InitializeComponent();
+    }
+
+
+    public async void OnBackTapped(object sender, EventArgs e)
 	{
 		await Shell.Current.GoToAsync("///more");
     }

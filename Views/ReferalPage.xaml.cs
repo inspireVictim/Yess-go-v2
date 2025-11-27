@@ -297,41 +297,9 @@ namespace YessGoFront.Views
             public string? ReferralCode { get; set; }
         }
 
-        private async void OnBackTapped(object? sender, EventArgs e)
+        public async void OnBackTapped(object sender, EventArgs e)
         {
-            try
-            {
-                // Отключаем кнопку на время навигации, чтобы избежать двойных нажатий
-                if (BackButton != null)
-                {
-                    BackButton.IsEnabled = false;
-                }
-                
-                // Возвращаемся на страницу More, откуда обычно открывается реферальная страница
-                await Shell.Current.GoToAsync("//main/more", animate: true);
-                System.Diagnostics.Debug.WriteLine("[ReferalPage] Успешно вернулись на страницу More");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Ошибка навигации: {ex.Message}");
-                // Попытка использовать альтернативный маршрут
-                try
-                {
-                    await Shell.Current.GoToAsync("..", animate: true);
-                }
-                catch (Exception ex2)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ReferalPage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
-                }
-            }
-            finally
-            {
-                // Включаем кнопку обратно
-                if (BackButton != null)
-                {
-                    BackButton.IsEnabled = true;
-                }
-            }
+            await Shell.Current.GoToAsync("///more");
         }
 
         private async void OnCopyCodeClicked(object? sender, EventArgs e)

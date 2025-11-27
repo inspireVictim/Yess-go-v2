@@ -28,6 +28,10 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(RefundPolicyPage), typeof(RefundPolicyPage));
             Routing.RegisterRoute(nameof(PaymentSecurityPage), typeof(PaymentSecurityPage));
             Routing.RegisterRoute(nameof(DeliveryTermsPage), typeof(DeliveryTermsPage));
+            Routing.RegisterRoute(nameof(FeedbackPage), typeof(FeedbackPage));
+            Routing.RegisterRoute(nameof(CertificatePage), typeof(CertificatePage));
+
+
         }
 
         protected override async void OnAppearing()

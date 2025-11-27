@@ -296,5 +296,15 @@ namespace YessGoFront.Views
             base.OnDisappearing();
             _viewModel.OnRegisterSuccess -= OnRegisterSuccess;
         }
+
+        private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+        {
+
+        }
+
+        public async void OnLoginsPage(object sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///login");
+        }
     }
 }

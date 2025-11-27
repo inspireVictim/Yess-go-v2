@@ -79,4 +79,15 @@
         Route="TransactionsPage"
         ContentTemplate="{DataTemplate views:TransactionsPage}" />
 
+    <!-- 🔹 Страница обратная связь -->
+    <ShellContent
+        Route="FeedbackPage"
+        ContentTemplate="{DataTemplate views:FeedbackPage}" />
+
+    <!-- 🔹 Страница сертификаты -->
+    <ShellContent
+        Route="CertificatePage"
+        ContentTemplate="{DataTemplate views:CertificatePage}" />
+
+
 </Shell>

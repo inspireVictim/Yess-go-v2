@@ -72,7 +72,7 @@
 				<!-- Запомнить меня -->
 				<HorizontalStackLayout Spacing="8">
 					<CheckBox x:Name="RememberCheck" Color="#007A51" IsChecked="{Binding RememberMe}"/>
-					<Label Text="Запомнить меня" VerticalOptions="Center"/>
+                    <Label Text="Запомнить меня" TextColor="#B0B0B0" VerticalOptions="Center"/>
 				</HorizontalStackLayout>
 
 				<!-- Кнопка входа -->
@@ -98,9 +98,23 @@
                                       HorizontalOptions="Center" />
 				</Grid>
 
-				<BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
+                <Label Text="Создать новый аккаунт"
+					TextColor="#0B4A3B"
+					FontSize="16"
+					TextDecorations="Underline"
+					HorizontalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnRegistrationPage" />
+                    </Label.GestureRecognizers>
+                </Label>
 
-				<Label Text="Забыли пароль?" HorizontalOptions="Center" TextColor="#0B4A3B" />
+
+                <BoxView HeightRequest="1" Color="#E0E0E0" Margin="0,8"/>
+
+                
+
+
+                <Label Text="Забыли пароль?" HorizontalOptions="Center" TextColor="#0B4A3B" />
 
 				<!-- Вход через Google -->
 				<Button Text="Войти с помощью Google"

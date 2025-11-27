@@ -1,11 +1,11 @@
 namespace YessGoFront.Views;
 
-public partial class FeedbackPage : ContentView
+public partial class FeedbackPage : ContentPage
 {
-	/*public FeedbackPage()
+	public FeedbackPage()
 	{
 		InitializeComponent();
-	}*/
+	}
 
     public async void OnBackTapped(object sender, EventArgs e)
     {

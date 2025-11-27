@@ -158,5 +158,10 @@ namespace YessGoFront.Views
             _viewModel.OnLoginSuccess -= OnLoginSuccess;
             System.Diagnostics.Debug.WriteLine("[LoginPage] OnDisappearing - unsubscribed from OnLoginSuccess");
         }
+
+        public async void OnRegistrationPage(object sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("///register");
+        }
     }
 }

@@ -9,6 +9,7 @@
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:StringToImageSourceConverter x:Key="ImageSourceConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -130,39 +131,76 @@
 
 							<Grid RowDefinitions="Auto,Auto" RowSpacing="0">
 								
-								<!-- Главное изображение партнёра -->
-								<Grid Grid.Row="0" HeightRequest="180">
-									<Image Source="{Binding CoverImage}"
+								<!-- Главное изображение партнёра (CoverImageUrl из БД) -->
+								<Grid Grid.Row="0" HeightRequest="200">
+									<Image Source="{Binding CoverImage, Converter={StaticResource ImageSourceConverter}}"
                                            Aspect="AspectFill"
                                            BackgroundColor="#F2F2F2">
-										<Image.Source>
-											<OnPlatform x:TypeArguments="ImageSource">
-												<On Platform="Default" Value="{Binding CoverImage, TargetNullValue='partner_default.png'}" />
-											</OnPlatform>
-										</Image.Source>
 									</Image>
 									
 									<!-- Градиентный оверлей снизу для читаемости текста -->
-									<BoxView>
+									<BoxView VerticalOptions="End"
+                                             HeightRequest="80">
 										<BoxView.Background>
 											<LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-												<GradientStop Color="Transparent" Offset="0.5" />
-												<GradientStop Color="#80000000" Offset="1.0" />
+												<GradientStop Color="Transparent" Offset="0.0" />
+												<GradientStop Color="#CC000000" Offset="1.0" />
 											</LinearGradientBrush>
 										</BoxView.Background>
 									</BoxView>
+
+									<!-- Информация поверх изображения (внизу) -->
+									<Grid VerticalOptions="End"
+                                          Padding="16,12"
+                                          RowDefinitions="Auto,Auto"
+                                          RowSpacing="4">
+										<!-- Название партнёра -->
+										<Label Grid.Row="0"
+                                               Text="{Binding Name}"
+                                               FontSize="20"
+                                               FontAttributes="Bold"
+                                               TextColor="White"
+                                               LineBreakMode="TailTruncation"
+                                               MaxLines="1">
+											<Label.Shadow>
+												<Shadow Brush="#000000"
+                                                        Opacity="0.8"
+                                                        Radius="3"
+                                                        Offset="0,1"/>
+											</Label.Shadow>
+										</Label>
+
+										<!-- Категория -->
+										<HorizontalStackLayout Grid.Row="1" Spacing="6">
+											<Label Text="●"
+                                                   FontSize="10"
+                                                   TextColor="#FFFFFFCC"
+                                                   VerticalOptions="Center" />
+											<Label Text="{Binding Category}"
+                                                   FontSize="14"
+                                                   TextColor="#FFFFFFCC"
+                                                   VerticalOptions="Center">
+												<Label.Shadow>
+													<Shadow Brush="#000000"
+                                                            Opacity="0.6"
+                                                            Radius="2"
+                                                            Offset="0,1"/>
+												</Label.Shadow>
+											</Label>
+										</HorizontalStackLayout>
+									</Grid>
 
 									<!-- Логотип в правом верхнем углу -->
 									<Frame HorizontalOptions="End"
                                            VerticalOptions="Start"
                                            Margin="12"
-                                           WidthRequest="56"
-                                           HeightRequest="56"
-                                           CornerRadius="28"
+                                           WidthRequest="60"
+                                           HeightRequest="60"
+                                           CornerRadius="30"
                                            Padding="4"
                                            BackgroundColor="White"
                                            HasShadow="True">
-										<Image Source="{Binding Logo}"
+										<Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
                                                Aspect="AspectFill" />
 									</Frame>
 
@@ -170,49 +208,26 @@
 									<Frame HorizontalOptions="Start"
                                            VerticalOptions="Start"
                                            Margin="12"
-                                           Padding="8,4"
-                                           CornerRadius="12"
+                                           Padding="10,6"
+                                           CornerRadius="16"
                                            BackgroundColor="#0F6B53"
-                                           HasShadow="False">
+                                           HasShadow="True">
 										<Label Text="{Binding CashbackText}"
-                                               FontSize="12"
+                                               FontSize="13"
                                                FontAttributes="Bold"
                                                TextColor="White" />
 									</Frame>
 								</Grid>
 
-								<!-- Информация о партнёре -->
-								<Grid Grid.Row="1" Padding="16,12" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
-									
-									<!-- Название партнёра -->
-									<Label Grid.Row="0"
-                                           Text="{Binding Name}"
-                                           FontSize="18"
-                                           FontAttributes="Bold"
-                                           TextColor="#111827"
+								<!-- Дополнительная информация (если нужно) -->
+								<Grid Grid.Row="1" 
+                                      Padding="16,8" 
+                                      IsVisible="{Binding HasDescription}">
+									<Label Text="{Binding Description}"
+                                           FontSize="13"
+                                           TextColor="#6B7280"
                                            LineBreakMode="TailTruncation"
-                                           MaxLines="1" />
-
-									<!-- Сфера деятельности (категория) -->
-									<HorizontalStackLayout Grid.Row="1" Spacing="6">
-										<Label Text="●"
-                                               FontSize="8"
-                                               TextColor="#6B7280"
-                                               VerticalOptions="Center" />
-										<Label Text="{Binding Category}"
-                                               FontSize="14"
-                                               TextColor="#6B7280"
-                                               VerticalOptions="Center" />
-									</HorizontalStackLayout>
-
-									<!-- Описание (если есть) -->
-									<Label Grid.Row="2"
-                                           Text="{Binding Description}"
-                                           FontSize="12"
-                                           TextColor="#9CA3AF"
-                                           LineBreakMode="TailTruncation"
-                                           MaxLines="2"
-                                           IsVisible="{Binding HasDescription}" />
+                                           MaxLines="2" />
 								</Grid>
 							</Grid>
 						</Border>

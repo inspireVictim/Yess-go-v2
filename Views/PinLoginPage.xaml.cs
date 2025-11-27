@@ -353,27 +353,15 @@ namespace YessGoFront.Views
                         await Microsoft.Maui.Storage.SecureStorage.SetAsync("user_pin", _currentPin);
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PIN saved successfully, switching to verification mode...");
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] PIN saved successfully, navigating to main...");
                     
-                    // Переключаемся в режим ввода PIN (не переходим сразу в приложение)
-                    _isCreatingPin = false;
+                    // Очищаем состояние
                     _confirmPin = null;
                     PinCode = string.Empty;
-                    
-                    // Обновляем UI для режима ввода PIN
-                    OnPropertyChanged(nameof(IsVerificationMode));
-                    OnPropertyChanged(nameof(TitleText));
-                    SubtitleText = "Введите PIN-код для входа";
                     ClearError();
                     
-                    // Показываем сообщение об успешном создании PIN
-                    await DisplayAlert(
-                        "PIN-код создан",
-                        "PIN-код успешно создан. Теперь введите его для входа в приложение.",
-                        "OK");
-                    
-                    // Пробуем биометрию, если доступна
-                    await TryBiometricFirstAsync();
+                    // Сразу переходим в приложение после успешного создания PIN
+                    await NavigateToMainAsync();
                 }
                 else
                 {

@@ -37,6 +37,9 @@ namespace YessGoFront.Services.Api
                     Password = request.Password
                 };
 
+                Logger?.LogInformation("[AuthApiService] Attempting login for phone: {Phone}", request.Username);
+                Logger?.LogDebug("[AuthApiService] BaseAddress: {BaseAddress}", HttpClient.BaseAddress);
+
                 // Используем базовый метод PostAsync, который отправляет JSON
                 // Endpoint: /api/v1/auth/login (без /json суффикса)
                 var tokenResponse = await PostAsync<UserLoginDto, TokenResponseDto>(
@@ -60,7 +63,8 @@ namespace YessGoFront.Services.Api
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {
-                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+                Logger?.LogError(ex, "[AuthApiService] Network error during login: {Message}", ex.Message);
+                throw new NetworkException($"Ошибка сети при входе: {ex.Message}", ex);
             }
         }
 

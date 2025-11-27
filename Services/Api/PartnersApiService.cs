@@ -1,7 +1,11 @@
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Config;
 using YessGoFront.Infrastructure.Http;
 using YessGoFront.Models;
+#if ANDROID
+using Android.Util;
+#endif
 
 namespace YessGoFront.Services.Api;
 
@@ -21,7 +25,44 @@ public class PartnersApiService : ApiClient, IPartnersApiService
         CancellationToken ct = default)
     {
         var endpoint = ApiEndpoints.PartnersEndpoints.List;
+        
+#if ANDROID
+        Log.Info("PartnersApiService", $"[GetAllAsync] Запрос партнёров с эндпоинта: {endpoint}");
+#endif
+        System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Fetching partners from: {endpoint}");
+        Logger?.LogInformation("[PartnersApiService] Fetching partners from: {Endpoint}", endpoint);
+        
         var result = await GetAsync<List<PartnerDto>>(endpoint, ct);
+        
+#if ANDROID
+        Log.Info("PartnersApiService", $"[GetAllAsync] Получено партнёров: {result?.Count ?? 0}");
+#endif
+        System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Loaded {result?.Count ?? 0} partners");
+        
+        if (result != null && result.Count > 0)
+        {
+            Logger?.LogInformation("[PartnersApiService] Loaded {Count} partners", result.Count);
+            // Логируем ВСЕ партнёры для отладки
+            foreach (var partner in result)
+            {
+                var logoUrl = partner.LogoUrl ?? "null";
+#if ANDROID
+                Log.Info("PartnersApiService", $"[GetAllAsync] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
+#endif
+                System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
+                Logger?.LogInformation("[PartnersApiService] Partner: Id={Id}, Name={Name}, LogoUrl={LogoUrl}", 
+                    partner.Id, partner.Name, logoUrl);
+            }
+        }
+        else
+        {
+#if ANDROID
+            Log.Warn("PartnersApiService", "[GetAllAsync] Партнёры не загружены или результат пуст");
+#endif
+            System.Diagnostics.Debug.WriteLine("[PartnersApiService] No partners loaded or empty result");
+            Logger?.LogWarning("[PartnersApiService] No partners loaded or empty result");
+        }
+        
         return result ?? new List<PartnerDto>();
     }
 

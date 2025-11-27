@@ -392,5 +392,66 @@ namespace YessGoFront.Views
         {
             await Shell.Current.GoToAsync("//main/partner");
         }
+
+        // Обработчик нажатия на блок категории
+        private async void OnCategoryTapped(object? sender, EventArgs e)
+        {
+            if (_isNavigating) return;
+            _isNavigating = true;
+            try
+            {
+                // Получаем slug категории из CommandParameter
+                string? categorySlug = null;
+                string? categoryName = null;
+
+                if (sender is Frame frame)
+                {
+                    // Ищем TapGestureRecognizer в GestureRecognizers
+                    var tapRecognizer = frame.GestureRecognizers
+                        .OfType<TapGestureRecognizer>()
+                        .FirstOrDefault();
+                    
+                    if (tapRecognizer != null)
+                    {
+                        var param = tapRecognizer.CommandParameter?.ToString();
+                        if (!string.IsNullOrEmpty(param))
+                        {
+                            // Маппинг slug к названиям категорий
+                            var categoryMap = new Dictionary<string, (string slug, string name)>
+                            {
+                                { "beauty", ("beauty", "Салоны красоты") },
+                                { "pharmacy", ("pharmacy", "Аптеки") },
+                                { "groceries", ("groceries", "Магазины") }
+                            };
+
+                            if (categoryMap.TryGetValue(param, out var category))
+                            {
+                                categorySlug = category.slug;
+                                categoryName = category.name;
+                            }
+                        }
+                    }
+                }
+
+                // Если slug не найден, открываем страницу со всеми партнёрами
+                if (string.IsNullOrEmpty(categorySlug))
+                {
+                    await Shell.Current.GoToAsync("///PartnersListPage");
+                }
+                else
+                {
+                    var route = $"///PartnersListPage?categorySlug={Uri.EscapeDataString(categorySlug)}&categoryName={Uri.EscapeDataString(categoryName ?? categorySlug)}";
+                    await Shell.Current.GoToAsync(route);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Category navigation error: {ex.Message}");
+            }
+            finally
+            {
+                _isNavigating = false;
+            }
+        }
     }
 }

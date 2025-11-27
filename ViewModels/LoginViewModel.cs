@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Services.Domain;
 using YessGoFront.Services.Api;
+#if ANDROID
+using Android.Util;
+#endif
 
 namespace YessGoFront.ViewModels;
 
@@ -77,8 +80,23 @@ public partial class LoginViewModel : ObservableObject
         }
         catch (NetworkException ex)
         {
-            ShowError("Ошибка сети. Проверьте интернет-соединение.");
-            _logger?.LogError(ex, "Network error during login");
+            // Показываем более детальное сообщение об ошибке
+            var errorMessage = ex.Message.Contains("timeout") 
+                ? "Сервер не отвечает. Проверьте подключение к интернету."
+                : ex.Message.Contains("cleartext") || ex.Message.Contains("SSL") || ex.Message.Contains("certificate")
+                ? "Ошибка подключения к серверу. Проверьте настройки сети."
+                : "Ошибка сети. Проверьте интернет-соединение.";
+            
+            ShowError(errorMessage);
+            _logger?.LogError(ex, "Network error during login: {Message}", ex.Message);
+            
+#if ANDROID
+            Android.Util.Log.Error("LoginViewModel", $"Network error: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Android.Util.Log.Error("LoginViewModel", $"Inner exception: {ex.InnerException.Message}");
+            }
+#endif
         }
         catch (UnauthorizedException ex)
         {

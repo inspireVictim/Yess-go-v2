@@ -59,6 +59,40 @@ namespace YessGoFront.Views
 
             // Загружаем партнёров
             await LoadPartnersAsync();
+
+            // Выделяем выбранную категорию
+            UpdateSelectedCategory();
+        }
+
+        private void UpdateSelectedCategory()
+        {
+            // Сбрасываем все выделения
+            foreach (var cat in Categories)
+            {
+                cat.IsSelected = false;
+            }
+
+            // Выделяем категорию, если она была передана
+            if (!string.IsNullOrEmpty(_categorySlug))
+            {
+                var selectedCategory = Categories.FirstOrDefault(c => 
+                    (c.Slug == _categorySlug) || 
+                    (string.IsNullOrEmpty(c.Slug) && _categorySlug == "all"));
+                
+                if (selectedCategory != null)
+                {
+                    selectedCategory.IsSelected = true;
+                }
+            }
+            else
+            {
+                // Если категория не выбрана, выделяем "Все компании"
+                var allCategory = Categories.FirstOrDefault(c => c.Slug == "all" || c.Name == "Все компании");
+                if (allCategory != null)
+                {
+                    allCategory.IsSelected = true;
+                }
+            }
         }
 
         private async Task LoadCategoriesAsync()
@@ -83,11 +117,16 @@ namespace YessGoFront.Views
                     return;
 
                 Categories.Clear();
-                Categories.Add(new CategoryItem("Все компании", "all", true));
+                var isAllSelected = string.IsNullOrEmpty(_categorySlug) || _categorySlug == "all";
+                Categories.Add(new CategoryItem("Все компании", "all", isAllSelected));
                 foreach (var c in categories.OrderBy(c => c.Name))
                 {
-                    Categories.Add(new CategoryItem(c.Name, c.Slug, false));
+                    var isSelected = c.Slug?.ToLowerInvariant() == _categorySlug.ToLowerInvariant();
+                    Categories.Add(new CategoryItem(c.Name, c.Slug, isSelected));
                 }
+                
+                // Обновляем выделение после загрузки категорий
+                UpdateSelectedCategory();
             }
             catch (Exception ex)
             {
@@ -133,6 +172,7 @@ namespace YessGoFront.Views
                 }
                 else
                 {
+                    // Пробуем загрузить по slug категории
                     endpoint = ApiEndpoints.PartnersEndpoints.ByCategory(_categorySlug);
                 }
 
@@ -140,8 +180,23 @@ namespace YessGoFront.Views
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger?.LogWarning($"Failed to load partners: {response.StatusCode}");
-                    ShowError("Не удалось загрузить партнёров");
-                    return;
+                    // Если запрос по категории не удался, пробуем загрузить всех партнёров и фильтровать локально
+                    if (!string.IsNullOrEmpty(_categorySlug) && _categorySlug != "all")
+                    {
+                        _logger?.LogInformation("Falling back to loading all partners and filtering locally");
+                        endpoint = ApiEndpoints.PartnersEndpoints.List;
+                        response = await httpClient.GetAsync(endpoint);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            ShowError("Не удалось загрузить партнёров");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        ShowError("Не удалось загрузить партнёров");
+                        return;
+                    }
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
@@ -167,7 +222,7 @@ namespace YessGoFront.Views
                     return;
                 }
 
-                // Применяем фильтр поиска
+                // Применяем фильтр поиска и категории
                 ApplyFilters();
             }
             catch (Exception ex)
@@ -183,13 +238,30 @@ namespace YessGoFront.Views
 
             var filtered = _allPartners.AsEnumerable();
 
+            // Фильтр по категории (если загрузили всех партнёров, но выбрана категория)
+            if (!string.IsNullOrEmpty(_categorySlug) && _categorySlug != "all")
+            {
+                var categoryLower = _categoryName.ToLowerInvariant();
+                filtered = filtered.Where(p =>
+                {
+                    // Проверяем по названию категории
+                    var partnerCategory = p.Categories?.FirstOrDefault()?.Name?.ToLowerInvariant() ?? 
+                                         p.Category?.ToLowerInvariant() ?? string.Empty;
+                    return partnerCategory.Contains(categoryLower) || 
+                           partnerCategory == categoryLower ||
+                           // Также проверяем по slug, если есть
+                           (p.Categories?.Any(c => c.Slug?.ToLowerInvariant() == _categorySlug.ToLowerInvariant()) == true);
+                });
+            }
+
             // Фильтр по поисковому запросу
             if (!string.IsNullOrWhiteSpace(_searchQuery))
             {
                 var searchLower = _searchQuery.ToLowerInvariant();
                 filtered = filtered.Where(p => 
                     (p.Name?.ToLowerInvariant().Contains(searchLower) == true) ||
-                    (p.Description?.ToLowerInvariant().Contains(searchLower) == true)
+                    (p.Description?.ToLowerInvariant().Contains(searchLower) == true) ||
+                    (p.Category?.ToLowerInvariant().Contains(searchLower) == true)
                 );
             }
 
@@ -207,12 +279,12 @@ namespace YessGoFront.Views
                 // Используем CoverImageUrl из БД, если нет - используем LogoUrl
                 var coverImage = !string.IsNullOrEmpty(partner.CoverImageUrl) 
                     ? partner.CoverImageUrl 
-                    : (!string.IsNullOrEmpty(partner.LogoUrl) ? partner.LogoUrl : "partner_default.png");
+                    : partner.LogoUrl ?? string.Empty;
 
                 Partners.Add(new PartnerListItem
                 {
                     Id = partner.Id,
-                    Logo = partner.LogoUrl ?? "partner_default.png",
+                    Logo = partner.LogoUrl ?? string.Empty,
                     CoverImage = coverImage,
                     Name = partner.Name ?? "Без названия",
                     Category = categoryName,

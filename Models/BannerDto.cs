@@ -2,24 +2,36 @@ using System.Text.Json.Serialization;
 
 namespace YessGoFront.Models;
 
+/// <summary>
+/// Обёртка для ответа API с баннерами
+/// </summary>
+public class BannerResponse
+{
+    [JsonPropertyName("items")]
+    public List<BannerDto> Items { get; set; } = new();
+    
+    [JsonPropertyName("total")]
+    public int Total { get; set; }
+}
+
 public class BannerDto
 {
     [JsonPropertyName("id")]
     public int Id { get; set; }
     
-    [JsonPropertyName("image_url")]
+    [JsonPropertyName("imageUrl")]
     public string ImageUrl { get; set; } = string.Empty;
     
-    [JsonPropertyName("partner_id")]
+    [JsonPropertyName("partnerId")]
     public int? PartnerId { get; set; }
     
-    [JsonPropertyName("partner_name")]
+    [JsonPropertyName("partnerName")]
     public string? PartnerName { get; set; }
     
     [JsonPropertyName("title")]
     public string? Title { get; set; }
     
-    [JsonPropertyName("is_active")]
+    [JsonPropertyName("isActive")]
     public bool IsActive { get; set; } = true;
     
     [JsonPropertyName("order")]

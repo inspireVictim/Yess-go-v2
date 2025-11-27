@@ -47,7 +47,7 @@
                                 Placeholder="Пароль" 
                                 IsPassword="True" 
                                 BackgroundColor="Transparent"
-                                Text="{Binding Password}" />
+                                Text="{Binding Password, Mode=TwoWay}" />
 						<Label Grid.Column="1" 
                                Text="👁" 
                                FontSize="20" 

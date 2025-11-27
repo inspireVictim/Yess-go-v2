@@ -22,10 +22,10 @@ public class PartnerDetailDto
     [JsonPropertyName("categories")]
     public List<CategoryDto>? Categories { get; set; }
 
-    [JsonPropertyName("logo_url")] 
+    [JsonPropertyName("logoUrl")] 
     public string? LogoUrl { get; set; }
     
-    [JsonPropertyName("cover_image_url")] 
+    [JsonPropertyName("coverImageUrl")] 
     public string? CoverImageUrl { get; set; }
 
     [JsonPropertyName("address")] 

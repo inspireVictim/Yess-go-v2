@@ -410,21 +410,40 @@ namespace YessGoFront.ViewModels
         {
             try
             {
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Начало загрузки баннеров");
+#endif
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBannersAsync: Начало загрузки баннеров");
+                
                 Banners.Clear();
                 
                 if (_bannerApiService != null)
                 {
+#if ANDROID
+                    Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Вызов GetActiveBannersAsync()");
+#endif
                     // Загружаем баннеры с сервера
                     var bannerDtos = await _bannerApiService.GetActiveBannersAsync();
+                    
+#if ANDROID
+                    Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Получено баннеров: {bannerDtos?.Count ?? 0}");
+#endif
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadBannersAsync: Получено баннеров: {bannerDtos?.Count ?? 0}");
                     
                     if (bannerDtos != null && bannerDtos.Count > 0)
                     {
                         foreach (var dto in bannerDtos.OrderBy(b => b.Order))
                         {
+                            var imageUrl = dto.ImageUrl ?? "null";
+#if ANDROID
+                            Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Banner: Id={dto.Id}, ImageUrl={imageUrl}");
+#endif
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadBannersAsync: Banner: Id={dto.Id}, ImageUrl={imageUrl}");
+                            
                             var banner = new BannerModel
                             {
                                 Id = dto.Id.ToString(),
-                                Image = dto.ImageUrl,
+                                Image = dto.ImageUrl ?? string.Empty,
                                 PartnerName = dto.PartnerName ?? string.Empty,
                                 PartnerId = dto.PartnerId
                             };
@@ -436,25 +455,50 @@ namespace YessGoFront.ViewModels
                                 _ = PrefetchBannerImage(banner.Image);
                             }
                         }
+#if ANDROID
+                        Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Загружено {Banners.Count} баннеров с сервера");
+#endif
                         System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded {Banners.Count} banners from server");
                         return;
                     }
                 }
+                else
+                {
+#if ANDROID
+                    Android.Util.Log.Warn("MainPageViewModel", "[LoadBannersAsync] _bannerApiService is null");
+#endif
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBannersAsync: _bannerApiService is null");
+                }
                 
                 // Fallback на локальные изображения, если API недоступен или нет данных
                 System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using fallback local banners");
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Adding fallback local banners");
+#endif
+                // В MAUI файлы из Resources/Images загружаются по имени файла (с расширением)
                 Banners.Add(new BannerModel { Image = "banner_1.png", PartnerName = "Партнёр A" });
                 Banners.Add(new BannerModel { Image = "banner_2.png", PartnerName = "Партнёр B" });
                 Banners.Add(new BannerModel { Image = "banner_3.png", PartnerName = "Партнёр C" });
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Added {Banners.Count} fallback banners");
+#endif
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading banners: {ex.Message}");
+#if ANDROID
+                Android.Util.Log.Error("MainPageViewModel", $"[LoadBannersAsync] Error: {ex.Message}");
+                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Adding fallback local banners after error");
+#endif
                 // Fallback на локальные изображения при ошибке
+                // В MAUI файлы из Resources/Images загружаются по имени файла (с расширением)
                 Banners.Clear();
                 Banners.Add(new BannerModel { Image = "banner_1.png", PartnerName = "Партнёр A" });
                 Banners.Add(new BannerModel { Image = "banner_2.png", PartnerName = "Партнёр B" });
                 Banners.Add(new BannerModel { Image = "banner_3.png", PartnerName = "Партнёр C" });
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Added {Banners.Count} fallback banners after error");
+#endif
             }
         }
 
@@ -472,14 +516,29 @@ namespace YessGoFront.ViewModels
         {
             try
             {
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Начало загрузки партнёров");
+#endif
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Начало загрузки партнёров");
+                
                 PartnersRow1.Clear();
                 PartnersRow2.Clear();
                 PartnersRow3.Clear();
 
                 if (_partnersApiService != null)
                 {
+#if ANDROID
+                    Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Вызов GetAllAsync()");
+#endif
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Вызов GetAllAsync()");
+                    
                     // Загружаем партнёров с сервера
                     var partners = await _partnersApiService.GetAllAsync();
+                    
+#if ANDROID
+                    Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Получено партнёров: {partners?.Count ?? 0}");
+#endif
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync: Получено партнёров: {partners?.Count ?? 0}");
                     
                     if (partners != null && partners.Count > 0)
                     {
@@ -487,10 +546,21 @@ namespace YessGoFront.ViewModels
                         var partnersList = partners.ToList();
                         var count = partnersList.Count;
                         
+#if ANDROID
+                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Обработка {count} партнёров");
+#endif
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync: Обработка {count} партнёров");
+                        
                         // Ряд 1: первые партнёры
                         var row1Partners = partnersList.Take((count + 2) / 3).ToList();
                         foreach (var partner in row1Partners)
                         {
+                            var logoUrl = partner.LogoUrl ?? "null";
+#if ANDROID
+                            Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
+#endif
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
+                            
                             PartnersRow1.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
@@ -552,6 +622,13 @@ namespace YessGoFront.ViewModels
                             });
                         }
                         
+#if ANDROID
+                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Загружено партнёров: Row1={PartnersRow1.Count}, Row2={PartnersRow2.Count}, Row3={PartnersRow3.Count}");
+                        if (PartnersRow1.Count > 0)
+                        {
+                            Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Первый партнёр лого: {PartnersRow1[0].Logo}");
+                        }
+#endif
                         System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded {partners.Count} partners from server");
                         System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Row1: {PartnersRow1.Count}, Row2: {PartnersRow2.Count}, Row3: {PartnersRow3.Count}");
                         if (PartnersRow1.Count > 0)
@@ -560,14 +637,36 @@ namespace YessGoFront.ViewModels
                         }
                         return;
                     }
+                    else
+                    {
+#if ANDROID
+                        Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] Партнёры не загружены или список пуст");
+#endif
+                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Партнёры не загружены или список пуст");
+                    }
+                }
+                else
+                {
+#if ANDROID
+                    Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] _partnersApiService is null");
+#endif
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: _partnersApiService is null");
                 }
                 
                 // Fallback на локальные изображения, если API недоступен или нет данных
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Использование fallback локальных партнёров");
+#endif
                 System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using fallback local partners");
                 LoadPartnersFallback();
             }
             catch (Exception ex)
             {
+#if ANDROID
+                Android.Util.Log.Error("MainPageViewModel", $"[LoadPartnersAsync] ОШИБКА: {ex.Message}", ex);
+#endif
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync ОШИБКА: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] StackTrace: {ex.StackTrace}");
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading partners: {ex.Message}");
                 // Fallback на локальные изображения при ошибке
                 LoadPartnersFallback();

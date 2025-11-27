@@ -147,41 +147,42 @@ public static class MauiProgram
 
     private static string GetDefaultApiBaseUrl()
     {
+        // Сначала проверяем переменную окружения
+        var envUrl = Environment.GetEnvironmentVariable("API_BASE_URL");
+        if (!string.IsNullOrEmpty(envUrl))
+        {
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using API_BASE_URL from environment: {envUrl}");
+            return envUrl.TrimEnd('/') + "/";
+        }
+
+        // Используем значение из ApiConfiguration (там уже правильный IP сервера)
+        var defaultUrl = ApiConfiguration.GetBaseUrlWithTrailingSlash();
+        System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using default API URL from ApiConfiguration: {defaultUrl}");
+        
 #if ANDROID
+        // Для эмулятора можно использовать 10.0.2.2, но только если сервер запущен на localhost
+        // По умолчанию используем реальный IP сервера из ApiConfiguration
         try
         {
             var fingerprint = Android.OS.Build.Fingerprint ?? "";
             var model = Android.OS.Build.Model ?? "";
-            var product = Android.OS.Build.Product ?? "";
-            var manufacturer = Android.OS.Build.Manufacturer ?? "";
-
             var isEmulator =
                 fingerprint.Contains("generic", StringComparison.OrdinalIgnoreCase) ||
                 fingerprint.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
                 fingerprint.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
                 model.Contains("Emulator", StringComparison.OrdinalIgnoreCase) ||
-                model.Contains("sdk", StringComparison.OrdinalIgnoreCase) ||
-                model.Contains("gphone", StringComparison.OrdinalIgnoreCase) ||
-                product.Contains("emulator", StringComparison.OrdinalIgnoreCase) ||
-                manufacturer.Equals("unknown", StringComparison.OrdinalIgnoreCase) ||
-                manufacturer.Equals("Genymotion", StringComparison.OrdinalIgnoreCase);
+                model.Contains("sdk", StringComparison.OrdinalIgnoreCase);
 
             if (isEmulator)
             {
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Using EMULATOR address");
-                return "http://10.0.2.2:8000/";
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Detected EMULATOR, but using server URL: {defaultUrl}");
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] If server is on localhost, set API_BASE_URL=http://10.0.2.2:8000/");
             }
         }
         catch { }
-
-        var envUrl = Environment.GetEnvironmentVariable("API_BASE_URL");
-        if (!string.IsNullOrEmpty(envUrl))
-            return envUrl;
-
-        return "http://5.59.232.211:8000/";
-#else
-        return "http://localhost:8000/";
 #endif
+
+        return defaultUrl;
     }
 
     private static void ConfigureSettings(IServiceCollection services)

@@ -79,12 +79,30 @@ namespace YessGoFront.Views
                         // Загружаем логотип
                         if (!string.IsNullOrWhiteSpace(partner.LogoUrl))
                         {
-                            var converter = new StringToImageSourceConverter();
-                            PartnerLogo.Source = converter.Convert(partner.LogoUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                            try
+                            {
+                                var converter = new StringToImageSourceConverter();
+                                var imageSource = converter.Convert(partner.LogoUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                                if (imageSource != null)
+                                {
+                                    PartnerLogo.Source = imageSource;
+                                }
+                                else
+                                {
+                                    // Если конвертер вернул null, скрываем изображение
+                                    PartnerLogo.IsVisible = false;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Ошибка загрузки логотипа: {ex.Message}");
+                                PartnerLogo.IsVisible = false;
+                            }
                         }
                         else
                         {
-                            PartnerLogo.Source = "default_partner_logo.png";
+                            // Если URL логотипа пустой, скрываем изображение
+                            PartnerLogo.IsVisible = false;
                         }
                         
                         // Загружаем обложку
@@ -118,7 +136,7 @@ namespace YessGoFront.Views
                         PartnerName.Text = $"Партнёр №{id}";
                         PartnerCategory.Text = "Категория: Не указана";
                         PartnerDescription.Text = "Информация о партнёре не найдена.";
-                        PartnerLogo.Source = "default_partner_logo.png";
+                        PartnerLogo.IsVisible = false;
                     }
                 }
                 else
@@ -127,7 +145,7 @@ namespace YessGoFront.Views
                     PartnerName.Text = $"Партнёр №{id}";
                     PartnerCategory.Text = "Категория: Еда и напитки";
                     PartnerDescription.Text = "Описание партнёра, информация о скидках, адрес и контакты.";
-                    PartnerLogo.Source = "default_partner_logo.png";
+                    PartnerLogo.IsVisible = false;
                 }
             }
             catch (Exception ex)
@@ -136,7 +154,7 @@ namespace YessGoFront.Views
                 PartnerName.Text = $"Партнёр №{id}";
                 PartnerCategory.Text = "Ошибка загрузки";
                 PartnerDescription.Text = "Не удалось загрузить информацию о партнёре.";
-                PartnerLogo.Source = "default_partner_logo.png";
+                PartnerLogo.IsVisible = false;
             }
         }
 

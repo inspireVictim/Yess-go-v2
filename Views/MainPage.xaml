@@ -233,6 +233,9 @@
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnCategoryTapped" CommandParameter="beauty" />
+                                    </Frame.GestureRecognizers>
                                     <Image Source="cat_beauty.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
@@ -256,6 +259,9 @@
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnCategoryTapped" CommandParameter="pharmacy" />
+                                    </Frame.GestureRecognizers>
                                     <Image Source="cat_beauty.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"
@@ -279,6 +285,9 @@
                    HasShadow="True"
                    IsClippedToBounds="True"
                    BackgroundColor="White">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnCategoryTapped" CommandParameter="groceries" />
+                                    </Frame.GestureRecognizers>
                                     <Image Source="cat_food.png"
                        Aspect="AspectFill"
                        HorizontalOptions="Fill"

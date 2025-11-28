@@ -18,6 +18,9 @@ namespace YessGoFront.Views
         }
         private readonly IAuthService? _authService;
         private string _currentPin = string.Empty;
+        private string _tokenStatus = "normal"; // normal, fresh, expired
+        private string _tokenStatusMessage = string.Empty;
+        private Color _tokenStatusColor = Colors.Gray;
         private bool _isCreatingPin = false; // true - создание PIN, false - ввод PIN
         private string? _confirmPin = null; // Для подтверждения при создании
         private string _subtitleText = string.Empty;
@@ -51,6 +54,28 @@ namespace YessGoFront.Views
         }
 
         public bool HasError { get; private set; }
+
+        public string TokenStatusMessage
+        {
+            get => _tokenStatusMessage;
+            set
+            {
+                _tokenStatusMessage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public Color TokenStatusColor
+        {
+            get => _tokenStatusColor;
+            set
+            {
+                _tokenStatusColor = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShowTokenStatus => !string.IsNullOrEmpty(_tokenStatusMessage);
         public string ErrorMessage { get; private set; } = string.Empty;
         public bool IsBusy { get; private set; }
         public bool CanDelete => _currentPin.Length > 0;
@@ -108,19 +133,29 @@ namespace YessGoFront.Views
                 var location = shell.CurrentState.Location.ToString();
                 System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Current location: {location}");
                 
-                // Проверяем наличие параметра isCreatingPin=true в URL
+                // Проверяем наличие параметров в URL
                 hasQueryParam = location.Contains("isCreatingPin=true");
                 if (hasQueryParam)
                 {
                     _isCreatingPin = true;
                     System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Setting isCreatingPin=true from query param");
                 }
+
+                // Проверяем параметр tokenStatus
+                if (location.Contains("tokenStatus=fresh"))
+                {
+                    _tokenStatus = "fresh";
+                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Token status set to fresh");
+                }
             }
             
             // Обновляем IsVerificationMode при изменении режима
             OnPropertyChanged(nameof(IsVerificationMode));
             OnPropertyChanged(nameof(TitleText));
-            
+
+            // Проверяем и отображаем статус токенов
+            await UpdateTokenStatusAsync();
+
             // Дополнительная проверка: если параметра нет, проверяем наличие PIN-кода
             if (!hasQueryParam && _authService != null)
             {
@@ -159,6 +194,64 @@ namespace YessGoFront.Views
             else if (!_isCreatingPin && string.IsNullOrEmpty(_currentPin))
             {
                 await TryBiometricFirstAsync();
+            }
+        }
+
+        private async Task UpdateTokenStatusAsync()
+        {
+            try
+            {
+                var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+                if (authService == null) return;
+
+                var accessToken = await authService.GetAccessTokenAsync();
+                var refreshToken = await authService.GetRefreshTokenAsync();
+
+                if (_tokenStatus == "fresh")
+                {
+                    // Токены помечены как свежие AppShell
+                    TokenStatusMessage = "Токены свежие. Подтвердите вход PIN";
+                    TokenStatusColor = Color.FromArgb("#4CAF50"); // Зеленый
+                    OnPropertyChanged(nameof(ShowTokenStatus));
+                }
+                else if (!string.IsNullOrWhiteSpace(accessToken))
+                {
+                    var remainingMinutes = Infrastructure.Auth.JwtHelper.GetTokenRemainingMinutes(accessToken);
+                    var isValid = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+
+                    if (!isValid)
+                    {
+                        TokenStatusMessage = "Токены истекли. Требуется обновление";
+                        TokenStatusColor = Color.FromArgb("#F44336"); // Красный
+                    }
+                    else if (remainingMinutes < 10)
+                    {
+                        TokenStatusMessage = $"Токены истекут через {remainingMinutes} мин. Рекомендуется обновить";
+                        TokenStatusColor = Color.FromArgb("#FF9800"); // Оранжевый
+                    }
+                    else
+                    {
+                        // Токены в норме, не показываем сообщение
+                        TokenStatusMessage = string.Empty;
+                    }
+                    OnPropertyChanged(nameof(ShowTokenStatus));
+                }
+                else if (!string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    TokenStatusMessage = "Требуется обновление токенов доступа";
+                    TokenStatusColor = Color.FromArgb("#FF9800"); // Оранжевый
+                    OnPropertyChanged(nameof(ShowTokenStatus));
+                }
+                else
+                {
+                    TokenStatusMessage = "Токены отсутствуют. Требуется авторизация";
+                    TokenStatusColor = Color.FromArgb("#F44336"); // Красный
+                    OnPropertyChanged(nameof(ShowTokenStatus));
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error updating token status: {ex.Message}");
             }
         }
 

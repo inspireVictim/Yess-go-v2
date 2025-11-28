@@ -65,25 +65,30 @@ namespace YessGoFront
 
                 if (localUser != null)
                 {
-                    // Пользователь есть в локальной БД - всегда требуем PIN или биометрию для безопасности
-                    Debug.WriteLine("[AppShell] Decision: local user found → always require PIN/biometric");
-                    
-                    // Пытаемся обновить токен в фоне, если он истек (но не пропускаем экран PIN)
+                    // Проверяем состояние токенов для оптимизации UX
+                    bool tokensAreFresh = false;
                     if (authenticationService != null)
                     {
                         var accessToken = await authenticationService.GetAccessTokenAsync();
-                        
-                        // Если токен истек, пытаемся обновить через refresh token (в фоне)
                         if (!string.IsNullOrWhiteSpace(accessToken))
                         {
                             var isTokenValid = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
-                            if (!isTokenValid)
+                            var remainingMinutes = Infrastructure.Auth.JwtHelper.GetTokenRemainingMinutes(accessToken);
+
+                            if (isTokenValid && remainingMinutes > 15)
                             {
+                                // Токены свежие (более 15 минут) - можем оптимизировать UX
+                                tokensAreFresh = true;
+                                Debug.WriteLine($"[AppShell] Tokens are fresh: {remainingMinutes} minutes remaining");
+                            }
+                            else if (!isTokenValid)
+                            {
+                                // Токены истекли - пытаемся обновить в фоне
                                 var refreshToken = await authenticationService.GetRefreshTokenAsync();
                                 if (!string.IsNullOrWhiteSpace(refreshToken))
                                 {
                                     Debug.WriteLine("[AppShell] Access token expired, attempting to refresh in background");
-                                    // Обновляем в фоне, не ждем результата - не блокируем навигацию
+                                    // Обновляем в фоне, не ждем результата
                                     _ = Task.Run(async () =>
                                     {
                                         try
@@ -99,10 +104,10 @@ namespace YessGoFront
                             }
                         }
                     }
-                    
-                    // Всегда проверяем PIN - даже если токен валиден, требуем PIN/биометрию
+
+                    // Проверяем наличие PIN
                     var hasValidPin = await authService.HasPinAsync();
-                    Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}");
+                    Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}, tokensAreFresh={tokensAreFresh}");
 
                     if (!hasValidPin)
                     {
@@ -111,8 +116,10 @@ namespace YessGoFront
                     }
                     else
                     {
-                        Debug.WriteLine("[AppShell] Decision: local user WITH valid PIN → navigating to PIN login (always require PIN/biometric)");
-                        await Shell.Current.GoToAsync("///pinlogin", animate: false);
+                        // Отправляем на PIN экран с информацией о состоянии токенов
+                        var route = tokensAreFresh ? "///pinlogin?tokenStatus=fresh" : "///pinlogin";
+                        Debug.WriteLine($"[AppShell] Decision: local user WITH valid PIN → navigating to PIN login (tokenStatus: {(tokensAreFresh ? "fresh" : "normal")})");
+                        await Shell.Current.GoToAsync(route, animate: false);
                     }
                     return;
                 }

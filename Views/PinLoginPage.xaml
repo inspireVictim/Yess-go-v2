@@ -22,17 +22,30 @@
                 
                 <!-- Заголовок -->
                 <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-                    <Label Text="{Binding TitleText}" 
-                           FontSize="24" 
+                    <Label Text="{Binding TitleText}"
+                           FontSize="24"
                            FontAttributes="Bold"
                            TextColor="#0B4A3B"
                            HorizontalOptions="Center" />
-                    <Label Text="{Binding SubtitleText}" 
-                           FontSize="14" 
+                    <Label Text="{Binding SubtitleText}"
+                           FontSize="14"
                            TextColor="#666666"
                            HorizontalOptions="Center"
                            HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
+
+                <!-- Статус токенов -->
+                <Frame BackgroundColor="{Binding TokenStatusColor}"
+                       CornerRadius="8"
+                       Padding="12"
+                       HasShadow="False"
+                       IsVisible="{Binding ShowTokenStatus}">
+                    <Label Text="{Binding TokenStatusMessage}"
+                           TextColor="White"
+                           FontSize="12"
+                           HorizontalTextAlignment="Center"
+                           FontAttributes="Bold"/>
+                </Frame>
 
                 <!-- Индикаторы PIN (4 точки) -->
                 <Grid ColumnDefinitions="*,*,*,*" 

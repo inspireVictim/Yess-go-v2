@@ -152,7 +152,7 @@ public static class JwtHelper
 
                 var expTime = DateTimeOffset.FromUnixTimeSeconds(exp);
                 var now = DateTimeOffset.UtcNow;
-                
+
                 // Токен валиден, если время истечения больше текущего времени (с запасом 1 минута)
                 return expTime > now.AddMinutes(1);
             }
@@ -163,6 +163,54 @@ public static class JwtHelper
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Получить оставшееся время жизни токена в минутах
+    /// </summary>
+    public static int GetTokenRemainingMinutes(string? accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return 0;
+
+        try
+        {
+            var payload = DecodePayload<Dictionary<string, JsonElement>>(accessToken);
+            if (payload == null)
+                return 0;
+
+            // Проверяем поле "exp" (expiration time)
+            if (payload.TryGetValue("exp", out var expElement))
+            {
+                long exp;
+                if (expElement.ValueKind == JsonValueKind.Number)
+                {
+                    exp = expElement.GetInt64();
+                }
+                else if (expElement.ValueKind == JsonValueKind.String)
+                {
+                    if (!long.TryParse(expElement.GetString(), out exp))
+                        return 0;
+                }
+                else
+                {
+                    return 0;
+                }
+
+                var expTime = DateTimeOffset.FromUnixTimeSeconds(exp);
+                var now = DateTimeOffset.UtcNow;
+                var remainingTime = expTime - now;
+
+                // Возвращаем оставшееся время в минутах (минимум 0)
+                return Math.Max(0, (int)remainingTime.TotalMinutes);
+            }
+
+            return 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 }

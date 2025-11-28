@@ -38,8 +38,8 @@ namespace YessGoFront.Views
 
         // Скорости рядов
         private const double SpeedRow1 = 20;   // вправо
-        private const double SpeedRow2 = -15;  // влево
-        private const double SpeedRow3 = 18;   // вправо
+        private const double SpeedRow2 = -20;  // влево
+        private const double SpeedRow3 = 20;   // вправо
 
         private ScrollView? _row1;
         private ScrollView? _row2;

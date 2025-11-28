@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using YessGoFront.Models;
 using YessGoFront.Services;
 using YessGoFront.Services.Api;
@@ -109,11 +110,13 @@ namespace YessGoFront.ViewModels
             LoadTopCategories();
             _ = LoadPartnersAsync(); // Асинхронная загрузка партнёров с сервера
 
+            // Инициализация команд для сторис
             OpenStoryAsyncCommand = new AsyncRelayCommand<StoryModel?>(OpenStoryAsync);
             CloseStoryCommand = new RelayCommand(CloseStory);
-            NextPageCommand = new RelayCommand(NextPage);
-            PrevPageCommand = new RelayCommand(PrevPage);
+            NextPageCommand = new RelayCommand(() => NextPage());
+            PrevPageCommand = new RelayCommand(() => PrevPage());
 
+            // Инициализация команд для баннеров
             OpenBannerAsyncCommand = new AsyncRelayCommand<BannerModel?>(OpenBannerAsync);
             CloseBannerCommand = new RelayCommand(CloseBanner);
             
@@ -516,162 +519,92 @@ namespace YessGoFront.ViewModels
         {
             try
             {
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Начало загрузки партнёров");
-#endif
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Начало загрузки партнёров");
-                
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров");
+
                 PartnersRow1.Clear();
                 PartnersRow2.Clear();
                 PartnersRow3.Clear();
 
-                if (_partnersApiService != null)
+                if (_partnersApiService == null)
                 {
-#if ANDROID
-                    Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Вызов GetAllAsync()");
-#endif
-                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Вызов GetAllAsync()");
-                    
-                    // Загружаем партнёров с сервера
-                    var partners = await _partnersApiService.GetAllAsync();
-                    
-#if ANDROID
-                    Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Получено партнёров: {partners?.Count ?? 0}");
-#endif
-                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync: Получено партнёров: {partners?.Count ?? 0}");
-                    
-                    if (partners != null && partners.Count > 0)
-                    {
-                        // Разделяем партнёров на три ряда
-                        var partnersList = partners.ToList();
-                        var count = partnersList.Count;
-                        
-#if ANDROID
-                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Обработка {count} партнёров");
-#endif
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync: Обработка {count} партнёров");
-                        
-                        // Ряд 1: первые партнёры
-                        var row1Partners = partnersList.Take((count + 2) / 3).ToList();
-                        foreach (var partner in row1Partners)
-                        {
-                            var logoUrl = partner.LogoUrl ?? "null";
-#if ANDROID
-                            Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
-#endif
-                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner: Id={partner.Id}, Name={partner.Name}, LogoUrl={logoUrl}");
-                            
-                            PartnersRow1.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        
-                        // Ряд 2: средние партнёры (в обратном порядке для визуального эффекта)
-                        var row2Partners = partnersList.Skip((count + 2) / 3).Take((count + 2) / 3).Reverse().ToList();
-                        foreach (var partner in row2Partners)
-                        {
-                            PartnersRow2.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        
-                        // Ряд 3: оставшиеся партнёры
-                        var row3Partners = partnersList.Skip(2 * ((count + 2) / 3)).ToList();
-                        foreach (var partner in row3Partners)
-                        {
-                            PartnersRow3.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        
-                        // Дублируем для бесшовной прокрутки
-                        foreach (var partner in row1Partners)
-                        {
-                            PartnersRow1.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        foreach (var partner in row2Partners)
-                        {
-                            PartnersRow2.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        foreach (var partner in row3Partners)
-                        {
-                            PartnersRow3.Add(new PartnerLogoModel
-                            {
-                                Id = partner.Id.ToString(),
-                                Name = partner.Name ?? string.Empty,
-                                Logo = partner.LogoUrl ?? string.Empty
-                            });
-                        }
-                        
-#if ANDROID
-                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Загружено партнёров: Row1={PartnersRow1.Count}, Row2={PartnersRow2.Count}, Row3={PartnersRow3.Count}");
-                        if (PartnersRow1.Count > 0)
-                        {
-                            Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Первый партнёр лого: {PartnersRow1[0].Logo}");
-                        }
-#endif
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded {partners.Count} partners from server");
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Row1: {PartnersRow1.Count}, Row2: {PartnersRow2.Count}, Row3: {PartnersRow3.Count}");
-                        if (PartnersRow1.Count > 0)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] First partner logo: {PartnersRow1[0].Logo}");
-                        }
-                        return;
-                    }
-                    else
-                    {
-#if ANDROID
-                        Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] Партнёры не загружены или список пуст");
-#endif
-                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: Партнёры не загружены или список пуст");
-                    }
+                    LoadPartnersFallback();
+                    return;
                 }
-                else
+
+                var partners = await _partnersApiService.GetAllAsync();
+
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Получено партнёров: {partners?.Count ?? 0}");
+
+                if (partners == null || partners.Count == 0)
                 {
-#if ANDROID
-                    Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] _partnersApiService is null");
-#endif
-                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: _partnersApiService is null");
+                    LoadPartnersFallback();
+                    return;
                 }
-                
-                // Fallback на локальные изображения, если API недоступен или нет данных
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Использование fallback локальных партнёров");
-#endif
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using fallback local partners");
-                LoadPartnersFallback();
+
+                // Приводим к единому формату
+                var list = partners
+                    .OfType<PartnerDto>()
+                    .Select(p => new PartnerLogoModel
+                    {
+                        Id = p.Id.ToString(),
+                        Name = p.Name ?? "",
+                        Logo = p.LogoUrl ?? ""
+                    })
+                    .ToList();
+
+                if (list.Count == 0)
+                {
+                    LoadPartnersFallback();
+                    return;
+                }
+
+                // === ДЕЛИМ НА 3 РЯДА ===
+                int count = list.Count;
+                int perRow = Math.Max(1, count / 3);
+
+                var row1 = list.Take(perRow).ToList();
+                var row2 = list.Skip(perRow).Take(perRow).ToList();
+                var row3 = list.Skip(perRow * 2).ToList();
+
+                if (row2.Count == 0) row2 = row1.ToList();
+                if (row3.Count == 0) row3 = row2.ToList();
+
+                // === ДУБЛИРУЕМ КАЖДЫЙ РЯД (обязательно для бесшовного скролла) ===
+                row1 = row1.Concat(row1).ToList();
+                row2 = row2.Concat(row2).ToList();
+                row3 = row3.Concat(row3).ToList();
+
+                // === ДЕЛАЕМ ВСЕ РЯДЫ ОДИНАКОВЫМИ ПО ДЛИНЕ ===
+                row1 = EnsureEnough(row1);
+                row2 = EnsureEnough(row2);
+                row3 = EnsureEnough(row3);
+
+                // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI ===
+                foreach (var p in row1) PartnersRow1.Add(p);
+                foreach (var p in row2) PartnersRow2.Add(p);
+                foreach (var p in row3) PartnersRow3.Add(p);
+
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] PARTNERS READY: row1={PartnersRow1.Count}, row2={PartnersRow2.Count}, row3={PartnersRow3.Count}");
             }
             catch (Exception ex)
             {
-#if ANDROID
-                Android.Util.Log.Error("MainPageViewModel", $"[LoadPartnersAsync] ОШИБКА: {ex.Message}", ex);
-#endif
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync ОШИБКА: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] StackTrace: {ex.StackTrace}");
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading partners: {ex.Message}");
-                // Fallback на локальные изображения при ошибке
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync ERROR: {ex.Message}");
                 LoadPartnersFallback();
             }
         }
+
+        private List<PartnerLogoModel> EnsureEnough(List<PartnerLogoModel> list)
+        {
+            while (list.Count < 24)
+                list = list.Concat(list).ToList();
+
+            if (list.Count > 60)
+                list = list.Take(60).ToList();
+
+            return list;
+        }
+
+
 
         private void LoadPartnersFallback()
         {

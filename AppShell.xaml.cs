@@ -18,7 +18,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(WalletPage), typeof(WalletPage));
             Routing.RegisterRoute(nameof(PartnersListPage), typeof(PartnersListPage));
             Routing.RegisterRoute(nameof(PartnerPage), typeof(PartnerPage));
-            Routing.RegisterRoute(nameof(PartnerDetailPage), typeof(PartnerDetailPage));
+            Routing.RegisterRoute("partnerdetails", typeof(PartnerDetailPage));
             Routing.RegisterRoute(nameof(TransactionsPage), typeof(TransactionsPage));
             Routing.RegisterRoute(nameof(TransactionDetailsPage), typeof(TransactionDetailsPage));
             Routing.RegisterRoute(nameof(PolicyPage), typeof(PolicyPage));

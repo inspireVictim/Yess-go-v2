@@ -1,11 +1,11 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
+using Microsoft.Maui.ApplicationModel;
 using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
 using YessGoFront.ViewModels;
@@ -15,41 +15,55 @@ namespace YessGoFront.Views
 {
     public partial class MainPage : ContentPage
     {
+        // ============================
+        // Навигация
+        // ============================
         private bool _isNavigating;
         private const string WalletRoute = "///wallet";
 
-        // ===== Кросс-фейд сторис =====
+        // ============================
+        // Story Crossfade
+        // ============================
         private bool _topIsA = true;
         private CancellationTokenSource? _swapCts;
         private Image? _imgA;
         private Image? _imgB;
 
-        // ===== Автопрокрутка партнёров =====
+        // ============================
+        // Автоскролл партнёров
+        // ============================
         private CancellationTokenSource? _autoScrollCts;
         private DateTime _lastTouch = DateTime.Now;
         private const int IdleSeconds = 5;
 
-        // скорость пикселей в секунду
-        private const double SpeedRow1 = 20;  // вправо
-        private const double SpeedRow2 = -15; // влево
-        private const double SpeedRow3 = 18;  // вправо
+        // Скорости рядов
+        private const double SpeedRow1 = 20;   // вправо
+        private const double SpeedRow2 = -15;  // влево
+        private const double SpeedRow3 = 18;   // вправо
 
         private ScrollView? _row1;
         private ScrollView? _row2;
         private ScrollView? _row3;
 
-        private bool _row1Ready, _row2Ready, _row3Ready;
+        private bool _row1Ready;
+        private bool _row2Ready;
+        private bool _row3Ready;
 
+
+        // ============================
+        // Конструктор
+        // ============================
         public MainPage()
         {
             InitializeComponent();
 
-            // Получаем сервисы из DI и создаём ViewModel
+            // DI
             var bannerApiService = MauiProgram.Services.GetService<IBannerApiService>();
             var partnersApiService = MauiProgram.Services.GetService<IPartnersApiService>();
             var walletService = MauiProgram.Services.GetService<IWalletService>();
             var authService = MauiProgram.Services.GetService<IAuthService>();
             var authenticationService = MauiProgram.Services.GetService<Infrastructure.Auth.IAuthenticationService>();
+
             BindingContext = new MainPageViewModel(bannerApiService, partnersApiService, walletService, authService, authenticationService);
 
             BindingContextChanged += (_, __) =>
@@ -62,106 +76,112 @@ namespace YessGoFront.Views
             };
         }
 
+
+        // ============================
+        // OnAppearing
+        // ============================
         protected override async void OnAppearing()
         {
             base.OnAppearing();
 
-            _imgA ??= this.FindByName<Image>("StoryImageA");
-            _imgB ??= this.FindByName<Image>("StoryImageB");
+            _imgA ??= FindByName("StoryImageA") as Image;
+            _imgB ??= FindByName("StoryImageB") as Image;
 
-            _row1 ??= this.FindByName<ScrollView>("Row1");
-            _row2 ??= this.FindByName<ScrollView>("Row2");
-            _row3 ??= this.FindByName<ScrollView>("Row3");
+            _row1 ??= FindByName("Row1") as ScrollView;
+            _row2 ??= FindByName("Row2") as ScrollView;
+            _row3 ??= FindByName("Row3") as ScrollView;
 
+            // Фикс готовности рядов
             HookSizeReady(_row1, r => _row1Ready = r);
             HookSizeReady(_row2, r => _row2Ready = r);
             HookSizeReady(_row3, r => _row3Ready = r);
 
             HookPartnerRows();
+
+            // ДОП. ФИКС — ждём загрузки контента (BindLayout)
+            await Task.Delay(300);
             StartSmoothAutoScroll();
 
-            // ✅ Обновлённый вызов для новой версии BottomNavBar
+            // Navbar
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
 
-            // Проверяем ViewModel один раз
+            // Story timeline grid width
             if (BindingContext is MainPageViewModel viewModel)
             {
-                // Подключаем обработчик SizeChanged для контейнера прогресс-бара
-                var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+                var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
                 if (progressContainer != null)
                 {
                     progressContainer.SizeChanged += OnProgressTimelineContainerSizeChanged;
-                    // Обновляем ширину сразу, если она уже установлена
+
                     if (progressContainer.Width > 0)
-                    {
                         viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
-                    }
                 }
 
-                // Обновляем данные пользователя из локальной БД
                 await viewModel.RefreshUserAsync();
             }
         }
 
+
+        // ============================
+        // OnDisappearing
+        // ============================
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
+
             UnhookPartnerRows();
             StopSmoothAutoScroll();
 
-            if (BindingContext is MainPageViewModel vm)
+            var vm = BindingContext as MainPageViewModel;
+            if (vm != null)
                 vm.PropertyChanged -= OnVmPropertyChanged;
 
-            // Отключаем обработчик SizeChanged для контейнера прогресс-бара
-            var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+            var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
             if (progressContainer != null)
-            {
                 progressContainer.SizeChanged -= OnProgressTimelineContainerSizeChanged;
-            }
         }
 
-        // ===== Баннерам подгоняем размер =====
+
+        // ============================
+        // Banner size fix
+        // ============================
         protected override void OnSizeAllocated(double width, double height)
         {
             base.OnSizeAllocated(width, height);
 
-            // Фиксированная высота для баннеров - 90px, чтобы не было пустого пространства
-            var banners = this.FindByName<CollectionView>("BannersCollection");
+            var banners = FindByName("BannersCollection") as CollectionView;
             if (banners != null)
-                banners.HeightRequest = 90; // Фиксированная высота, равная высоте элементов
+                banners.HeightRequest = 90;
         }
 
-        // ===== Обновление ширины контейнера прогресс-бара =====
+
         private void OnProgressTimelineContainerSizeChanged(object? sender, EventArgs e)
         {
             if (sender is Grid container && BindingContext is MainPageViewModel vm)
             {
                 if (container.Width > 0)
-                {
                     vm.ProgressTimelineContainerWidth = container.Width;
-                }
             }
         }
 
-        // ===== Обработка VM обновлений (сторис) =====
+
+        // ============================
+        // Story crossfade
+        // ============================
         private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (BindingContext is not MainPageViewModel vm)
                 return;
 
-            // Обновляем ширину контейнера при открытии сторис
             if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
             {
                 if (vm.IsStoryOpen)
                 {
-                    // Небольшая задержка, чтобы контейнер успел отрисоваться
                     await Task.Delay(50);
-                    var progressContainer = this.FindByName<Grid>("ProgressTimelineContainer");
+                    var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
                     if (progressContainer != null && progressContainer.Width > 0)
-                    {
                         vm.ProgressTimelineContainerWidth = progressContainer.Width;
-                    }
                 }
                 return;
             }
@@ -173,9 +193,10 @@ namespace YessGoFront.Views
             if (string.IsNullOrWhiteSpace(nextSrc))
                 return;
 
-            _imgA ??= this.FindByName<Image>("StoryImageA");
-            _imgB ??= this.FindByName<Image>("StoryImageB");
-            if (_imgA is null || _imgB is null)
+            _imgA ??= FindByName("StoryImageA") as Image;
+            _imgB ??= FindByName("StoryImageB") as Image;
+
+            if (_imgA == null || _imgB == null)
                 return;
 
             _swapCts?.Cancel();
@@ -190,7 +211,6 @@ namespace YessGoFront.Views
                     var bottom = _topIsA ? _imgB : _imgA;
 
                     bottom.Opacity = 0;
-                    bottom.Source = null;
                     bottom.Source = nextSrc;
 
                     await Task.Delay(50, ct);
@@ -202,14 +222,20 @@ namespace YessGoFront.Views
                     top.Opacity = 0;
                 });
             }
-            catch (TaskCanceledException) { }
             catch { }
         }
 
-        // ===== Регистрируем готовность рядов =====
+
+        // ============================
+        // Готовность рядов
+        // ============================
         private void HookSizeReady(ScrollView? row, Action<bool> setReady)
         {
-            if (row == null) { setReady(false); return; }
+            if (row == null)
+            {
+                setReady(false);
+                return;
+            }
 
             setReady(IsRowReady(row));
             row.SizeChanged += (_, __) => setReady(IsRowReady(row));
@@ -219,13 +245,19 @@ namespace YessGoFront.Views
                 setReady(IsRowReady(row));
                 row.Scrolled -= Once;
             }
+
             row.Scrolled += Once;
         }
 
         private static bool IsRowReady(ScrollView row)
-            => row.ContentSize.Width > Math.Max(0, row.Width) + 1;
+        {
+            return row.ContentSize.Width > row.Width + 20;
+        }
 
-        // ===== Реакция на прокрутку =====
+
+        // ============================
+        // Обработчики скрола
+        // ============================
         private void HookPartnerRows()
         {
             Attach(_row1);
@@ -235,18 +267,9 @@ namespace YessGoFront.Views
             void Attach(ScrollView? sv)
             {
                 if (sv == null) return;
+
                 sv.Scrolled += OnAnyRowScrolled;
-
-                // Обработка тапа на ScrollView
-                var tap = new TapGestureRecognizer();
-                tap.Tapped += (_, __) => 
-                {
-                    _lastTouch = DateTime.Now;
-                    System.Diagnostics.Debug.WriteLine("[MainPage] Touch detected, resetting idle timer");
-                };
-                sv.GestureRecognizers.Add(tap);
             }
-
         }
 
         private void UnhookPartnerRows()
@@ -265,11 +288,15 @@ namespace YessGoFront.Views
         private void OnAnyRowScrolled(object? sender, ScrolledEventArgs e)
         {
             _lastTouch = DateTime.Now;
+
             if (sender is ScrollView sv)
                 SeamlessWrap(sv);
         }
 
-        // ===== Плавная авто-анимация =====
+
+        // ============================
+        // Автоскролл
+        // ============================
         private void StartSmoothAutoScroll()
         {
             StopSmoothAutoScroll();
@@ -304,7 +331,7 @@ namespace YessGoFront.Views
                     sw.Restart();
                 }
 
-                await Task.Delay(16, token); // ~60 fps
+                await Task.Delay(16, token);
             }
         }
 
@@ -313,16 +340,19 @@ namespace YessGoFront.Views
             if (sv == null) return;
 
             double contentWidth = sv.ContentSize.Width;
-            double viewport = sv.Width;
-            if (contentWidth <= viewport || contentWidth <= 0)
+            double viewportWidth = sv.Width;
+
+            if (contentWidth <= viewportWidth)
                 return;
 
             double newX = sv.ScrollX + delta;
 
-            if (newX > contentWidth / 2)
-                newX -= contentWidth / 2;
+            double half = contentWidth / 2;
+
+            if (newX > half)
+                newX -= half;
             else if (newX < 0)
-                newX += contentWidth / 2;
+                newX += half;
 
             try
             {
@@ -335,11 +365,12 @@ namespace YessGoFront.Views
         private void SeamlessWrap(ScrollView sv)
         {
             double contentWidth = sv.ContentSize.Width;
-            double viewport = sv.Width;
-            if (contentWidth <= viewport || contentWidth <= 0)
+            double viewportWidth = sv.Width;
+
+            if (contentWidth <= viewportWidth)
                 return;
 
-            double half = contentWidth / 2.0;
+            double half = contentWidth / 2;
             double x = sv.ScrollX;
 
             if (x > half + 2)
@@ -348,17 +379,14 @@ namespace YessGoFront.Views
                 _ = sv.ScrollToAsync(x + half, 0, false);
         }
 
-        // ===== Обновление времени последнего взаимодействия =====
-        private void OnPartnerLogoTapped(object? sender, EventArgs e)
-        {
-            _lastTouch = DateTime.Now;
-            System.Diagnostics.Debug.WriteLine("[MainPage] Partner logo tapped, resetting idle timer");
-        }
 
-        // ===== Навигация =====
+        // ============================
+        // Навигация
+        // ============================
         private async void OnWalletTapped(object? sender, EventArgs e)
         {
             if (_isNavigating) return;
+
             _isNavigating = true;
             try
             {
@@ -378,6 +406,7 @@ namespace YessGoFront.Views
         {
             if (_isNavigating) return;
             _isNavigating = true;
+
             try
             {
                 await Shell.Current.GoToAsync(nameof(TransactionsPage));
@@ -388,65 +417,58 @@ namespace YessGoFront.Views
             }
         }
 
+
         private async void OnMoreTapped(object sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("//main/partner");
         }
 
-        // Обработчик нажатия на блок категории
+
         private async void OnCategoryTapped(object? sender, EventArgs e)
         {
             if (_isNavigating) return;
+
             _isNavigating = true;
+
             try
             {
-                // Получаем slug категории из CommandParameter
-                string? categorySlug = null;
-                string? categoryName = null;
+                string? slug = null;
+                string? name = null;
 
                 if (sender is Frame frame)
                 {
-                    // Ищем TapGestureRecognizer в GestureRecognizers
-                    var tapRecognizer = frame.GestureRecognizers
+                    var tap = frame.GestureRecognizers
                         .OfType<TapGestureRecognizer>()
                         .FirstOrDefault();
-                    
-                    if (tapRecognizer != null)
-                    {
-                        var param = tapRecognizer.CommandParameter?.ToString();
-                        if (!string.IsNullOrEmpty(param))
-                        {
-                            // Маппинг slug к названиям категорий
-                            var categoryMap = new Dictionary<string, (string slug, string name)>
-                            {
-                                { "beauty", ("beauty", "Салоны красоты") },
-                                { "pharmacy", ("pharmacy", "Аптеки") },
-                                { "groceries", ("groceries", "Магазины") }
-                            };
 
-                            if (categoryMap.TryGetValue(param, out var category))
-                            {
-                                categorySlug = category.slug;
-                                categoryName = category.name;
-                            }
+                    if (tap?.CommandParameter is string param)
+                    {
+                        var map = new Dictionary<string, (string slug, string name)>
+                        {
+                            { "beauty", ("beauty", "Салоны красоты") },
+                            { "pharmacy", ("pharmacy", "Аптеки") },
+                            { "groceries", ("groceries", "Магазины") }
+                        };
+
+                        if (map.TryGetValue(param, out var data))
+                        {
+                            slug = data.slug;
+                            name = data.name;
                         }
                     }
                 }
 
-                // Если slug не найден, открываем страницу со всеми партнёрами
-                if (string.IsNullOrEmpty(categorySlug))
+                if (slug == null)
                 {
                     await Shell.Current.GoToAsync("///PartnersListPage");
                 }
                 else
                 {
-                    var route = $"///PartnersListPage?categorySlug={Uri.EscapeDataString(categorySlug)}&categoryName={Uri.EscapeDataString(categoryName ?? categorySlug)}";
+                    var route =
+                        $"///PartnersListPage?categorySlug={Uri.EscapeDataString(slug)}&categoryName={Uri.EscapeDataString(name!)}";
+
                     await Shell.Current.GoToAsync(route);
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainPage] Category navigation error: {ex.Message}");
             }
             finally
             {

@@ -564,7 +564,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow1.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }
@@ -576,7 +576,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow2.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }
@@ -588,7 +588,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow3.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }
@@ -599,7 +599,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow1.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }
@@ -608,7 +608,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow2.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }
@@ -617,7 +617,7 @@ namespace YessGoFront.ViewModels
                             PartnersRow3.Add(new PartnerLogoModel
                             {
                                 Id = partner.Id.ToString(),
-                                Name = partner.Name,
+                                Name = partner.Name ?? string.Empty,
                                 Logo = partner.LogoUrl ?? string.Empty
                             });
                         }

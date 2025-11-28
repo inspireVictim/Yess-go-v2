@@ -18,7 +18,13 @@
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">15.0</SupportedOSPlatformVersion>
 
 		<!-- Подавление предупреждений о версиях пакетов -->
-		<NoWarn>$(NoWarn);NU1608</NoWarn>
+		<NoWarn>$(NoWarn);NU1608;XC0045</NoWarn>
+
+		<!-- Включение компиляции биндингов с Source для производительности -->
+		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
+		<!-- Отключение XAML предупреждений для MainPage.xaml -->
+		<MauiDisableXamlWarnings>MainPage.xaml</MauiDisableXamlWarnings>
 	</PropertyGroup>
 
 	<!-- ✅ Android -->

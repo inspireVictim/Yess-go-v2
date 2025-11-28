@@ -137,7 +137,7 @@
                                         </Border.StrokeShape>
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer
-                                                Command="{Binding BindingContext.OpenStoryAsyncCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                                Command="{Binding BindingContext.OpenStoryAsyncCommand, Source={x:Reference MainPage}}"
                                                 CommandParameter="{Binding .}" />
                                         </Border.GestureRecognizers>
                                         <Image Source="{Binding Icon}" Aspect="AspectFill"/>
@@ -205,7 +205,7 @@
                                         </Grid>
                                     </Border>
                                     <Grid.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainPageViewModel}}, Path=OpenBannerAsyncCommand}" 
+                                        <TapGestureRecognizer Command="{Binding BindingContext.OpenBannerAsyncCommand, Source={x:Reference MainPage}}"
                                                               CommandParameter="{Binding .}"/>
                                     </Grid.GestureRecognizers>
                                 </Grid>
@@ -345,60 +345,62 @@
                            TextColor="#555"
                            Margin="0,2,0,0"/>
 
-                    <!-- 🔹 Исправленный блок -->
+                    <!-- 🔹 Исправленный блок с ScrollView для бесшовной прокрутки -->
                     <VerticalStackLayout Spacing="0" Padding="0" Margin="0">
 
                         <!-- Ряд 1 -->
                         <ScrollView x:Name="Row1"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never">
+                                    HorizontalScrollBarVisibility="Never"
+                                    VerticalScrollBarVisibility="Never"
+                                    VerticalOptions="Start">
                             <HorizontalStackLayout x:Name="Row1Panel"
                                                    Spacing="20"
                                                    Padding="24,0"
                                                    BindableLayout.ItemsSource="{Binding PartnersRow1}">
-             <BindableLayout.ItemTemplate>
-                 <DataTemplate x:DataType="models:PartnerLogoModel">
-                     <Grid WidthRequest="84" HeightRequest="84">
-                         <Border Padding="0"
-                                 BackgroundColor="White"
-                                 Stroke="#0F6B53"
-                                 StrokeThickness="1">
-                             <Border.StrokeShape>
-                                 <RoundRectangle CornerRadius="42"/>
-                             </Border.StrokeShape>
-                             <Grid>
-                                 <!-- Placeholder -->
-                                 <Grid x:Name="PartnerPlaceholder"
-                                       BackgroundColor="#E0E0E0"
-                                       HorizontalOptions="Fill"
-                                       VerticalOptions="Fill">
-                                     <ActivityIndicator IsRunning="True"
-                                                        Color="#0F6B53"
-                                                        VerticalOptions="Center"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="20"
-                                                        HeightRequest="20"/>
-                                 </Grid>
-                                 <!-- Изображение -->
-                                 <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}" 
-                                        Aspect="AspectFill"
-                                        HorizontalOptions="Fill"
-                                        VerticalOptions="Fill">
-                                     <Image.Behaviors>
-                                         <helpers:ImageLoadingBehavior />
-                                     </Image.Behaviors>
-                                 </Image>
-                             </Grid>
-                         </Border>
-                         <Grid.GestureRecognizers>
-                             <TapGestureRecognizer
-                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenPartnerAsyncCommand}"
-                                 CommandParameter="{Binding .}" />
-                         </Grid.GestureRecognizers>
-                     </Grid>
-                 </DataTemplate>
-             </BindableLayout.ItemTemplate>
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PartnerLogoModel">
+                                        <Grid WidthRequest="84" HeightRequest="84">
+                                            <Border Padding="0"
+                                                    BackgroundColor="White"
+                                                    Stroke="#0F6B53"
+                                                    StrokeThickness="1">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="42"/>
+                                                </Border.StrokeShape>
+                                                <Grid>
+                                                    <!-- Placeholder -->
+                                                    <Grid x:Name="PartnerPlaceholder"
+                                                          BackgroundColor="#E0E0E0"
+                                                          HorizontalOptions="Fill"
+                                                          VerticalOptions="Fill">
+                                                        <ActivityIndicator IsRunning="True"
+                                                                           Color="#0F6B53"
+                                                                           VerticalOptions="Center"
+                                                                           HorizontalOptions="Center"
+                                                                           WidthRequest="20"
+                                                                           HeightRequest="20"/>
+                                                    </Grid>
+                                                    <!-- Изображение -->
+                                                    <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
+                                                           Aspect="AspectFill"
+                                                           HorizontalOptions="Fill"
+                                                           VerticalOptions="Fill">
+                                                        <Image.Behaviors>
+                                                            <helpers:ImageLoadingBehavior />
+                                                        </Image.Behaviors>
+                                                    </Image>
+                                                </Grid>
+                                            </Border>
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPage}}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Grid.GestureRecognizers>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
                             </HorizontalStackLayout>
                         </ScrollView>
 
@@ -406,53 +408,55 @@
                         <ScrollView x:Name="Row2"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never">
+                                    HorizontalScrollBarVisibility="Never"
+                                    VerticalScrollBarVisibility="Never"
+                                    VerticalOptions="Start">
                             <HorizontalStackLayout x:Name="Row2Panel"
                                                    Spacing="20"
                                                    Padding="24,0"
                                                    BindableLayout.ItemsSource="{Binding PartnersRow2}">
-             <BindableLayout.ItemTemplate>
-                 <DataTemplate x:DataType="models:PartnerLogoModel">
-                     <Grid WidthRequest="84" HeightRequest="84">
-                         <Border Padding="0"
-                                 BackgroundColor="White"
-                                 Stroke="#0F6B53"
-                                 StrokeThickness="1">
-                             <Border.StrokeShape>
-                                 <RoundRectangle CornerRadius="42"/>
-                             </Border.StrokeShape>
-                             <Grid>
-                                 <!-- Placeholder -->
-                                 <Grid x:Name="PartnerPlaceholder"
-                                       BackgroundColor="#E0E0E0"
-                                       HorizontalOptions="Fill"
-                                       VerticalOptions="Fill">
-                                     <ActivityIndicator IsRunning="True"
-                                                        Color="#0F6B53"
-                                                        VerticalOptions="Center"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="20"
-                                                        HeightRequest="20"/>
-                                 </Grid>
-                                 <!-- Изображение -->
-                                 <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}" 
-                                        Aspect="AspectFill"
-                                        HorizontalOptions="Fill"
-                                        VerticalOptions="Fill">
-                                     <Image.Behaviors>
-                                         <helpers:ImageLoadingBehavior />
-                                     </Image.Behaviors>
-                                 </Image>
-                             </Grid>
-                         </Border>
-                         <Grid.GestureRecognizers>
-                             <TapGestureRecognizer
-                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenPartnerAsyncCommand}"
-                                 CommandParameter="{Binding .}" />
-                         </Grid.GestureRecognizers>
-                     </Grid>
-                 </DataTemplate>
-             </BindableLayout.ItemTemplate>
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PartnerLogoModel">
+                                        <Grid WidthRequest="84" HeightRequest="84">
+                                            <Border Padding="0"
+                                                    BackgroundColor="White"
+                                                    Stroke="#0F6B53"
+                                                    StrokeThickness="1">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="42"/>
+                                                </Border.StrokeShape>
+                                                <Grid>
+                                                    <!-- Placeholder -->
+                                                    <Grid x:Name="PartnerPlaceholder"
+                                                          BackgroundColor="#E0E0E0"
+                                                          HorizontalOptions="Fill"
+                                                          VerticalOptions="Fill">
+                                                        <ActivityIndicator IsRunning="True"
+                                                                           Color="#0F6B53"
+                                                                           VerticalOptions="Center"
+                                                                           HorizontalOptions="Center"
+                                                                           WidthRequest="20"
+                                                                           HeightRequest="20"/>
+                                                    </Grid>
+                                                    <!-- Изображение -->
+                                                    <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
+                                                           Aspect="AspectFill"
+                                                           HorizontalOptions="Fill"
+                                                           VerticalOptions="Fill">
+                                                        <Image.Behaviors>
+                                                            <helpers:ImageLoadingBehavior />
+                                                        </Image.Behaviors>
+                                                    </Image>
+                                                </Grid>
+                                            </Border>
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPage}}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Grid.GestureRecognizers>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
                             </HorizontalStackLayout>
                         </ScrollView>
 
@@ -460,7 +464,9 @@
                         <ScrollView x:Name="Row3"
                                     Orientation="Horizontal"
                                     HeightRequest="98"
-                                    HorizontalScrollBarVisibility="Never">
+                                    HorizontalScrollBarVisibility="Never"
+                                    VerticalScrollBarVisibility="Never"
+                                    VerticalOptions="Start">
                             <HorizontalStackLayout x:Name="Row3Panel"
                                                    Spacing="20"
                                                    Padding="24,0"
@@ -477,7 +483,8 @@
                                                 </Border.StrokeShape>
                                                 <Grid>
                                                     <!-- Placeholder -->
-                                                    <Grid BackgroundColor="#E0E0E0"
+                                                    <Grid x:Name="PartnerPlaceholder"
+                                                          BackgroundColor="#E0E0E0"
                                                           HorizontalOptions="Fill"
                                                           VerticalOptions="Fill">
                                                         <ActivityIndicator IsRunning="True"
@@ -488,7 +495,7 @@
                                                                            HeightRequest="20"/>
                                                     </Grid>
                                                     <!-- Изображение -->
-                                                    <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}" 
+                                                    <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
                                                            Aspect="AspectFill"
                                                            HorizontalOptions="Fill"
                                                            VerticalOptions="Fill">
@@ -500,7 +507,7 @@
                                             </Border>
                                             <Grid.GestureRecognizers>
                                                 <TapGestureRecognizer
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenPartnerAsyncCommand}"
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPage}}"
                                                     CommandParameter="{Binding .}" />
                                             </Grid.GestureRecognizers>
                                         </Grid>
@@ -570,8 +577,8 @@
                                                 <converters:StoryProgressWidthConverter/>
                                             </MultiBinding.Converter>
                                             <Binding Path="."/>
-                                            <Binding Path="BindingContext.CurrentStoryPageCount" Source="{RelativeSource AncestorType={x:Type ContentPage}}"/>
-                                            <Binding Path="BindingContext.ProgressTimelineContainerWidth" Source="{RelativeSource AncestorType={x:Type ContentPage}}"/>
+                                            <Binding Path="BindingContext.CurrentStoryPageCount" Source="{x:Reference MainPage}"/>
+                                            <Binding Path="BindingContext.ProgressTimelineContainerWidth" Source="{x:Reference MainPage}"/>
                                         </MultiBinding>
                                     </Border.WidthRequest>
                                 </Border>

@@ -36,5 +36,10 @@ public interface IPartnersApiService
     /// Получить партнёров рядом с указанными координатами
     /// </summary>
     Task<IReadOnlyList<PartnerDto>> GetNearbyAsync(double latitude, double longitude, int radius = 5000, CancellationToken ct = default);
+
+    /// <summary>
+    /// Получить продукты партнёра
+    /// </summary>
+    Task<IReadOnlyList<ProductDto>> GetProductsAsync(string partnerId, CancellationToken ct = default);
 }
 

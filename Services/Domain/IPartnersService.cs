@@ -29,5 +29,9 @@ public interface IPartnersService
         double longitude,
         int radius = 5000,
         CancellationToken ct = default);
+
+    Task<IReadOnlyList<ProductDto>> GetPartnerProductsAsync(
+        string partnerId,
+        CancellationToken ct = default);
 }
 

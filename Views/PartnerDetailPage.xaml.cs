@@ -282,5 +282,27 @@ namespace YessGoFront.Views
                 }
             }
         }
+
+        private async void OnViewProductsClicked(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(partnerId))
+            {
+                await DisplayAlert("Ошибка", "Не удалось определить партнёра", "OK");
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Переход к продуктам партнёра: {partnerId}");
+                var route = $"PartnerDetailViewPage?partnerId={Uri.EscapeDataString(partnerId)}";
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Навигация к: {route}");
+                await Shell.Current.GoToAsync(route, animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Ошибка навигации к продуктам: {ex.Message}");
+                await DisplayAlert("Ошибка", "Не удалось открыть каталог продуктов", "OK");
+            }
+        }
     }
 }

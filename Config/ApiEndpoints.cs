@@ -53,6 +53,7 @@ public static class ApiEndpoints
         public const string Categories = $"{Partners}/categories";
         public static string Nearby(double latitude, double longitude, double radius = 10.0)
             => $"{Locations}?latitude={latitude}&longitude={longitude}&radius={radius}";
+        public static string Products(int partnerId) => $"{Partners}/{partnerId}/products";
     }
 
     // Wallet endpoints

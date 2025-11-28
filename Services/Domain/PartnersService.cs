@@ -134,5 +134,28 @@ public class PartnersService : IPartnersService
             throw new NetworkException("Не удалось загрузить ближайших партнёров", ex);
         }
     }
+
+    public async Task<IReadOnlyList<ProductDto>> GetPartnerProductsAsync(
+        string partnerId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(partnerId))
+                throw new ArgumentException("Partner ID cannot be empty", nameof(partnerId));
+
+            _logger?.LogDebug("Getting products for partner: {PartnerId}", partnerId);
+            return await _apiService.GetProductsAsync(partnerId, ct);
+        }
+        catch (ApiException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error getting products for partner {PartnerId}", partnerId);
+            throw new NetworkException("Не удалось загрузить продукты партнёра", ex);
+        }
+    }
 }
 

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
 using YessGoFront.Views;
+using YessGoFront.Pages;
 using YessGoFront.Services;
 
 namespace YessGoFront
@@ -15,21 +16,22 @@ namespace YessGoFront
             InitializeComponent();
 
             // Регистрация внутренних маршрутов
-            Routing.RegisterRoute(nameof(WalletPage), typeof(WalletPage));
-            Routing.RegisterRoute(nameof(PartnersListPage), typeof(PartnersListPage));
-            Routing.RegisterRoute(nameof(PartnerPage), typeof(PartnerPage));
-            Routing.RegisterRoute("partnerdetails", typeof(PartnerDetailPage));
-            Routing.RegisterRoute(nameof(TransactionsPage), typeof(TransactionsPage));
-            Routing.RegisterRoute(nameof(TransactionDetailsPage), typeof(TransactionDetailsPage));
-            Routing.RegisterRoute(nameof(PolicyPage), typeof(PolicyPage));
-            Routing.RegisterRoute(nameof(ConditionsPage), typeof(ConditionsPage));
-            Routing.RegisterRoute(nameof(ContactsPage), typeof(ContactsPage));
-            Routing.RegisterRoute(nameof(PublicOfferPage), typeof(PublicOfferPage));
-            Routing.RegisterRoute(nameof(RefundPolicyPage), typeof(RefundPolicyPage));
-            Routing.RegisterRoute(nameof(PaymentSecurityPage), typeof(PaymentSecurityPage));
-            Routing.RegisterRoute(nameof(DeliveryTermsPage), typeof(DeliveryTermsPage));
-            Routing.RegisterRoute(nameof(FeedbackPage), typeof(FeedbackPage));
-            Routing.RegisterRoute(nameof(CertificatePage), typeof(CertificatePage));
+            Routing.RegisterRoute(nameof(Views.WalletPage), typeof(Views.WalletPage));
+            Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
+            Routing.RegisterRoute(nameof(Views.PartnerPage), typeof(Views.PartnerPage));
+            Routing.RegisterRoute("partnerdetails", typeof(Views.PartnerDetailPage));
+            Routing.RegisterRoute("PartnerDetailViewPage", typeof(PartnerDetailViewPage));
+            Routing.RegisterRoute(nameof(Views.TransactionsPage), typeof(Views.TransactionsPage));
+            Routing.RegisterRoute(nameof(Views.TransactionDetailsPage), typeof(Views.TransactionDetailsPage));
+            Routing.RegisterRoute(nameof(Views.PolicyPage), typeof(Views.PolicyPage));
+            Routing.RegisterRoute(nameof(Views.ConditionsPage), typeof(Views.ConditionsPage));
+            Routing.RegisterRoute(nameof(Views.ContactsPage), typeof(Views.ContactsPage));
+            Routing.RegisterRoute(nameof(Views.PublicOfferPage), typeof(Views.PublicOfferPage));
+            Routing.RegisterRoute(nameof(Views.RefundPolicyPage), typeof(Views.RefundPolicyPage));
+            Routing.RegisterRoute(nameof(Views.PaymentSecurityPage), typeof(Views.PaymentSecurityPage));
+            Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
+            Routing.RegisterRoute(nameof(Views.FeedbackPage), typeof(Views.FeedbackPage));
+            Routing.RegisterRoute(nameof(Views.CertificatePage), typeof(Views.CertificatePage));
 
 
         }

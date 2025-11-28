@@ -116,5 +116,18 @@ public class PartnersApiService : ApiClient, IPartnersApiService
         var result = await GetAsync<List<PartnerDto>>(endpoint, ct);
         return result ?? new List<PartnerDto>();
     }
+
+    public async Task<IReadOnlyList<ProductDto>> GetProductsAsync(
+        string partnerId,
+        CancellationToken ct = default)
+    {
+        if (!int.TryParse(partnerId, out var id))
+        {
+            throw new ArgumentException($"Invalid partner ID: {partnerId}", nameof(partnerId));
+        }
+        var endpoint = ApiEndpoints.PartnersEndpoints.Products(id);
+        var result = await GetAsync<List<ProductDto>>(endpoint, ct);
+        return result ?? new List<ProductDto>();
+    }
 }
 

@@ -338,7 +338,8 @@ namespace YessGoFront.Views
                 
                 if (context is PartnerListItem item)
                 {
-                    await Shell.Current.GoToAsync($"///PartnerDetailPage?partnerId={item.Id}");
+                    // Открываем сразу страницу с продуктами
+                    await Shell.Current.GoToAsync($"PartnerDetailViewPage?partnerId={item.Id}");
                 }
                 else
                 {

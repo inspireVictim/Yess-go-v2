@@ -85,6 +85,9 @@
 		<None Remove="Tests\**" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Compile Update="Pages\PartnerDetailViewPage.xaml.cs">
+	    <DependentUpon>PartnerDetailViewPage.xaml</DependentUpon>
+	  </Compile>
 	  <Compile Update="Views\ContactsPage.xaml.cs">
 	    <DependentUpon>ContactsPage.xaml</DependentUpon>
 	  </Compile>

@@ -166,6 +166,14 @@
 
                 <!-- Кнопки действий -->
                 <VerticalStackLayout Spacing="12" Margin="0,8,0,0">
+                    <Button Text="🛍️ Просмотреть продукты"
+                            HeightRequest="52"
+                            BackgroundColor="#FF9800"
+                            TextColor="White"
+                            CornerRadius="12"
+                            FontAttributes="Bold"
+                            Clicked="OnViewProductsClicked"/>
+
                     <Button Text="📍 Посмотреть на карте"
                             HeightRequest="52"
                             BackgroundColor="#0F6B53"

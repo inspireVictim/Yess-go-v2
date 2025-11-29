@@ -32,6 +32,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
             Routing.RegisterRoute(nameof(Views.FeedbackPage), typeof(Views.FeedbackPage));
             Routing.RegisterRoute(nameof(Views.CertificatePage), typeof(Views.CertificatePage));
+            Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
 
 
         }

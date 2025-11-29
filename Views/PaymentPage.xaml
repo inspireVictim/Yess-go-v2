@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.PaymentPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
+    xmlns:converters="clr-namespace:YessGoFront.Converters"
+    x:DataType="viewmodels:PaymentViewModel"
+    Title="Оплата"
+    Shell.NavBarIsVisible="True"
+    BackgroundColor="#F4F6F8">
+
+    <ContentPage.Resources>
+        <converters:InverseBoolConverter x:Key="InvertedBoolConverter"/>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+
+            <!-- Информация о партнёре -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="16" 
+                   HasShadow="True" 
+                   Padding="20">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Партнёр:" 
+                           FontSize="14" 
+                           TextColor="#666" />
+                    <Label Text="{Binding PartnerName}" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           TextColor="#222" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Ввод суммы -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="16" 
+                   HasShadow="True" 
+                   Padding="20">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Сумма оплаты (KGS):" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#222" />
+                    
+                    <Entry Text="{Binding Amount, Mode=TwoWay}"
+                           Keyboard="Numeric"
+                           Placeholder="Введите сумму"
+                           FontSize="18"
+                           BackgroundColor="#F8F9FA"
+                           TextColor="#222" />
+
+                    <!-- Быстрый выбор суммы -->
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                        <Button Text="100" 
+                                Grid.Column="0"
+                                Command="{Binding SetAmountCommand}"
+                                CommandParameter="100"
+                                BackgroundColor="#E8F5E9"
+                                TextColor="#0F6B53"
+                                CornerRadius="8" />
+                        <Button Text="500" 
+                                Grid.Column="1"
+                                Command="{Binding SetAmountCommand}"
+                                CommandParameter="500"
+                                BackgroundColor="#E8F5E9"
+                                TextColor="#0F6B53"
+                                CornerRadius="8" />
+                        <Button Text="1000" 
+                                Grid.Column="2"
+                                Command="{Binding SetAmountCommand}"
+                                CommandParameter="1000"
+                                BackgroundColor="#E8F5E9"
+                                TextColor="#0F6B53"
+                                CornerRadius="8" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Кнопка оплаты -->
+            <Button Text="Оплатить" 
+                    Command="{Binding ProcessPaymentCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    BackgroundColor="#0F6B53"
+                    TextColor="White"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    CornerRadius="12"
+                    HeightRequest="50" />
+
+            <!-- Кнопка отмены -->
+            <Button Text="Отмена" 
+                    Command="{Binding CancelCommand}"
+                    BackgroundColor="#E0E0E0"
+                    TextColor="#666"
+                    CornerRadius="12"
+                    HeightRequest="50" />
+
+            <!-- Индикатор загрузки -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}" 
+                              IsVisible="{Binding IsBusy}"
+                              Color="#0F6B53" />
+
+            <!-- Сообщение об ошибке -->
+            <Label Text="{Binding ErrorMessage}" 
+                   IsVisible="{Binding HasError}"
+                   TextColor="#D32F2F"
+                   FontSize="14"
+                   HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
+

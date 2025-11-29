@@ -69,6 +69,9 @@ public class PartnerDto
     [JsonPropertyName("coverImageUrl")] 
     public string? CoverImageUrl { get; set; }
     
+    [JsonPropertyName("qr_code_url")]
+    public string? QrCodeUrl { get; set; }
+    
     [JsonPropertyName("cashback_rate")]
     [JsonConverter(typeof(DecimalToDoubleConverter))]
     public double CashbackPercent { get; set; }

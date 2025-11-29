@@ -18,6 +18,8 @@ using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
 using ZXing.Net.Maui.Controls;
 using Microsoft.Maui.Handlers;
+using YessGoFront.ViewModels;
+
 #if ANDROID
 using YessGoFront.Platforms.Android.Handlers;
 #endif
@@ -66,6 +68,9 @@ public static class MauiProgram
 
         var app = builder.Build();
         Services = app.Services;
+
+
+
 
         // Инициализируем базу данных при запуске приложения
         _ = Task.Run(async () =>
@@ -273,7 +278,8 @@ public static class MauiProgram
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPartnersService, PartnersService>();
         services.AddScoped<IWalletService, WalletService>();
-        services.AddScoped<IQRService, QRService>();
+        services.AddScoped<YessGoFront.Services.QRService.IQRService, YessGoFront.Services.QRService.QRService>();
+        services.AddScoped<YessGoFront.Services.Domain.IQRService, YessGoFront.Services.Domain.QRService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPromoCodeService, PromoCodeService>();
     }
@@ -285,6 +291,8 @@ public static class MauiProgram
         services.AddTransient<ViewModels.TransactionDetailsViewModel>();
         services.AddTransient<ViewModels.NotificationsViewModel>();
         services.AddTransient<ViewModels.PromocodeViewModel>();
+        services.AddTransient<ViewModels.QrViewModel>();
+        services.AddTransient<ViewModels.PaymentViewModel>();
     }
 
     private static void ConfigureLogging(MauiAppBuilder builder)

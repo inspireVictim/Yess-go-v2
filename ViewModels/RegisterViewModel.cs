@@ -272,8 +272,11 @@ public partial class RegisterViewModel : ObservableObject
         _logger?.LogWarning("Registration error: {Message}", message);
     }
 
-    private static string ParseApiError(string msg)
+    private static string ParseApiError(string? msg)
     {
+        if (string.IsNullOrWhiteSpace(msg))
+            return "Произошла ошибка";
+            
         if (msg.StartsWith("Неверный запрос"))
         {
             msg = msg.Replace("Неверный запрос", "").Trim();

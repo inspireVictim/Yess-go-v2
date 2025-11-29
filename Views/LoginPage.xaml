@@ -41,24 +41,35 @@
                                        FullPhoneNumber="{Binding Phone, Mode=TwoWay}" />
 
 				<!-- Поле Пароль -->
-				<Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+                <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
 					<Grid Padding="12,0" ColumnDefinitions="*,Auto">
 						<Entry x:Name="PasswordEntry" 
-                                Placeholder="Пароль" 
+                                Placeholder="Пароль"
+								PlaceholderColor="#6B7280"
                                 IsPassword="True" 
                                 BackgroundColor="Transparent"
+								VerticalOptions="Center"
+                                TextColor="#6B7280"
                                 Text="{Binding Password, Mode=TwoWay}" />
-						<Label Grid.Column="1" 
-                               Text="👁" 
-                               FontSize="20" 
-                               VerticalOptions="Center" 
+						<Image x:Name="PasswordVisibilityIcon"
+                               Grid.Column="1"
+                               WidthRequest="24"
+                               HeightRequest="24"
+                               VerticalOptions="Center"
                                HorizontalOptions="Center"
-                               Padding="8,0"
-                               TextColor="#666666">
-							<Label.GestureRecognizers>
+                               Margin="8,0"
+                               Source="majesticons_eye_off">
+							<Image.Triggers>
+								<DataTrigger TargetType="Image" 
+                                           Binding="{Binding Source={x:Reference PasswordEntry}, Path=IsPassword}" 
+                                           Value="False">
+									<Setter Property="Source" Value="mingcute_eye_line" />
+								</DataTrigger>
+							</Image.Triggers>
+							<Image.GestureRecognizers>
 								<TapGestureRecognizer Tapped="TogglePassword_Tapped"/>
-							</Label.GestureRecognizers>
-						</Label>
+							</Image.GestureRecognizers>
+						</Image>
 					</Grid>
 				</Border>
 

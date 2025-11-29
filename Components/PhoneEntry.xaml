@@ -33,12 +33,16 @@
 
         <!-- Поле ввода номера -->
         <Entry x:Name="PhoneNumberEntryBinding"
-               Grid.Column="2"
-               Placeholder="555 12 34 56"
-               Keyboard="Telephone"
-               BackgroundColor="Transparent"
-               TextChanged="OnPhoneNumberChanged"
-               MaxLength="12" />
+            Grid.Column="2"
+            Placeholder="555 123 456"
+            PlaceholderColor="#6B7280"
+            Keyboard="Telephone"
+            BackgroundColor="Transparent"
+            TextChanged="OnPhoneNumberChanged"
+            MaxLength="12"
+            TextColor="#6B7280"
+            VerticalOptions="Center" />
+
 
         <!-- Индикатор валидности -->
         <Label x:Name="ValidationIndicator"

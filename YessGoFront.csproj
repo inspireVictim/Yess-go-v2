@@ -43,6 +43,7 @@
 	<!-- ✅ Ресурсы -->
 	<ItemGroup>
 		<MauiImage Include="Resources\Images\**" />
+		<MauiImage Include="Resources\Eye\**" />
 		<MauiFont Include="Resources\Fonts\**" />
 		<MauiSplashScreen Include="Resources\Splash\**" Color="FFFFFF" />
 		<!-- Иконка приложения - MAUI автоматически создаст все необходимые размеры для Android и iOS -->

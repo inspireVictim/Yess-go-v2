@@ -42,8 +42,11 @@
                         <Grid Padding="12,0">
                             <Entry x:Name="FirstNameEntry" 
                                    Placeholder="Имя" 
+                                   PlaceholderColor="#6B7280"
                                    Keyboard="Default" 
                                    BackgroundColor="Transparent"
+                                   VerticalOptions="Center"
+                                   TextColor="#6B7280"
                                    Text="{Binding FirstName}" />
                         </Grid>
                     </Border>
@@ -53,8 +56,11 @@
                         <Grid Padding="12,0">
                             <Entry x:Name="LastNameEntry" 
                                    Placeholder="Фамилия" 
+                                   PlaceholderColor="#6B7280"
                                    Keyboard="Default" 
                                    BackgroundColor="Transparent"
+                                   VerticalOptions="Center"
+                                   TextColor="#6B7280"
                                    Text="{Binding LastName}" />
                         </Grid>
                     </Border>
@@ -111,10 +117,13 @@
                             IsVisible="{Binding IsVerificationStep}">
                         <Grid Padding="12,0">
                             <Entry x:Name="VerificationCodeEntry" 
-                                   Placeholder="Введите код из SMS" 
+                                   Placeholder="Введите код из SMS"
+                                   PlaceholderColor="#6B7280"
                                    Keyboard="Numeric" 
                                    BackgroundColor="Transparent"
                                    Text="{Binding VerificationCode}"
+                                   VerticalOptions="Center"
+                                   TextColor="#6B7280"
                                    MaxLength="6" />
                         </Grid>
                     </Border>
@@ -124,20 +133,31 @@
                         <Grid Padding="12,0" ColumnDefinitions="*,Auto">
                             <Entry x:Name="PasswordEntry" 
                                    Placeholder="Пароль" 
+                                   PlaceholderColor="#6B7280"
                                    IsPassword="True" 
                                    BackgroundColor="Transparent"
-                                   Text="{Binding Password}" />
-                            <Label Grid.Column="1" 
-                                   Text="👁" 
-                                   FontSize="20" 
-                                   VerticalOptions="Center" 
+                                   TextColor="#6B7280"
+                                   Text="{Binding Password}" 
+                                   VerticalOptions="Center" />
+                            <Image x:Name="PasswordVisibilityIcon"
+                                   Grid.Column="1"
+                                   WidthRequest="24"
+                                   HeightRequest="24"
+                                   VerticalOptions="Center"
                                    HorizontalOptions="Center"
-                                   Padding="8,0"
-                                   TextColor="#666666">
-                                <Label.GestureRecognizers>
+                                   Margin="8,0"
+                                   Source="majesticons_eye_off">
+                                <Image.Triggers>
+                                    <DataTrigger TargetType="Image" 
+                                               Binding="{Binding Source={x:Reference PasswordEntry}, Path=IsPassword}" 
+                                               Value="False">
+                                        <Setter Property="Source" Value="mingcute_eye_line" />
+                                    </DataTrigger>
+                                </Image.Triggers>
+                                <Image.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="TogglePassword_Tapped"/>
-                                </Label.GestureRecognizers>
-                            </Label>
+                                </Image.GestureRecognizers>
+                            </Image>
                         </Grid>
                     </Border>
 
@@ -146,47 +166,56 @@
                         <Grid Padding="12,0" ColumnDefinitions="*,Auto">
                             <Entry x:Name="ConfirmPasswordEntry" 
                                    Placeholder="Подтвердите пароль" 
+                                   PlaceholderColor="#6B7280"
                                    IsPassword="True" 
                                    BackgroundColor="Transparent"
-                                   Text="{Binding ConfirmPassword}" />
-                            <Label Grid.Column="1" 
-                                   Text="👁" 
-                                   FontSize="20" 
-                                   VerticalOptions="Center" 
+                                   TextColor="#6B7280"
+                                   Text="{Binding ConfirmPassword}" 
+                                   VerticalOptions="Center" />
+                            <Image x:Name="ConfirmPasswordVisibilityIcon"
+                                   Grid.Column="1"
+                                   WidthRequest="24"
+                                   HeightRequest="24"
+                                   VerticalOptions="Center"
                                    HorizontalOptions="Center"
-                                   Padding="8,0"
-                                   TextColor="#666666">
-                                <Label.GestureRecognizers>
+                                   Margin="8,0"
+                                   Source="majesticons_eye_off">
+                                <Image.Triggers>
+                                    <DataTrigger TargetType="Image" 
+                                               Binding="{Binding Source={x:Reference ConfirmPasswordEntry}, Path=IsPassword}" 
+                                               Value="False">
+                                        <Setter Property="Source" Value="mingcute_eye_line" />
+                                    </DataTrigger>
+                                </Image.Triggers>
+                                <Image.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="ToggleConfirmPassword_Tapped"/>
-                                </Label.GestureRecognizers>
-                            </Label>
+                                </Image.GestureRecognizers>
+                            </Image>
                         </Grid>
                     </Border>
 
-                    <!-- Текст с ссылкой на политику конфиденциальности -->
-                    <Label x:Name="PolicyLinkLabel" 
-                           FontSize="13" 
-                           TextColor="#666666"
-                           Margin="0,0,0,8">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Я согласен(а) с " />
-                                <Span x:Name="PolicyLinkSpan" 
-                                      Text="политикой конфиденциальности" 
-                                      TextColor="#007A51"
-                                      TextDecorations="Underline"
-                                      FontAttributes="Bold">
-                                    <Span.GestureRecognizers>
-                                        <TapGestureRecognizer Tapped="OnPolicyLinkTapped"/>
-                                    </Span.GestureRecognizers>
-                                </Span>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <HorizontalStackLayout Spacing="8">
-                        <CheckBox x:Name="acknowledged" Color="#007A51" IsChecked="{Binding IsPolicyAcknowledged}"/>
-                        <Label Text="Ознакомлен(а)" VerticalOptions="Center"/>
+                    <!-- Текст с ссылкой на политику конфиденциальности и чекбокс -->
+                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                        <CheckBox x:Name="acknowledged" Color="#007A51" IsChecked="{Binding IsPolicyAcknowledged}" VerticalOptions="Center"/>
+                        <Label x:Name="PolicyLinkLabel" 
+                               FontSize="11" 
+                               TextColor="#666666"
+                               VerticalOptions="Center">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Я согласен(а) с " />
+                                    <Span x:Name="PolicyLinkSpan" 
+                                          Text="политикой конфиденциальности" 
+                                          TextColor="#007A51"
+                                          TextDecorations="Underline"
+                                          FontAttributes="Bold">
+                                        <Span.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnPolicyLinkTapped"/>
+                                        </Span.GestureRecognizers>
+                                    </Span>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
                     </HorizontalStackLayout>
 
                     <!-- Сообщение об ошибке -->

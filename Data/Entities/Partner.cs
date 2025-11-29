@@ -105,6 +105,7 @@ public class Partner
     public City? City { get; set; }
 
     public List<PartnerLocation> Locations { get; set; } = new();
+    public List<PartnerProduct> Products { get; set; } = new();
     public List<Order> Orders { get; set; } = new();
     public List<Transaction> Transactions { get; set; } = new();
     public List<Promotion> Promotions { get; set; } = new();

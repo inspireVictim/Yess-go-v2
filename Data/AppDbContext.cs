@@ -30,6 +30,7 @@ public class AppDbContext : DbContext
     public DbSet<City> Cities { get; set; } = null!;
     public DbSet<Partner> Partners { get; set; } = null!;
     public DbSet<PartnerLocation> PartnerLocations { get; set; } = null!;
+    public DbSet<PartnerProduct> PartnerProducts { get; set; } = null!;
     public DbSet<Transaction> Transactions { get; set; } = null!;
     public DbSet<Order> Orders { get; set; } = null!;
     public DbSet<Notification> Notifications { get; set; } = null!;

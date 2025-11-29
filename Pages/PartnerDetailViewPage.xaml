@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:converters="clr-namespace:YessGoFront.Converters"
+             xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
              x:Class="YessGoFront.Pages.PartnerDetailViewPage"
              BackgroundColor="#F9F9F9"
              Title="Продукты партнёра">
@@ -18,6 +19,7 @@
             <!-- Обложка с изображением партнёра -->
             <Grid HeightRequest="250" BackgroundColor="#DC2626">
                 <Image x:Name="CoverImage"
+                       Source="{Binding CoverImageSource}"
                        Aspect="AspectFill"
                        Opacity="0.5"
                        HorizontalOptions="Fill"
@@ -26,8 +28,7 @@
                 <!-- Верхняя панель с кнопкой назад, поиском и меню -->
                 <Grid Padding="16,12" RowDefinitions="Auto">
                     <HorizontalStackLayout Spacing="12" VerticalOptions="Start">
-                        <Button x:Name="BackButton"
-                                Text="←"
+                        <Button Text="←"
                                 BackgroundColor="#40000000"
                                 TextColor="White"
                                 FontSize="20"
@@ -36,7 +37,7 @@
                                 HeightRequest="40"
                                 CornerRadius="20"
                                 Padding="0"
-                                Clicked="OnBackClicked"/>
+                                Command="{Binding GoBackCommand}"/>
                         
                         <HorizontalStackLayout HorizontalOptions="EndAndExpand" Spacing="12">
                             <Label Text="🔍"
@@ -82,7 +83,7 @@
 
                     <!-- Название бренда -->
                     <VerticalStackLayout Spacing="4" VerticalOptions="Center">
-                        <Label x:Name="PartnerNameLabel"
+                        <Label Text="{Binding PartnerName}"
                                FontSize="28"
                                FontAttributes="Bold"
                                TextColor="Black"
@@ -93,19 +94,17 @@
                 <!-- Промо и рейтинг -->
                 <HorizontalStackLayout Spacing="16" VerticalOptions="Center">
                     <!-- Промо-бейдж -->
-                    <Border x:Name="PromoBorder"
-                            BackgroundColor="#10B981"
+                    <Border BackgroundColor="#10B981"
                             StrokeThickness="0"
                             StrokeShape="RoundRectangle 8"
-                            Padding="12,6">
+                            Padding="12,6"
+                            IsVisible="{Binding IsPromoVisible}">
                         <HorizontalStackLayout Spacing="6">
-                            <Label x:Name="PromoPercentLabel"
-                                   Text="-30%"
+                            <Label Text="{Binding PromoPercent}"
                                    FontSize="14"
                                    FontAttributes="Bold"
                                    TextColor="White"/>
-                            <Label x:Name="PromoText"
-                                   Text="скидки на все"
+                            <Label Text="{Binding PromoText}"
                                    FontSize="12"
                                    TextColor="White"/>
                         </HorizontalStackLayout>
@@ -125,13 +124,28 @@
                 </HorizontalStackLayout>
 
                 <!-- Список продуктов -->
-                <Label Text="Продукты"
-                       FontSize="20"
-                       FontAttributes="Bold"
-                       TextColor="Black"
-                       Margin="0,8,0,8"/>
+                <HorizontalStackLayout Spacing="8" Margin="0,8,0,8">
+                    <Label Text="Продукты"
+                           FontSize="20"
+                           FontAttributes="Bold"
+                           TextColor="Black"/>
+                    <Label Text="{Binding Products.Count, StringFormat='({0})'}"
+                           FontSize="16"
+                           TextColor="#666"
+                           VerticalOptions="Center"/>
+                </HorizontalStackLayout>
 
-                <CollectionView x:Name="ProductsCollection"
+                <!-- Сообщение, если продуктов нет -->
+                <Label x:Name="EmptyProductsLabel"
+                       Text="Продукты для этого партнёра пока не добавлены в базу данных"
+                       FontSize="14"
+                       TextColor="#999"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       Margin="20"
+                       IsVisible="False"/>
+
+                <CollectionView ItemsSource="{Binding Products}"
                                 SelectionMode="None"
                                 ItemsLayout="VerticalList"
                                 ItemSizingStrategy="MeasureFirstItem">
@@ -143,7 +157,7 @@
                                    Padding="0"
                                    Margin="0,0,0,16"
                                    HasShadow="True">
-                                <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                                     <!-- Изображение продукта -->
                                     <Grid Grid.Row="0" Grid.ColumnSpan="2">
                                         <Image Source="{Binding ImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
@@ -160,7 +174,7 @@
                                                     StrokeShape="RoundRectangle 8"
                                                     Padding="8,4"
                                                     IsVisible="{Binding DiscountPercent, Converter={StaticResource IsNotNullConverter}}">
-                                                <Label Text="{Binding DiscountPercent, StringFormat='-{0}%'}"
+                                                <Label Text="{Binding DiscountPercent, StringFormat='-{0:F0}%'}"
                                                        FontSize="12"
                                                        FontAttributes="Bold"
                                                        TextColor="White"/>
@@ -168,26 +182,43 @@
                                         </AbsoluteLayout>
                                     </Grid>
 
-                                    <!-- Название продукта -->
-                                    <Label Grid.Row="1"
-                                           Text="{Binding Name}"
-                                           FontSize="18"
-                                           FontAttributes="Bold"
-                                           TextColor="Black"
-                                           Margin="16,12,16,4"
-                                           LineBreakMode="WordWrap"/>
+                                    <!-- Название и вес продукта -->
+                                    <VerticalStackLayout Grid.Row="1" Spacing="4" Margin="16,12,16,4">
+                                        <Label Text="{Binding Name}"
+                                               FontSize="18"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"
+                                               LineBreakMode="WordWrap"/>
+                                        
+                                        <!-- Вес продукта -->
+                                        <Label Text="{Binding Weight}"
+                                               FontSize="12"
+                                               TextColor="#999"
+                                               IsVisible="{Binding Weight, Converter={StaticResource IsNotNullConverter}}"/>
+                                    </VerticalStackLayout>
 
-                                    <!-- Описание/ингредиенты -->
+                                    <!-- Описание продукта -->
                                     <Label Grid.Row="2"
-                                           Text="{Binding Ingredients}"
+                                           Text="{Binding Description}"
                                            FontSize="14"
                                            TextColor="#666"
+                                           Margin="16,0,16,4"
+                                           LineBreakMode="WordWrap"
+                                           MaxLines="2"
+                                           IsVisible="{Binding Description, Converter={StaticResource IsNotNullConverter}}"/>
+
+                                    <!-- Ингредиенты -->
+                                    <Label Grid.Row="3"
+                                           Text="{Binding Ingredients}"
+                                           FontSize="12"
+                                           TextColor="#999"
                                            Margin="16,0,16,12"
                                            LineBreakMode="WordWrap"
+                                           MaxLines="2"
                                            IsVisible="{Binding Ingredients, Converter={StaticResource IsNotNullConverter}}"/>
 
                                     <!-- Цена и кнопка -->
-                                    <Grid Grid.Row="3"
+                                    <Grid Grid.Row="4"
                                           Grid.ColumnSpan="2"
                                           ColumnDefinitions="*,Auto"
                                           Margin="16,0,16,16">

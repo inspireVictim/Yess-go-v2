@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:YessGoFront.Converters"
+             xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
+             x:Class="YessGoFront.Views.PartnerDetailViewPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringToImageSourceConverter x:Key="StringToImageSourceConverter" />
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter" />
+            <converters:StringEqualsConverter x:Key="StringEqualsConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Зеленая панель с иконками -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Иконка назад слева -->
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <!-- Пустое пространство в центре -->
+                <BoxView Grid.Column="1" Color="Transparent"/>
+                
+                <!-- Иконка корзины справа -->
+                <ImageButton Grid.Column="2"
+                             Source="basket.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBasketButtonClicked"/>
+            </Grid>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+        <VerticalStackLayout Spacing="0">
+            <!-- Основной контент -->
+            <VerticalStackLayout Spacing="16" Padding="20" BackgroundColor="#F9F9F9">
+                <!-- Логотип и название -->
+                <HorizontalStackLayout Spacing="16" VerticalOptions="Start">
+                    <!-- Логотип -->
+                    <Grid x:Name="LogoFrame"
+                          WidthRequest="80"
+                          HeightRequest="80"
+                          HorizontalOptions="Start">
+                        <Label x:Name="LogoText"
+                               Text="why cook"
+                               TextColor="#DC2626"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               HorizontalTextAlignment="Center"
+                               VerticalTextAlignment="Center"
+                               HorizontalOptions="Fill"
+                               VerticalOptions="Fill"/>
+                    </Grid>
+
+                    <!-- Название бренда -->
+                    <VerticalStackLayout Spacing="4" VerticalOptions="Center">
+                        <Label Text="{Binding PartnerName}"
+                               FontSize="28"
+                               FontAttributes="Bold"
+                               TextColor="Black"
+                               HorizontalOptions="Start"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- Описание партнёра -->
+                <Label Text="{Binding PartnerDescription}"
+                       FontSize="14"
+                       TextColor="#666"
+                       LineBreakMode="WordWrap"
+                       Margin="0,8,0,0"
+                       IsVisible="{Binding PartnerDescription, Converter={StaticResource IsNotNullConverter}}"/>
+
+                <!-- Промо и рейтинг -->
+                <HorizontalStackLayout Spacing="16" VerticalOptions="Center">
+                    <!-- Промо-бейдж -->
+                    <Border BackgroundColor="#10B981"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="12,6"
+                            IsVisible="{Binding IsPromoVisible}">
+                        <HorizontalStackLayout Spacing="6">
+                            <Label Text="{Binding PromoPercent}"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="White"/>
+                            <Label Text="{Binding PromoText}"
+                                   FontSize="12"
+                                   TextColor="White"/>
+                        </HorizontalStackLayout>
+                    </Border>
+
+                    <!-- Рейтинг -->
+                    <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                        <Label Text="👍"
+                               FontSize="16"
+                               VerticalOptions="Center"/>
+                        <Label x:Name="RatingLabel"
+                               Text="100% (500+)"
+                               FontSize="14"
+                               TextColor="#666"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- Товары и отзывы -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,16">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="12">
+                        <Button Text="Товары"
+                                Command="{Binding SelectTabCommand}"
+                                CommandParameter="Products"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                CornerRadius="8"
+                                Padding="20,12"
+                                BackgroundColor="#E0E0E0"
+                                TextColor="#666">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" 
+                                           Binding="{Binding SelectedTab, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Products}" 
+                                           Value="True">
+                                    <Setter Property="BackgroundColor" Value="#0B4A3B" />
+                                    <Setter Property="TextColor" Value="White" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                        <Button Text="Отзывы"
+                                Command="{Binding SelectTabCommand}"
+                                CommandParameter="Reviews"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                CornerRadius="8"
+                                Padding="20,12"
+                                BackgroundColor="#E0E0E0"
+                                TextColor="#666">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" 
+                                           Binding="{Binding SelectedTab, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Reviews}" 
+                                           Value="True">
+                                    <Setter Property="BackgroundColor" Value="#0B4A3B" />
+                                    <Setter Property="TextColor" Value="White" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </HorizontalStackLayout>
+                    
+                    <!-- Иконки социальных сетей -->
+                    <HorizontalStackLayout Grid.Column="1" Spacing="12" VerticalOptions="Center">
+                        <ImageButton Source="PatnerDetailViewPage/skill_icons_instagram.svg"
+                                     WidthRequest="24"
+                                     HeightRequest="24"
+                                     BackgroundColor="Transparent"
+                                     Aspect="AspectFit"/>
+                        <ImageButton Source="PatnerDetailViewPage/logos_whatsapp_icon.svg"
+                                     WidthRequest="24"
+                                     HeightRequest="24"
+                                     BackgroundColor="Transparent"
+                                     Aspect="AspectFit"/>
+                        <ImageButton Source="PatnerDetailViewPage/image_254.svg"
+                                     WidthRequest="24"
+                                     HeightRequest="24"
+                                     BackgroundColor="Transparent"
+                                     Aspect="AspectFit"/>
+                        <ImageButton Source="PatnerDetailViewPage/famicons_call.svg"
+                                     WidthRequest="24"
+                                     HeightRequest="24"
+                                     BackgroundColor="Transparent"
+                                     Aspect="AspectFit"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Контент товаров -->
+                <VerticalStackLayout>
+                    <VerticalStackLayout.Triggers>
+                        <DataTrigger TargetType="VerticalStackLayout" 
+                                   Binding="{Binding SelectedTab, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Products}" 
+                                   Value="False">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </VerticalStackLayout.Triggers>
+                    <!-- Список продуктов -->
+                    <HorizontalStackLayout Spacing="8" Margin="0,8,0,8">
+                        <Label Text="Продукты"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               TextColor="Black"/>
+                        <Label Text="{Binding Products.Count, StringFormat='({0})'}"
+                               FontSize="16"
+                               TextColor="#666"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- Сообщение, если продуктов нет -->
+                    <Label x:Name="EmptyProductsLabel"
+                           Text="Продукты для этого партнёра пока не добавлены в базу данных"
+                           FontSize="14"
+                           TextColor="#999"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Margin="20"
+                           IsVisible="False"/>
+
+                    <CollectionView ItemsSource="{Binding Products}"
+                                SelectionMode="None"
+                                ItemsLayout="VerticalList"
+                                ItemSizingStrategy="MeasureFirstItem">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White"
+                                   BorderColor="Transparent"
+                                   CornerRadius="12"
+                                   Padding="0"
+                                   Margin="0,0,0,16"
+                                   HasShadow="True">
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                                    <!-- Изображение продукта -->
+                                    <Grid Grid.Row="0" Grid.ColumnSpan="2">
+                                        <Image Source="{Binding ImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                               Aspect="AspectFill"
+                                               HeightRequest="180"
+                                               HorizontalOptions="Fill"/>
+                                        
+                                        <!-- Бейдж скидки -->
+                                        <AbsoluteLayout>
+                                            <Border AbsoluteLayout.LayoutBounds="12,12,60,24"
+                                                    AbsoluteLayout.LayoutFlags="None"
+                                                    BackgroundColor="#10B981"
+                                                    StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 8"
+                                                    Padding="8,4">
+                                                <Label Text="{Binding DiscountPercent, StringFormat='-{0:F0}%'}"
+                                                       FontSize="12"
+                                                       FontAttributes="Bold"
+                                                       TextColor="White"/>
+                                            </Border>
+                                        </AbsoluteLayout>
+                                    </Grid>
+
+                                    <!-- Название, категория и вес продукта -->
+                                    <VerticalStackLayout Grid.Row="1" Spacing="4" Margin="16,12,16,4">
+                                        <!-- ID продукта (для проверки данных из БД) -->
+                                        <Label Text="{Binding Id, StringFormat='ID: {0}'}"
+                                               FontSize="10"
+                                               TextColor="#999"
+                                               FontAttributes="Italic"/>
+                                        
+                                        <Label Text="{Binding Name}"
+                                               FontSize="18"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"
+                                               LineBreakMode="WordWrap"/>
+                                        
+                                        <!-- Категория продукта -->
+                                        <Label Text="{Binding Category, StringFormat='Категория: {0}'}"
+                                               FontSize="12"
+                                               TextColor="#0B4A3B"
+                                               FontAttributes="Italic"/>
+                                        
+                                        <!-- Вес продукта -->
+                                        <Label Text="{Binding Weight, StringFormat='Вес: {0}'}"
+                                               FontSize="12"
+                                               TextColor="#999"/>
+                                    </VerticalStackLayout>
+
+                                    <!-- Описание продукта -->
+                                    <Label Grid.Row="2"
+                                           Text="{Binding Description, StringFormat='Описание: {0}'}"
+                                           FontSize="14"
+                                           TextColor="#666"
+                                           Margin="16,0,16,4"
+                                           LineBreakMode="WordWrap"/>
+
+                                    <!-- Ингредиенты -->
+                                    <Label Grid.Row="3"
+                                           Text="{Binding Ingredients, StringFormat='Ингредиенты: {0}'}"
+                                           FontSize="12"
+                                           TextColor="#999"
+                                           Margin="16,0,16,12"
+                                           LineBreakMode="WordWrap"/>
+
+                                    <!-- Цена и кнопка -->
+                                    <Grid Grid.Row="4"
+                                          Grid.ColumnSpan="2"
+                                          ColumnDefinitions="*,Auto"
+                                          Margin="16,0,16,16">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                            <!-- Старая цена (зачеркнутая) -->
+                                            <Label Text="{Binding OriginalPrice, StringFormat='Старая цена: {0:F0} сом'}"
+                                                   FontSize="14"
+                                                   TextColor="#999"
+                                                   TextDecorations="Strikethrough"/>
+                                            
+                                            <!-- Новая цена и монеты -->
+                                            <HorizontalStackLayout Spacing="4">
+                                            <Label Text="{Binding Price, StringFormat='Цена: {0:F0} сом'}"
+                                                   FontSize="18"
+                                                   FontAttributes="Bold"
+                                                   TextColor="Black"/>
+                                                <Label Text="{Binding YessCoins, StringFormat='+ {0:F0} Yess!Coins'}"
+                                                       FontSize="14"
+                                                       TextColor="#DC2626"/>
+                                            </HorizontalStackLayout>
+                                            
+                                            <!-- Дополнительная информация из БД -->
+                                            <Label Text="{Binding PartnerId, StringFormat='PartnerId: {0}'}"
+                                                   FontSize="10"
+                                                   TextColor="#CCC"
+                                                   FontAttributes="Italic"/>
+                                            <Label Text="{Binding IsAvailable, StringFormat='Доступен: {0}'}"
+                                                   FontSize="10"
+                                                   TextColor="#CCC"
+                                                   FontAttributes="Italic"/>
+                                        </VerticalStackLayout>
+
+                                        <!-- Кнопка покупки -->
+                                        <Button Grid.Column="1"
+                                                Text="В корзину"
+                                                BackgroundColor="#FF9800"
+                                                TextColor="White"
+                                                FontSize="14"
+                                                FontAttributes="Bold"
+                                                CornerRadius="8"
+                                                Padding="16,8"
+                                                VerticalOptions="Center"
+                                                Clicked="OnAddToCartClicked"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- Контент отзывов -->
+                <VerticalStackLayout Spacing="16" Margin="0,8,0,0">
+                    <VerticalStackLayout.Triggers>
+                        <DataTrigger TargetType="VerticalStackLayout" 
+                                   Binding="{Binding SelectedTab, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Reviews}" 
+                                   Value="False">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </VerticalStackLayout.Triggers>
+
+                    <Label Text="Отзывы"
+                           FontSize="20"
+                           FontAttributes="Bold"
+                           TextColor="Black"
+                           Margin="0,8,0,8"/>
+
+                    <!-- Заглушка для отзывов (пока нет данных) -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="12"
+                           Padding="16"
+                           Margin="0,0,0,12"
+                           HasShadow="True">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Отзывы пока отсутствуют"
+                                   FontSize="14"
+                                   TextColor="#999"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"/>
+                            <Label Text="Будьте первым, кто оставит отзыв об этом партнёре!"
+                                   FontSize="12"
+                                   TextColor="#666"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   LineBreakMode="WordWrap"/>
+                        </VerticalStackLayout>
+                    </Frame>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
+

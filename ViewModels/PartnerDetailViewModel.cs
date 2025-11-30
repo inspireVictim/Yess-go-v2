@@ -19,6 +19,7 @@ namespace YessGoFront.ViewModels;
 public partial class PartnerDetailViewModel : ObservableObject
 {
     private readonly IPartnersService _partnersService;
+    private readonly ICartService _cartService;
     private readonly ILogger<PartnerDetailViewModel>? _logger;
 
     [ObservableProperty]
@@ -35,6 +36,9 @@ public partial class PartnerDetailViewModel : ObservableObject
 
     [ObservableProperty]
     private string partnerName = string.Empty;
+
+    [ObservableProperty]
+    private string? partnerDescription;
 
     [ObservableProperty]
     private ImageSource? coverImageSource;
@@ -105,22 +109,37 @@ public partial class PartnerDetailViewModel : ObservableObject
     [ObservableProperty]
     private bool isPromoVisible = true;
 
+    [ObservableProperty]
+    private string selectedTab = "Products"; // "Products" или "Reviews"
+
     public ObservableCollection<ProductDto> Products { get; } = new();
 
     public IAsyncRelayCommand<int> LoadPartnerCommand { get; }
     public IAsyncRelayCommand GoBackCommand { get; }
     public IAsyncRelayCommand<ProductDto> AddToCartCommand { get; }
+    public IRelayCommand<string> SelectTabCommand { get; }
 
     public PartnerDetailViewModel(
         IPartnersService partnersService,
+        ICartService cartService,
         ILogger<PartnerDetailViewModel>? logger = null)
     {
         _partnersService = partnersService ?? throw new ArgumentNullException(nameof(partnersService));
+        _cartService = cartService ?? throw new ArgumentNullException(nameof(cartService));
         _logger = logger;
 
         LoadPartnerCommand = new AsyncRelayCommand<int>(LoadPartnerAsync);
         GoBackCommand = new AsyncRelayCommand(GoBackAsync);
         AddToCartCommand = new AsyncRelayCommand<ProductDto>(AddToCartAsync);
+        SelectTabCommand = new RelayCommand<string>(SelectTab);
+    }
+
+    private void SelectTab(string? tab)
+    {
+        if (!string.IsNullOrWhiteSpace(tab))
+        {
+            SelectedTab = tab;
+        }
     }
 
     private async Task LoadPartnerAsync(int partnerId)
@@ -154,6 +173,7 @@ public partial class PartnerDetailViewModel : ObservableObject
 
             Partner = partnerData;
             PartnerName = partnerData.Name;
+            PartnerDescription = partnerData.Description;
 
             // Загружаем обложку
             if (!string.IsNullOrWhiteSpace(partnerData.CoverImageUrl))
@@ -343,16 +363,19 @@ public partial class PartnerDetailViewModel : ObservableObject
 
     private async Task AddToCartAsync(ProductDto? product)
     {
-        if (product == null)
+        if (product == null || Partner == null)
             return;
 
         try
         {
-            // TODO: Реализовать добавление в корзину
             _logger?.LogDebug("Adding product {ProductId} ({ProductName}) to cart", product.Id, product.Name);
             
-            // Временная заглушка - показать сообщение пользователю
-            // В реальном приложении здесь будет вызов сервиса корзины
+            await _cartService.AddToCartAsync(
+                product,
+                Partner.Id,
+                Partner.Name,
+                Partner.LogoUrl);
+            
             if (Application.Current?.MainPage != null)
             {
                 await Application.Current.MainPage.DisplayAlert(

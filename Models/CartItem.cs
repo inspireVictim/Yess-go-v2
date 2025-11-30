@@ -1,0 +1,63 @@
+using System.Text.Json.Serialization;
+
+namespace YessGoFront.Models;
+
+/// <summary>
+/// Элемент корзины
+/// </summary>
+public class CartItem
+{
+    [JsonPropertyName("product_id")]
+    public int ProductId { get; set; }
+
+    [JsonPropertyName("partner_id")]
+    public int PartnerId { get; set; }
+
+    [JsonPropertyName("partner_name")]
+    public string PartnerName { get; set; } = string.Empty;
+
+    [JsonPropertyName("partner_logo_url")]
+    public string? PartnerLogoUrl { get; set; }
+
+    [JsonPropertyName("product_name")]
+    public string ProductName { get; set; } = string.Empty;
+
+    [JsonPropertyName("product_description")]
+    public string? ProductDescription { get; set; }
+
+    [JsonPropertyName("product_image_url")]
+    public string? ProductImageUrl { get; set; }
+
+    [JsonPropertyName("price")]
+    public decimal Price { get; set; }
+
+    [JsonPropertyName("original_price")]
+    public decimal? OriginalPrice { get; set; }
+
+    [JsonPropertyName("discount_percent")]
+    public decimal? DiscountPercent { get; set; }
+
+    [JsonPropertyName("yess_coins")]
+    public decimal? YessCoins { get; set; }
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; } = 1;
+
+    /// <summary>
+    /// Общая цена за все единицы товара
+    /// </summary>
+    public decimal TotalPrice => Price * Quantity;
+
+    /// <summary>
+    /// Общее количество Yess!Coins за все единицы товара
+    /// </summary>
+    public decimal TotalYessCoins => (YessCoins ?? 0) * Quantity;
+
+    /// <summary>
+    /// Процент скидки для отображения
+    /// </summary>
+    public string DiscountPercentText => DiscountPercent.HasValue 
+        ? $"-{DiscountPercent.Value:F0}%" 
+        : string.Empty;
+}
+

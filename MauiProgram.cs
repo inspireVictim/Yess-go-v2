@@ -282,6 +282,7 @@ public static class MauiProgram
         services.AddScoped<YessGoFront.Services.Domain.IQRService, YessGoFront.Services.Domain.QRService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPromoCodeService, PromoCodeService>();
+        services.AddSingleton<ICartService, CartService>();
     }
 
     private static void ConfigureViewModels(IServiceCollection services)

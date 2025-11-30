@@ -44,6 +44,7 @@
 	<ItemGroup>
 		<MauiImage Include="Resources\Images\**" />
 		<MauiImage Include="Resources\Eye\**" />
+		<MauiImage Include="Resources\PatnerDetailViewPage\**" />
 		<MauiFont Include="Resources\Fonts\**" />
 		<MauiSplashScreen Include="Resources\Splash\**" Color="FFFFFF" />
 		<!-- Иконка приложения - MAUI автоматически создаст все необходимые размеры для Android и iOS -->
@@ -86,14 +87,14 @@
 		<None Remove="Tests\**" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Compile Update="Pages\PartnerDetailViewPage.xaml.cs">
-	    <DependentUpon>PartnerDetailViewPage.xaml</DependentUpon>
-	  </Compile>
 	  <Compile Update="Views\ContactsPage.xaml.cs">
 	    <DependentUpon>ContactsPage.xaml</DependentUpon>
 	  </Compile>
 	  <Compile Update="Views\RegisterPage.xaml.cs">
 	    <DependentUpon>RegisterPage.xaml</DependentUpon>
+	  </Compile>
+	  <Compile Update="Views\PartnerDetailViewPage.xaml.cs">
+	    <DependentUpon>PartnerDetailViewPage.xaml</DependentUpon>
 	  </Compile>
 	</ItemGroup>
 	<ItemGroup>
@@ -103,6 +104,8 @@
 	  <MauiXaml Update="Views\RegisterPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
+	  <MauiXaml Update="Views\PartnerDetailViewPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	</ItemGroup>
-
 </Project>

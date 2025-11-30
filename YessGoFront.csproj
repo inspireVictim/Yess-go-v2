@@ -92,11 +92,17 @@
 	  <Compile Update="Views\ContactsPage.xaml.cs">
 	    <DependentUpon>ContactsPage.xaml</DependentUpon>
 	  </Compile>
+	  <Compile Update="Views\RegisterPage.xaml.cs">
+	    <DependentUpon>RegisterPage.xaml</DependentUpon>
+	  </Compile>
 	</ItemGroup>
 	<ItemGroup>
 	  <None Update="Views\FeedbackPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </None>
+	  <MauiXaml Update="Views\RegisterPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	</ItemGroup>
 
 </Project>

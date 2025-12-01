@@ -73,7 +73,7 @@
     <!-- 🔹 Страница продуктов партнёра -->
     <ShellContent
         Route="PartnerDetailViewPage"
-        ContentTemplate="{DataTemplate pages:PartnerDetailViewPage}" />
+        ContentTemplate="{DataTemplate views:PartnerDetailViewPage}" />
 
     <!-- 🔹 Страница промокодов -->
     <ShellContent
@@ -94,6 +94,11 @@
     <ShellContent
         Route="CertificatePage"
         ContentTemplate="{DataTemplate views:CertificatePage}" />
+
+    <!-- 🔹 Страница корзины -->
+    <ShellContent
+        Route="BasketPage"
+        ContentTemplate="{DataTemplate views:BasketPage}" />
 
 
 </Shell>

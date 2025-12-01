@@ -146,12 +146,12 @@
                                    VerticalOptions="Center"
                                    HorizontalOptions="Center"
                                    Margin="8,0"
-                                   Source="majesticons_eye_off">
+                                   Source="majesticons_eye_off_k">
                                 <Image.Triggers>
                                     <DataTrigger TargetType="Image" 
                                                Binding="{Binding Source={x:Reference PasswordEntry}, Path=IsPassword}" 
                                                Value="False">
-                                        <Setter Property="Source" Value="mingcute_eye_line" />
+                                        <Setter Property="Source" Value="mingcute_eye_line_k" />
                                     </DataTrigger>
                                 </Image.Triggers>
                                 <Image.GestureRecognizers>
@@ -179,12 +179,12 @@
                                    VerticalOptions="Center"
                                    HorizontalOptions="Center"
                                    Margin="8,0"
-                                   Source="majesticons_eye_off">
+                                   Source="majesticons_eye_off_k">
                                 <Image.Triggers>
                                     <DataTrigger TargetType="Image" 
                                                Binding="{Binding Source={x:Reference ConfirmPasswordEntry}, Path=IsPassword}" 
                                                Value="False">
-                                        <Setter Property="Source" Value="mingcute_eye_line" />
+                                        <Setter Property="Source" Value="mingcute_eye_line_k" />
                                     </DataTrigger>
                                 </Image.Triggers>
                                 <Image.GestureRecognizers>

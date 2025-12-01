@@ -1,11 +1,269 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="YessGoFront.Views.BasketPage">
-    <VerticalStackLayout>
-        <Label 
-            Text="Страница корзина в разработке"
-            VerticalOptions="Center" 
-            HorizontalOptions="Center" />
-    </VerticalStackLayout>
-</ContentView>
+             xmlns:converters="clr-namespace:YessGoFront.Converters"
+             x:Class="YessGoFront.Views.BasketPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringToImageSourceConverter x:Key="StringToImageSourceConverter" />
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter" />
+            <converters:IsNullConverter x:Key="IsNullConverter" />
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:FirstLettersConverter x:Key="FirstLettersConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Заголовок -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Кнопка назад -->
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <!-- Заголовок -->
+                <Label Grid.Column="1"
+                       Text="Корзина"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+                
+                <!-- Пустое место справа для балансировки -->
+                <BoxView Grid.Column="2" 
+                         WidthRequest="30"
+                         Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <!-- Контент корзины -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="16" Padding="16">
+                
+                <!-- Сообщение о пустой корзине -->
+                <Label Text="Корзина пуста"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="#999"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       IsVisible="{Binding IsEmpty}"
+                       Margin="0,50,0,0"/>
+
+                <!-- Секции по партнёрам -->
+                <CollectionView ItemsSource="{Binding PartnerGroups}"
+                                IsVisible="{Binding IsEmpty, Converter={StaticResource InverseBoolConverter}}">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White"
+                                   BorderColor="Transparent"
+                                   CornerRadius="12"
+                                   Padding="0"
+                                   HasShadow="True"
+                                   Margin="0,0,0,16">
+                                <VerticalStackLayout Spacing="12" Padding="16">
+                                    <!-- Заголовок партнера -->
+                                    <HorizontalStackLayout Spacing="12" VerticalOptions="Start">
+                                        <!-- Логотип партнёра -->
+                                        <Border BackgroundColor="#DC2626"
+                                                WidthRequest="40"
+                                                HeightRequest="40"
+                                                StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 4">
+                                            <Grid>
+                                                <!-- Если есть логотип, показываем изображение -->
+                                                <Image Source="{Binding PartnerLogoUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                       Aspect="AspectFill"
+                                                       HorizontalOptions="Fill"
+                                                       VerticalOptions="Fill"
+                                                       IsVisible="{Binding PartnerLogoUrl, Converter={StaticResource IsNotNullConverter}}"/>
+                                                
+                                                <!-- Если нет логотипа, показываем первые буквы названия -->
+                                                <Label Text="{Binding PartnerName, Converter={StaticResource FirstLettersConverter}}"
+                                                       TextColor="White"
+                                                       FontSize="10"
+                                                       FontAttributes="Bold"
+                                                       HorizontalTextAlignment="Center"
+                                                       VerticalTextAlignment="Center"
+                                                       HorizontalOptions="Fill"
+                                                       VerticalOptions="Fill"
+                                                       IsVisible="{Binding PartnerLogoUrl, Converter={StaticResource IsNullConverter}}"/>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <Label Text="{Binding PartnerName}"
+                                               FontSize="16"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"
+                                               VerticalOptions="Center"/>
+                                    </HorizontalStackLayout>
+
+                                    <!-- Список товаров партнёра -->
+                                    <CollectionView ItemsSource="{Binding Items}">
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
+                                                    <!-- Изображение товара -->
+                                                    <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                                          WidthRequest="100"
+                                                          HeightRequest="100"
+                                                          Margin="0,0,12,0">
+                                                        <Border BackgroundColor="#F0F0F0"
+                                                                StrokeShape="RoundRectangle 8">
+                                                            <Image Source="{Binding ProductImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                   Aspect="AspectFill"
+                                                                   HorizontalOptions="Fill"
+                                                                   VerticalOptions="Fill"/>
+                                                        </Border>
+                                                        
+                                                        <!-- Бейдж скидки -->
+                                                        <Border HorizontalOptions="Start"
+                                                                VerticalOptions="Start"
+                                                                Margin="4,4,0,0"
+                                                                BackgroundColor="#DC2626"
+                                                                StrokeThickness="0"
+                                                                StrokeShape="RoundRectangle 4"
+                                                                Padding="4,2"
+                                                                IsVisible="{Binding DiscountPercent, Converter={StaticResource IsNotNullConverter}}">
+                                                            <Label Text="{Binding DiscountPercentText}"
+                                                                   FontSize="10"
+                                                                   FontAttributes="Bold"
+                                                                   TextColor="White"
+                                                                   HorizontalTextAlignment="Center"
+                                                                   VerticalTextAlignment="Center"/>
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- Информация о товаре -->
+                                                    <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="4">
+                                                        <Label Text="{Binding ProductName}"
+                                                               FontSize="14"
+                                                               FontAttributes="Bold"
+                                                               TextColor="Black"
+                                                               LineBreakMode="WordWrap"/>
+                                                        
+                                                        <Label Text="{Binding ProductDescription}"
+                                                               FontSize="11"
+                                                               TextColor="#666"
+                                                               LineBreakMode="WordWrap"
+                                                               MaxLines="3"
+                                                               IsVisible="{Binding ProductDescription, Converter={StaticResource IsNotNullConverter}}"/>
+                                                        
+                                                        <!-- Цены -->
+                                                        <Label Text="{Binding OriginalPrice, StringFormat='{0:F0} сом'}"
+                                                               FontSize="12"
+                                                               TextColor="#999"
+                                                               TextDecorations="Strikethrough"
+                                                               Margin="0,4,0,0"
+                                                               IsVisible="{Binding OriginalPrice, Converter={StaticResource IsNotNullConverter}}"/>
+                                                        
+                                                        <Border BackgroundColor="#FF9800"
+                                                                StrokeThickness="0"
+                                                                StrokeShape="RoundRectangle 4"
+                                                                Padding="8,4"
+                                                                Margin="0,4,0,0">
+                                                            <HorizontalStackLayout Spacing="4">
+                                                                <Label Text="{Binding Price, StringFormat='{0:F0} сом'}"
+                                                                       FontSize="12"
+                                                                       FontAttributes="Bold"
+                                                                       TextColor="White"/>
+                                                                <Label Text="{Binding YessCoins, StringFormat='+ {0:F0} Yess!Coins'}"
+                                                                       FontSize="12"
+                                                                       FontAttributes="Bold"
+                                                                       TextColor="White"
+                                                                       IsVisible="{Binding YessCoins, Converter={StaticResource IsNotNullConverter}}"/>
+                                                            </HorizontalStackLayout>
+                                                        </Border>
+                                                    </VerticalStackLayout>
+
+                                                    <!-- Управление количеством -->
+                                                    <HorizontalStackLayout Grid.Row="1" Grid.Column="1"
+                                                                           Spacing="8"
+                                                                           HorizontalOptions="End"
+                                                                           VerticalOptions="End">
+                                                        <ImageButton Source="basket.svg"
+                                                                     WidthRequest="24"
+                                                                     HeightRequest="24"
+                                                                     BackgroundColor="Transparent"
+                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveItemCommand}"
+                                                                     CommandParameter="{Binding .}"/>
+                                                        <Label Text="{Binding Quantity}"
+                                                               FontSize="16"
+                                                               FontAttributes="Bold"
+                                                               TextColor="Black"
+                                                               VerticalOptions="Center"
+                                                               Margin="8,0"/>
+                                                        <Button Text="+"
+                                                                FontSize="18"
+                                                                FontAttributes="Bold"
+                                                                BackgroundColor="#0B4A3B"
+                                                                TextColor="White"
+                                                                WidthRequest="32"
+                                                                HeightRequest="32"
+                                                                CornerRadius="16"
+                                                                Padding="0"
+                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IncreaseQuantityCommand}"
+                                                                CommandParameter="{Binding .}"/>
+                                                    </HorizontalStackLayout>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+
+                                    <!-- Итого по секции -->
+                                    <HorizontalStackLayout Spacing="4" Margin="0,8,0,0">
+                                        <Label Text="{Binding TotalPrice, StringFormat='Итого: {0:F0} сом'}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"/>
+                                        <Label Text="{Binding TotalYessCoins, StringFormat=' + {0:F0} Yess!Coins'}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"
+                                               IsVisible="{Binding TotalYessCoins, Converter={StaticResource IsNotNullConverter}}"/>
+                                    </HorizontalStackLayout>
+
+                                    <!-- Кнопка заказа -->
+                                    <Button Text="Перейти к заказу"
+                                            BackgroundColor="#0B4A3B"
+                                            TextColor="White"
+                                            FontSize="14"
+                                            FontAttributes="Bold"
+                                            CornerRadius="8"
+                                            Padding="0,12"
+                                            Margin="0,8,0,0"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ProceedToOrderCommand}"
+                                            CommandParameter="{Binding PartnerId}"/>
+                                    
+                                    <!-- Процент скидки -->
+                                    <Label FontSize="12"
+                                           TextColor="#0B4A3B"
+                                           HorizontalOptions="Center"
+                                           Margin="0,4,0,0"
+                                           IsVisible="{Binding DiscountPercent, Converter={StaticResource IsNotNullConverter}}">
+                                        <Label.Text>
+                                            <Binding Path="DiscountPercent" StringFormat="Скидка {0:F0}%"/>
+                                        </Label.Text>
+                                    </Label>
+                                </VerticalStackLayout>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

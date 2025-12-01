@@ -2,7 +2,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
 using YessGoFront.Views;
-using YessGoFront.Pages;
 using YessGoFront.Services;
 
 namespace YessGoFront
@@ -20,7 +19,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
             Routing.RegisterRoute(nameof(Views.PartnerPage), typeof(Views.PartnerPage));
             Routing.RegisterRoute("partnerdetails", typeof(Views.PartnerDetailPage));
-            Routing.RegisterRoute("PartnerDetailViewPage", typeof(PartnerDetailViewPage));
+            Routing.RegisterRoute("PartnerDetailViewPage", typeof(Views.PartnerDetailViewPage));
             Routing.RegisterRoute(nameof(Views.TransactionsPage), typeof(Views.TransactionsPage));
             Routing.RegisterRoute(nameof(Views.TransactionDetailsPage), typeof(Views.TransactionDetailsPage));
             Routing.RegisterRoute(nameof(Views.PolicyPage), typeof(Views.PolicyPage));
@@ -32,6 +31,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
             Routing.RegisterRoute(nameof(Views.FeedbackPage), typeof(Views.FeedbackPage));
             Routing.RegisterRoute(nameof(Views.CertificatePage), typeof(Views.CertificatePage));
+            Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
             Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
 
 

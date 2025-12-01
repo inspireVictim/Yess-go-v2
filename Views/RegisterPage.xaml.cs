@@ -110,17 +110,19 @@ namespace YessGoFront.Views
 
         private void TogglePassword_Tapped(object? sender, EventArgs e)
         {
-            if (PasswordEntry != null)
+            var passwordEntry = this.FindByName<Entry>("PasswordEntry");
+            if (passwordEntry != null)
             {
-                PasswordEntry.IsPassword = !PasswordEntry.IsPassword;
+                passwordEntry.IsPassword = !passwordEntry.IsPassword;
             }
         }
 
         private void ToggleConfirmPassword_Tapped(object? sender, EventArgs e)
         {
-            if (ConfirmPasswordEntry != null)
+            var confirmPasswordEntry = this.FindByName<Entry>("ConfirmPasswordEntry");
+            if (confirmPasswordEntry != null)
             {
-                ConfirmPasswordEntry.IsPassword = !ConfirmPasswordEntry.IsPassword;
+                confirmPasswordEntry.IsPassword = !confirmPasswordEntry.IsPassword;
             }
         }
 

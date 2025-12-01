@@ -199,12 +199,12 @@ public class PartnersService : IPartnersService
                 partnerIdInt, partnerProductsCount);
             System.Diagnostics.Debug.WriteLine($"[PartnersService] 📊 Total products for partner {partnerIdInt}: {partnerProductsCount} (including unavailable)");
 
-            // Получаем продукты из базы данных, отсортированные по ID
+            // Получаем продукты из базы данных, отсортированные по ID (БЕЗ фильтра по IsAvailable)
             List<PartnerProduct> products = new List<PartnerProduct>();
             try
             {
                 products = await _dbContext.PartnerProducts
-                    .Where(p => p.PartnerId == partnerIdInt && p.IsAvailable)
+                    .Where(p => p.PartnerId == partnerIdInt)
                     .OrderBy(p => p.Id)
                     .ToListAsync(ct);
             }
@@ -219,10 +219,10 @@ public class PartnersService : IPartnersService
                     _logger?.LogInformation("🔄 [GetPartnerProductsAsync] Using FromSqlRaw fallback for partner {PartnerIdInt}", partnerIdInt);
                     System.Diagnostics.Debug.WriteLine($"[PartnersService] 🔄 Using FromSqlRaw fallback for partner {partnerIdInt}");
                     
-                    // Используем FromSqlRaw с параметрами EF Core ({0}, {1}, ...)
+                    // Используем FromSqlRaw с параметрами EF Core ({0}, {1}, ...) - БЕЗ фильтра по is_available
                     var rawProducts = await _dbContext.PartnerProducts
                         .FromSqlRaw(
-                            "SELECT * FROM partner_products WHERE partner_id = {0} AND (is_available = 1 OR is_available = 'true') ORDER BY id",
+                            "SELECT * FROM partner_products WHERE partner_id = {0} ORDER BY id",
                             partnerIdInt)
                         .ToListAsync(ct);
                     
@@ -246,13 +246,13 @@ public class PartnersService : IPartnersService
                         }
                         
                         using var command = connection.CreateCommand();
-                        // SQLite использует позиционные параметры ? без имени
+                        // SQLite использует позиционные параметры ? без имени - БЕЗ фильтра по is_available
                         command.CommandText = @"
                             SELECT id, partner_id, name, description, ingredients, image_url, weight, 
                                    price, original_price, discount_percent, yess_coins, is_available, category,
                                    created_at, updated_at
                             FROM partner_products 
-                            WHERE partner_id = ? AND (is_available = 1 OR is_available = 'true' OR is_available = 'True')
+                            WHERE partner_id = ?
                             ORDER BY id";
                         
                         // В SQLite позиционные параметры добавляются по порядку
@@ -297,9 +297,9 @@ public class PartnersService : IPartnersService
                 }
             }
 
-            _logger?.LogInformation("✅ [GetPartnerProductsAsync] Found {Count} AVAILABLE products in database for partnerId {PartnerIdInt}", 
+            _logger?.LogInformation("✅ [GetPartnerProductsAsync] Found {Count} products in database for partnerId {PartnerIdInt} (all products, including unavailable)", 
                 products.Count, partnerIdInt);
-            System.Diagnostics.Debug.WriteLine($"[PartnersService] ✅ Found {products.Count} AVAILABLE products in database for partnerId {partnerIdInt}");
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] ✅ Found {products.Count} products in database for partnerId {partnerIdInt} (all products, including unavailable)");
 
             // Логируем детали каждого продукта для отладки
             if (products.Any())

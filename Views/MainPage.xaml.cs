@@ -10,6 +10,7 @@ using YessGoFront.Services.Api;
 using YessGoFront.Services.Domain;
 using YessGoFront.ViewModels;
 using YessGoFront.Views.Controls;
+using YessGoFront.Models;
 
 namespace YessGoFront.Views
 {
@@ -423,6 +424,31 @@ namespace YessGoFront.Views
             await Shell.Current.GoToAsync("//main/partner");
         }
 
+
+        private void OnPartnerTapped(object? sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainPage] ===== OnPartnerTapped EVENT FIRED =====");
+            
+            if (sender is Grid grid && grid.BindingContext is PartnerLogoModel partner)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] OnPartnerTapped: Partner Name='{partner.Name}', ID='{partner.Id}'");
+                
+                // Вызываем команду из ViewModel
+                if (BindingContext is MainPageViewModel vm)
+                {
+                    System.Diagnostics.Debug.WriteLine("[MainPage] Calling OpenPartnerAsyncCommand from ViewModel");
+                    vm.OpenPartnerAsyncCommand.Execute(partner);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[MainPage] ERROR: BindingContext is not MainPageViewModel");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] OnPartnerTapped: sender type={sender?.GetType()?.Name}, BindingContext type={((sender as Grid)?.BindingContext)?.GetType()?.Name}");
+            }
+        }
 
         private async void OnCategoryTapped(object? sender, EventArgs e)
         {

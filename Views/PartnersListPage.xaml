@@ -4,12 +4,15 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:converters="clr-namespace:YessGoFront.Converters"
+    xmlns:helpers="clr-namespace:YessGoFront.Helpers"
     Shell.NavBarIsVisible="False">
 
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
             <converters:StringToImageSourceConverter x:Key="ImageSourceConverter" />
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter" />
+            <converters:IsNullConverter x:Key="IsNullConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -136,6 +139,9 @@
 									<Image Source="{Binding CoverImage, Converter={StaticResource ImageSourceConverter}}"
                                            Aspect="AspectFill"
                                            BackgroundColor="#F2F2F2">
+										<Image.Behaviors>
+											<helpers:ImageLoadingBehavior />
+										</Image.Behaviors>
 									</Image>
 									
 									<!-- Градиентный оверлей снизу для читаемости текста -->
@@ -200,8 +206,31 @@
                                            Padding="4"
                                            BackgroundColor="White"
                                            HasShadow="True">
-										<Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
-                                               Aspect="AspectFill" />
+										<Grid>
+											<!-- Изображение (только если Logo не пустой) -->
+											<Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
+                                                   Aspect="AspectFill"
+                                                   HorizontalOptions="Fill"
+                                                   VerticalOptions="Fill"
+                                                   IsVisible="{Binding Logo, Converter={StaticResource IsNotNullConverter}}">
+												<Image.Behaviors>
+													<helpers:ImageLoadingBehavior />
+												</Image.Behaviors>
+											</Image>
+											
+											<!-- Текст с именем партнёра (если Logo пустой) -->
+											<Label Text="{Binding Name}"
+                                                   FontSize="10"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#0F6B53"
+                                                   HorizontalTextAlignment="Center"
+                                                   VerticalTextAlignment="Center"
+                                                   HorizontalOptions="Fill"
+                                                   VerticalOptions="Fill"
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation"
+                                                   IsVisible="{Binding Logo, Converter={StaticResource IsNullConverter}}" />
+										</Grid>
 									</Frame>
 
 									<!-- Бейдж кешбэка в левом верхнем углу -->

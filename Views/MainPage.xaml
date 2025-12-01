@@ -20,6 +20,8 @@
         <converters:StringToImageSourceConverter x:Key="ImageSourceConverter"/>
         <converters:ProgressToWidthMultiConverter x:Key="ProgressToWidthMultiConverter"/>
         <converters:StoryProgressWidthConverter x:Key="StoryProgressWidthConverter"/>
+        <converters:IsNullConverter x:Key="IsNullConverter"/>
+        <converters:IsNotNullConverter x:Key="IsNotNullConverter"/>
     </ContentPage.Resources>
 
     <Grid RowDefinitions="*,Auto">
@@ -362,7 +364,13 @@
                                                    BindableLayout.ItemsSource="{Binding PartnersRow1}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:PartnerLogoModel">
-                                        <Grid WidthRequest="84" HeightRequest="84">
+                                        <Grid WidthRequest="84" HeightRequest="84" BackgroundColor="Transparent">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
+                                                    CommandParameter="{Binding .}"
+                                                    Tapped="OnPartnerTapped" />
+                                            </Grid.GestureRecognizers>
                                             <Border Padding="0"
                                                     BackgroundColor="White"
                                                     Stroke="#0F6B53"
@@ -375,7 +383,8 @@
                                                     <Grid x:Name="PartnerPlaceholder"
                                                           BackgroundColor="#E0E0E0"
                                                           HorizontalOptions="Fill"
-                                                          VerticalOptions="Fill">
+                                                          VerticalOptions="Fill"
+                                                          InputTransparent="True">
                                                         <ActivityIndicator IsRunning="True"
                                                                            Color="#0F6B53"
                                                                            VerticalOptions="Center"
@@ -383,22 +392,33 @@
                                                                            WidthRequest="20"
                                                                            HeightRequest="20"/>
                                                     </Grid>
-                                                    <!-- Изображение -->
+                                                    <!-- Изображение (только если Logo не пустой) -->
                                                     <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
                                                            Aspect="AspectFill"
                                                            HorizontalOptions="Fill"
-                                                           VerticalOptions="Fill">
+                                                           VerticalOptions="Fill"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNotNullConverter}}"
+                                                           InputTransparent="True">
                                                         <Image.Behaviors>
                                                             <helpers:ImageLoadingBehavior />
                                                         </Image.Behaviors>
                                                     </Image>
+                                                    <!-- Текст с именем партнёра (если Logo пустой) -->
+                                                    <Label Text="{Binding Name}"
+                                                           FontSize="10"
+                                                           FontAttributes="Bold"
+                                                           TextColor="#0F6B53"
+                                                           HorizontalOptions="Center"
+                                                           VerticalOptions="Center"
+                                                           HorizontalTextAlignment="Center"
+                                                           VerticalTextAlignment="Center"
+                                                           MaxLines="2"
+                                                           LineBreakMode="TailTruncation"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNullConverter}}"
+                                                           BackgroundColor="Transparent"
+                                                           InputTransparent="True"/>
                                                 </Grid>
                                             </Border>
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer
-                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
-                                                    CommandParameter="{Binding .}" />
-                                            </Grid.GestureRecognizers>
                                         </Grid>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>
@@ -418,7 +438,13 @@
                                                    BindableLayout.ItemsSource="{Binding PartnersRow2}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:PartnerLogoModel">
-                                        <Grid WidthRequest="84" HeightRequest="84">
+                                        <Grid WidthRequest="84" HeightRequest="84" BackgroundColor="Transparent">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
+                                                    CommandParameter="{Binding .}"
+                                                    Tapped="OnPartnerTapped" />
+                                            </Grid.GestureRecognizers>
                                             <Border Padding="0"
                                                     BackgroundColor="White"
                                                     Stroke="#0F6B53"
@@ -431,7 +457,8 @@
                                                     <Grid x:Name="PartnerPlaceholder"
                                                           BackgroundColor="#E0E0E0"
                                                           HorizontalOptions="Fill"
-                                                          VerticalOptions="Fill">
+                                                          VerticalOptions="Fill"
+                                                          InputTransparent="True">
                                                         <ActivityIndicator IsRunning="True"
                                                                            Color="#0F6B53"
                                                                            VerticalOptions="Center"
@@ -439,22 +466,33 @@
                                                                            WidthRequest="20"
                                                                            HeightRequest="20"/>
                                                     </Grid>
-                                                    <!-- Изображение -->
+                                                    <!-- Изображение (только если Logo не пустой) -->
                                                     <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
                                                            Aspect="AspectFill"
                                                            HorizontalOptions="Fill"
-                                                           VerticalOptions="Fill">
+                                                           VerticalOptions="Fill"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNotNullConverter}}"
+                                                           InputTransparent="True">
                                                         <Image.Behaviors>
                                                             <helpers:ImageLoadingBehavior />
                                                         </Image.Behaviors>
                                                     </Image>
+                                                    <!-- Текст с именем партнёра (если Logo пустой) -->
+                                                    <Label Text="{Binding Name}"
+                                                           FontSize="10"
+                                                           FontAttributes="Bold"
+                                                           TextColor="#0F6B53"
+                                                           HorizontalOptions="Center"
+                                                           VerticalOptions="Center"
+                                                           HorizontalTextAlignment="Center"
+                                                           VerticalTextAlignment="Center"
+                                                           MaxLines="2"
+                                                           LineBreakMode="TailTruncation"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNullConverter}}"
+                                                           BackgroundColor="Transparent"
+                                                           InputTransparent="True"/>
                                                 </Grid>
                                             </Border>
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer
-                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
-                                                    CommandParameter="{Binding .}" />
-                                            </Grid.GestureRecognizers>
                                         </Grid>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>
@@ -474,7 +512,13 @@
                                                    BindableLayout.ItemsSource="{Binding PartnersRow3}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:PartnerLogoModel">
-                                        <Grid WidthRequest="84" HeightRequest="84">
+                                        <Grid WidthRequest="84" HeightRequest="84" BackgroundColor="Transparent">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
+                                                    CommandParameter="{Binding .}"
+                                                    Tapped="OnPartnerTapped" />
+                                            </Grid.GestureRecognizers>
                                             <Border Padding="0"
                                                     BackgroundColor="White"
                                                     Stroke="#0F6B53"
@@ -487,7 +531,8 @@
                                                     <Grid x:Name="PartnerPlaceholder"
                                                           BackgroundColor="#E0E0E0"
                                                           HorizontalOptions="Fill"
-                                                          VerticalOptions="Fill">
+                                                          VerticalOptions="Fill"
+                                                          InputTransparent="True">
                                                         <ActivityIndicator IsRunning="True"
                                                                            Color="#0F6B53"
                                                                            VerticalOptions="Center"
@@ -495,22 +540,33 @@
                                                                            WidthRequest="20"
                                                                            HeightRequest="20"/>
                                                     </Grid>
-                                                    <!-- Изображение -->
+                                                    <!-- Изображение (только если Logo не пустой) -->
                                                     <Image Source="{Binding Logo, Converter={StaticResource ImageSourceConverter}}"
                                                            Aspect="AspectFill"
                                                            HorizontalOptions="Fill"
-                                                           VerticalOptions="Fill">
+                                                           VerticalOptions="Fill"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNotNullConverter}}"
+                                                           InputTransparent="True">
                                                         <Image.Behaviors>
                                                             <helpers:ImageLoadingBehavior />
                                                         </Image.Behaviors>
                                                     </Image>
+                                                    <!-- Текст с именем партнёра (если Logo пустой) -->
+                                                    <Label Text="{Binding Name}"
+                                                           FontSize="10"
+                                                           FontAttributes="Bold"
+                                                           TextColor="#0F6B53"
+                                                           HorizontalOptions="Center"
+                                                           VerticalOptions="Center"
+                                                           HorizontalTextAlignment="Center"
+                                                           VerticalTextAlignment="Center"
+                                                           MaxLines="2"
+                                                           LineBreakMode="TailTruncation"
+                                                           IsVisible="{Binding Logo, Converter={StaticResource IsNullConverter}}"
+                                                           BackgroundColor="Transparent"
+                                                           InputTransparent="True"/>
                                                 </Grid>
                                             </Border>
-                                            <Grid.GestureRecognizers>
-                                                <TapGestureRecognizer
-                                                    Command="{Binding BindingContext.OpenPartnerAsyncCommand, Source={x:Reference MainPageElement}}"
-                                                    CommandParameter="{Binding .}" />
-                                            </Grid.GestureRecognizers>
                                         </Grid>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>

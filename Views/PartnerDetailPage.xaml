@@ -58,10 +58,23 @@
                        Padding="4"
                        HorizontalOptions="Center"
                        Margin="0,-60,0,0">
-                    <Image x:Name="PartnerLogo"
-                           Aspect="AspectFill"
-                           HorizontalOptions="Fill"
-                           VerticalOptions="Fill"/>
+                    <Grid>
+                        <Image x:Name="PartnerLogo"
+                               Aspect="AspectFit"
+                               HorizontalOptions="Fill"
+                               VerticalOptions="Fill"
+                               IsVisible="False"/>
+                        <Label x:Name="LogoText"
+                               Text=""
+                               TextColor="#DC2626"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               HorizontalTextAlignment="Center"
+                               VerticalTextAlignment="Center"
+                               HorizontalOptions="Fill"
+                               VerticalOptions="Fill"
+                               IsVisible="False"/>
+                    </Grid>
                 </Frame>
 
                 <!-- Описание -->

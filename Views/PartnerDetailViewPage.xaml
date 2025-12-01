@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:converters="clr-namespace:YessGoFront.Converters"
              xmlns:viewmodels="clr-namespace:YessGoFront.ViewModels"
+             xmlns:helpers="clr-namespace:YessGoFront.Helpers"
              x:Class="YessGoFront.Views.PartnerDetailViewPage"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#F9F9F9">
@@ -52,20 +53,40 @@
                 <!-- Логотип и название -->
                 <HorizontalStackLayout Spacing="16" VerticalOptions="Start">
                     <!-- Логотип -->
-                    <Grid x:Name="LogoFrame"
-                          WidthRequest="80"
-                          HeightRequest="80"
-                          HorizontalOptions="Start">
-                        <Label x:Name="LogoText"
-                               Text="why cook"
-                               TextColor="#DC2626"
-                               FontSize="12"
-                               FontAttributes="Bold"
-                               HorizontalTextAlignment="Center"
-                               VerticalTextAlignment="Center"
-                               HorizontalOptions="Fill"
-                               VerticalOptions="Fill"/>
-                    </Grid>
+                    <Frame x:Name="LogoFrame"
+                           WidthRequest="80"
+                           HeightRequest="80"
+                           CornerRadius="40"
+                           Padding="4"
+                           BackgroundColor="White"
+                           HasShadow="True"
+                           HorizontalOptions="Start">
+                        <Grid>
+                            <!-- Изображение (только если LogoImageSource не пустой) -->
+                            <Image Source="{Binding LogoImageSource}"
+                                   Aspect="AspectFit"
+                                   HorizontalOptions="Fill"
+                                   VerticalOptions="Fill"
+                                   IsVisible="{Binding IsLogoImageVisible}">
+								<Image.Behaviors>
+									<helpers:ImageLoadingBehavior />
+								</Image.Behaviors>
+							</Image>
+                            
+                            <!-- Текст с именем партнёра (если LogoImageSource пустой) -->
+                            <Label Text="{Binding LogoText}"
+                                   TextColor="#DC2626"
+                                   FontSize="12"
+                                   FontAttributes="Bold"
+                                   HorizontalTextAlignment="Center"
+                                   VerticalTextAlignment="Center"
+                                   HorizontalOptions="Fill"
+                                   VerticalOptions="Fill"
+                                   MaxLines="2"
+                                   LineBreakMode="TailTruncation"
+                                   IsVisible="{Binding IsLogoTextVisible}" />
+                        </Grid>
+                    </Frame>
 
                     <!-- Название бренда -->
                     <VerticalStackLayout Spacing="4" VerticalOptions="Center">
@@ -232,7 +253,11 @@
                                         <Image Source="{Binding ImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
                                                Aspect="AspectFill"
                                                HeightRequest="180"
-                                               HorizontalOptions="Fill"/>
+                                               HorizontalOptions="Fill">
+											<Image.Behaviors>
+												<helpers:ImageLoadingBehavior />
+											</Image.Behaviors>
+										</Image>
                                         
                                         <!-- Бейдж скидки -->
                                         <AbsoluteLayout>

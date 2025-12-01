@@ -65,9 +65,6 @@ public partial class PartnerDetailViewPage : ContentPage
         _viewModel = new PartnerDetailViewModel(partnersService, cartService, logger);
         BindingContext = _viewModel;
 
-        // Подписываемся на изменения свойств ViewModel для обновления логотипа
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-    
         // Подписываемся на изменения коллекции продуктов
         _viewModel.Products.CollectionChanged += OnProductsCollectionChanged;
     }
@@ -86,69 +83,6 @@ public partial class PartnerDetailViewPage : ContentPage
         }
     }
 
-    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (_viewModel == null)
-            return;
-
-        // Обновляем логотип при изменении соответствующих свойств
-        if (e.PropertyName == nameof(PartnerDetailViewModel.LogoImageSource) ||
-            e.PropertyName == nameof(PartnerDetailViewModel.LogoText) ||
-            e.PropertyName == nameof(PartnerDetailViewModel.IsLogoImageVisible) ||
-            e.PropertyName == nameof(PartnerDetailViewModel.IsLogoTextVisible))
-        {
-            UpdateLogo();
-        }
-    
-        // Обновляем сообщение о пустой коллекции продуктов
-        if (e.PropertyName == nameof(PartnerDetailViewModel.Products))
-        {
-            UpdateEmptyProductsMessage();
-        }
-    }
-
-    private void UpdateLogo()
-    {
-        if (_viewModel == null)
-            return;
-
-        var logoFrame = this.FindByName<Grid>("LogoFrame");
-        var logoText = this.FindByName<Label>("LogoText");
-    
-        if (logoFrame == null)
-            return;
-
-        // Если есть изображение логотипа, показываем его
-        if (_viewModel.IsLogoImageVisible && _viewModel.LogoImageSource != null)
-        {
-            // Удаляем все существующие дочерние элементы
-            logoFrame.Children.Clear();
-            
-            var logoImage = new Image
-            {
-                Source = _viewModel.LogoImageSource,
-                Aspect = Aspect.AspectFit,
-                HorizontalOptions = LayoutOptions.Fill,
-                VerticalOptions = LayoutOptions.Fill
-            };
-            logoFrame.Children.Add(logoImage);
-        }
-        else if (_viewModel.IsLogoTextVisible && !string.IsNullOrWhiteSpace(_viewModel.LogoText))
-        {
-            // Показываем текст логотипа
-            if (logoText != null)
-            {
-                logoText.Text = _viewModel.LogoText;
-                logoText.IsVisible = true;
-            }
-            // Убираем изображение, если оно было, оставляем только текст
-            logoFrame.Children.Clear();
-            if (logoText != null)
-            {
-                logoFrame.Children.Add(logoText);
-            }
-        }
-    }
 
     private async void OnAddToCartClicked(object sender, EventArgs e)
     {

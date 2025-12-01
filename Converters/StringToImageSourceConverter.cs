@@ -62,12 +62,12 @@ public class StringToImageSourceConverter : IValueConverter
                 Log.Error("StringToImageSourceConverter", $"[Convert] Error creating UriImageSource for '{absoluteUri}': {ex.Message}");
 #endif
                 System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Error creating UriImageSource for '{absoluteUri}': {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] StackTrace: {ex.StackTrace}");
                 return null;
             }
         }
-
-        // Проверяем, является ли это относительным URL (начинается с /)
-        // НО только если это не похоже на локальный файл из Resources
+        
+        // Проверяем, является ли это локальным файлом из Resources
         // Локальные файлы из Resources обычно имеют расширение (.png, .jpg и т.д.) и не начинаются с /
         bool looksLikeLocalFile = imagePath.Contains(".") && 
                                    (imagePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
@@ -75,9 +75,15 @@ public class StringToImageSourceConverter : IValueConverter
                                     imagePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
                                     imagePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) ||
                                     imagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) &&
-                                   !imagePath.Contains("/") && !imagePath.Contains("\\");
+                                   !imagePath.Contains("/") && !imagePath.Contains("\\") &&
+                                   !imagePath.StartsWith("http", StringComparison.OrdinalIgnoreCase);
         
-        if (imagePath.StartsWith("/") && !looksLikeLocalFile)
+        // Проверяем, является ли строка относительным URL (начинается с /uploads или /static)
+        // Такие URL нужно нормализовать к абсолютному URL
+        if (imagePath.StartsWith("/uploads", StringComparison.OrdinalIgnoreCase) ||
+            imagePath.StartsWith("/static", StringComparison.OrdinalIgnoreCase) ||
+            imagePath.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
+            (imagePath.StartsWith("/") && !looksLikeLocalFile))
         {
             // Это относительный URL - нормализуем и создаём абсолютный URL
             string normalizedUrl = NormalizeImageUrl(imagePath);
@@ -169,31 +175,47 @@ public class StringToImageSourceConverter : IValueConverter
     private static string NormalizeImageUrl(string imageUrl)
     {
         if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: Empty URL");
             return imageUrl;
+        }
 
         // Если это уже абсолютный URL (начинается с http:// или https://), возвращаем как есть
         if (imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) 
             || imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] URL is already absolute: {imageUrl}");
+            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: URL is already absolute: {imageUrl}");
             return imageUrl;
         }
 
-        // Если это относительный путь (начинается с /), добавляем базовый URL сервера
-        if (imageUrl.StartsWith("/"))
+        try
         {
             var baseUrl = ApiConfiguration.GetBaseUrl().TrimEnd('/');
-            var fullUrl = $"{baseUrl}{imageUrl}";
-            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Normalized relative URL: {imageUrl} -> {fullUrl}");
-            return fullUrl;
-        }
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: Base URL is empty, cannot normalize: {imageUrl}");
+                return imageUrl;
+            }
 
-        // Если путь не начинается с /, но и не является абсолютным URL,
-        // предполагаем, что это тоже относительный путь от корня сервера
-        var baseUrl2 = ApiConfiguration.GetBaseUrl().TrimEnd('/');
-        var fullUrl2 = $"{baseUrl2}/{imageUrl.TrimStart('/')}";
-        System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Normalized path: {imageUrl} -> {fullUrl2}");
-        return fullUrl2;
+            // Если это относительный путь (начинается с /), добавляем базовый URL сервера
+            if (imageUrl.StartsWith("/"))
+            {
+                var fullUrl = $"{baseUrl}{imageUrl}";
+                System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: Normalized relative URL: {imageUrl} -> {fullUrl}");
+                return fullUrl;
+            }
+
+            // Если путь не начинается с /, но и не является абсолютным URL,
+            // предполагаем, что это тоже относительный путь от корня сервера
+            var fullUrl2 = $"{baseUrl}/{imageUrl.TrimStart('/')}";
+            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: Normalized path: {imageUrl} -> {fullUrl2}");
+            return fullUrl2;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] NormalizeImageUrl: Error normalizing URL '{imageUrl}': {ex.Message}");
+            return imageUrl; // Возвращаем исходный URL в случае ошибки
+        }
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

@@ -218,6 +218,12 @@ public partial class PartnerDetailViewModel : ObservableObject
 
     private async Task SetLogoAsync(PartnerDetailDto partner)
     {
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] ===== SetLogoAsync =====");
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] LogoUrl: '{partner.LogoUrl}'");
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] LogoUrl is null: {partner.LogoUrl == null}");
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] LogoUrl is empty: {string.IsNullOrEmpty(partner.LogoUrl)}");
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] LogoUrl is whitespace: {string.IsNullOrWhiteSpace(partner.LogoUrl)}");
+        
         if (string.IsNullOrWhiteSpace(partner.LogoUrl))
         {
             // Используем текст по умолчанию
@@ -226,11 +232,13 @@ public partial class PartnerDetailViewModel : ObservableObject
                 : partner.Name.ToUpper();
             IsLogoTextVisible = true;
             IsLogoImageVisible = false;
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] LogoUrl пустой, показываем текст: '{LogoText}'");
             return;
         }
 
         try
         {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] Вызываем конвертер для: '{partner.LogoUrl}'");
             var converter = new StringToImageSourceConverter();
             var logoSource = converter.Convert(
                 partner.LogoUrl,
@@ -238,11 +246,14 @@ public partial class PartnerDetailViewModel : ObservableObject
                 null,
                 System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
 
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] Конвертер вернул: {(logoSource != null ? "ImageSource" : "null")}");
+
             if (logoSource != null)
             {
                 LogoImageSource = logoSource;
                 IsLogoImageVisible = true;
                 IsLogoTextVisible = false;
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] ✅ Логотип установлен: IsLogoImageVisible={IsLogoImageVisible}, IsLogoTextVisible={IsLogoTextVisible}");
             }
             else
             {
@@ -252,18 +263,23 @@ public partial class PartnerDetailViewModel : ObservableObject
                     : partner.Name.ToUpper();
                 IsLogoTextVisible = true;
                 IsLogoImageVisible = false;
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] ❌ Конвертер вернул null, показываем текст: '{LogoText}'");
             }
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Error loading logo for partner {PartnerId}", partner.Id);
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] ❌ Ошибка загрузки логотипа: {ex.Message}");
             // Используем текст в случае ошибки
             LogoText = partner.Name.Length > 10 
                 ? partner.Name.Substring(0, 10).ToUpper() 
                 : partner.Name.ToUpper();
             IsLogoTextVisible = true;
             IsLogoImageVisible = false;
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] Показываем текст после ошибки: '{LogoText}'");
         }
+        
+        System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewModel] ===== SetLogoAsync ЗАВЕРШЕНО =====");
     }
 
     private void SetPromoInfo(PartnerDetailDto partner)

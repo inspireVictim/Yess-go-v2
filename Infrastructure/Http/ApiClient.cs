@@ -88,7 +88,13 @@ public abstract class ApiClient
             if (endpoint.Contains("partners", StringComparison.OrdinalIgnoreCase) || endpoint.Contains("banners", StringComparison.OrdinalIgnoreCase))
             {
                 var entityType = endpoint.Contains("partners", StringComparison.OrdinalIgnoreCase) ? "Partners" : "Banners";
+                
+                // Проверяем формат JSON (camelCase vs snake_case) для logoUrl
+                var hasLogoUrl = jsonContent.Contains("\"logoUrl\"", StringComparison.OrdinalIgnoreCase);
+                var hasLogoUrlSnake = jsonContent.Contains("\"logo_url\"", StringComparison.OrdinalIgnoreCase);
+                
 #if ANDROID
+                Android.Util.Log.Info("ApiClient", $"[GetAsync] {entityType} JSON format check: logoUrl={hasLogoUrl}, logo_url={hasLogoUrlSnake}");
                 var preview = jsonContent.Length > 5000 ? jsonContent.Substring(0, 5000) + "..." : jsonContent;
                 Android.Util.Log.Info("ApiClient", $"[GetAsync] {entityType} API JSON response (first 5000 chars):\n{preview}");
                 // Также логируем полный JSON, если он не слишком большой
@@ -97,7 +103,10 @@ public abstract class ApiClient
                     Android.Util.Log.Info("ApiClient", $"[GetAsync] {entityType} API FULL JSON response:\n{jsonContent}");
                 }
 #endif
+                System.Diagnostics.Debug.WriteLine($"[ApiClient] {entityType} JSON format: logoUrl={hasLogoUrl}, logo_url={hasLogoUrlSnake}");
                 System.Diagnostics.Debug.WriteLine($"[ApiClient] {entityType} API response (first 5000 chars): {(jsonContent.Length > 5000 ? jsonContent.Substring(0, 5000) + "..." : jsonContent)}");
+                Logger?.LogInformation("[ApiClient] {EntityType} JSON format: logoUrl={HasLogoUrl}, logo_url={HasLogoUrlSnake}", 
+                    entityType, hasLogoUrl, hasLogoUrlSnake);
                 Logger?.LogInformation("[ApiClient] {EntityType} API response (first 1000 chars): {Json}", 
                     entityType, jsonContent.Length > 1000 ? jsonContent.Substring(0, 1000) + "..." : jsonContent);
             }

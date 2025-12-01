@@ -519,7 +519,7 @@ namespace YessGoFront.ViewModels
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров");
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров из БД");
 
                 PartnersRow1.Clear();
                 PartnersRow2.Clear();
@@ -527,33 +527,43 @@ namespace YessGoFront.ViewModels
 
                 if (_partnersApiService == null)
                 {
-                    LoadPartnersFallback();
-                    return;
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] PartnersApiService недоступен, не можем загрузить партнёров");
+                    return; // Не используем fallback, просто оставляем пустым
                 }
 
                 var partners = await _partnersApiService.GetAllAsync();
 
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Получено партнёров: {partners?.Count ?? 0}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Получено партнёров из API: {partners?.Count ?? 0}");
 
                 if (partners == null || partners.Count == 0)
                 {
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Партнёры не получены из API или список пуст, используем fallback");
                     LoadPartnersFallback();
                     return;
                 }
 
-                // Приводим к единому формату
+                // Приводим к единому формату - ВСЕ партнёры из БД, даже без логотипов
                 var list = partners
                     .OfType<PartnerDto>()
-                    .Select(p => new PartnerLogoModel
+                    .Select(p => 
                     {
-                        Id = p.Id.ToString(),
-                        Name = p.Name ?? "",
-                        Logo = p.LogoUrl ?? ""
+                        var logoUrl = p.LogoUrl ?? "";
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner из БД: Id={p.Id}, Name={p.Name}, LogoUrl={logoUrl ?? "null"}");
+                        
+                        return new PartnerLogoModel
+                        {
+                            Id = p.Id.ToString(),
+                            Name = p.Name ?? "",
+                            Logo = logoUrl // Сохраняем даже пустой LogoUrl - конвертер обработает
+                        };
                     })
-                    .ToList();
+                    .ToList(); // НЕ фильтруем - показываем ВСЕ партнёры из БД
 
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Всего партнёров из БД: {list.Count}");
+                
                 if (list.Count == 0)
                 {
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Список партнёров пуст после обработки, используем fallback");
                     LoadPartnersFallback();
                     return;
                 }
@@ -561,6 +571,8 @@ namespace YessGoFront.ViewModels
                 // === ДЕЛИМ НА 3 РЯДА ===
                 int count = list.Count;
                 int perRow = Math.Max(1, count / 3);
+                
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Разделение на ряды: всего={count}, на ряд={perRow}");
 
                 var row1 = list.Take(perRow).ToList();
                 var row2 = list.Skip(perRow).Take(perRow).ToList();
@@ -589,6 +601,7 @@ namespace YessGoFront.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync ERROR: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] StackTrace: {ex.StackTrace}");
                 LoadPartnersFallback();
             }
         }
@@ -979,14 +992,17 @@ namespace YessGoFront.ViewModels
 
         public async Task OpenPartnerAsync(PartnerLogoModel partner)
         {
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ===== OpenPartnerAsync CALLED =====");
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner parameter: {(partner == null ? "NULL" : $"Name='{partner.Name}', ID='{partner?.Id}'")}");
+            
             if (partner == null)
             {
-                System.Diagnostics.Debug.WriteLine("[MainPage] OpenPartnerAsync: partner is null");
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] OpenPartnerAsync: partner is null, returning");
                 return;
             }
 
             // 🔹 Для проверки — выведем лог
-            System.Diagnostics.Debug.WriteLine($"[MainPage] Нажали на партнёра: Name='{partner.Name}', ID='{partner.Id}'");
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Нажали на партнёра: Name='{partner.Name}', ID='{partner.Id}'");
 
             try
             {
@@ -995,21 +1011,46 @@ namespace YessGoFront.ViewModels
                 {
                     // Используем абсолютный путь с тремя слешами для навигации к зарегистрированному маршруту
                     var route = $"///partnerdetails?partnerId={Uri.EscapeDataString(partner.Id)}";
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] Navigating to: {route}");
-                    await Shell.Current.GoToAsync(route);
-                    System.Diagnostics.Debug.WriteLine("[MainPage] Navigation completed successfully");
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Navigating to: {route}");
+                    
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        try
+                        {
+                            await Shell.Current.GoToAsync(route);
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Navigation completed successfully");
+                        }
+                        catch (Exception navEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Navigation exception: {navEx.Message}");
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Navigation stack trace: {navEx.StackTrace}");
+                            throw;
+                        }
+                    });
                 }
                 else if (!string.IsNullOrWhiteSpace(partner.Name))
                 {
                     // Fallback: используем имя, если ID не указан
                     var route = $"///partnerdetails?partnerName={Uri.EscapeDataString(partner.Name)}";
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] Navigating by name to: {route}");
-                    await Shell.Current.GoToAsync(route);
-                    System.Diagnostics.Debug.WriteLine("[MainPage] Navigation completed successfully");
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Navigating by name to: {route}");
+                    
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        try
+                        {
+                            await Shell.Current.GoToAsync(route);
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Navigation completed successfully");
+                        }
+                        catch (Exception navEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Navigation exception: {navEx.Message}");
+                            throw;
+                        }
+                    });
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainPage] Не удалось открыть партнёра: нет ID и имени");
+                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Не удалось открыть партнёра: нет ID и имени");
                     await MainThread.InvokeOnMainThreadAsync(async () =>
                     {
                         await Application.Current?.MainPage?.DisplayAlert("Ошибка", "Не удалось открыть информацию о партнёре", "OK");
@@ -1018,14 +1059,16 @@ namespace YessGoFront.ViewModels
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MainPage] Ошибка навигации к партнёру: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[MainPage] Stack trace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Ошибка навигации к партнёру: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Stack trace: {ex.StackTrace}");
                 
                 await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
                     await Application.Current?.MainPage?.DisplayAlert("Ошибка", $"Не удалось открыть партнёра: {ex.Message}", "OK");
                 });
             }
+            
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ===== OpenPartnerAsync COMPLETED =====");
         }
     }
 }

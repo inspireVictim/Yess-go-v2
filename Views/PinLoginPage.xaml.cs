@@ -153,7 +153,8 @@ namespace YessGoFront.Views
             OnPropertyChanged(nameof(IsVerificationMode));
             OnPropertyChanged(nameof(TitleText));
 
-            // Проверяем и отображаем статус токенов
+            // Проверяем и отображаем статус токенов (будет обновлен после успешной PIN/биометрии)
+            // Не показываем предупреждения, если токены будут обновлены автоматически
             await UpdateTokenStatusAsync();
 
             // Дополнительная проверка: если параметра нет, проверяем наличие PIN-кода
@@ -207,6 +208,23 @@ namespace YessGoFront.Views
                 var accessToken = await authService.GetAccessTokenAsync();
                 var refreshToken = await authService.GetRefreshTokenAsync();
 
+                // Сначала проверяем наличие валидного refresh token
+                // Если он есть, токены будут автоматически обновлены при PIN/биометрии
+                // Поэтому не показываем никаких предупреждений
+                bool hasValidRefreshToken = !string.IsNullOrWhiteSpace(refreshToken) && 
+                                            Infrastructure.Auth.JwtHelper.IsTokenValid(refreshToken);
+
+                if (hasValidRefreshToken)
+                {
+                    // Есть валидный refresh token - токены будут обновлены автоматически
+                    // Не показываем предупреждения, так как система автоматически обновит токены
+                    TokenStatusMessage = string.Empty;
+                    OnPropertyChanged(nameof(ShowTokenStatus));
+                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Valid refresh token found, suppressing token expiration warnings");
+                    return;
+                }
+
+                // Если нет валидного refresh token, проверяем статус access token
                 if (_tokenStatus == "fresh")
                 {
                     // Токены помечены как свежие AppShell
@@ -221,25 +239,28 @@ namespace YessGoFront.Views
 
                     if (!isValid)
                     {
-                        TokenStatusMessage = "Токены истекли. Требуется обновление";
+                        // Access token истек и нет валидного refresh token - нужен повторный вход
+                        TokenStatusMessage = "Токены истекли. Требуется повторный вход";
                         TokenStatusColor = Color.FromArgb("#F44336"); // Красный
                     }
                     else if (remainingMinutes < 10)
                     {
+                        // Access token скоро истечет и нет валидного refresh token
                         TokenStatusMessage = $"Токены истекут через {remainingMinutes} мин. Рекомендуется обновить";
                         TokenStatusColor = Color.FromArgb("#FF9800"); // Оранжевый
                     }
                     else
                     {
-                        // Токены в норме, не показываем сообщение
+                        // Токены в норме
                         TokenStatusMessage = string.Empty;
                     }
                     OnPropertyChanged(nameof(ShowTokenStatus));
                 }
                 else if (!string.IsNullOrWhiteSpace(refreshToken))
                 {
-                    TokenStatusMessage = "Требуется обновление токенов доступа";
-                    TokenStatusColor = Color.FromArgb("#FF9800"); // Оранжевый
+                    // Есть refresh token, но он невалиден, и нет access token
+                    TokenStatusMessage = "Токены истекли. Требуется повторный вход";
+                    TokenStatusColor = Color.FromArgb("#F44336"); // Красный
                     OnPropertyChanged(nameof(ShowTokenStatus));
                 }
                 else
@@ -315,6 +336,8 @@ namespace YessGoFront.Views
                                     if (tokensValid)
                                     {
                                         System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens are valid after biometric auth");
+                                        // Обновляем статус токенов после успешного обновления
+                                        await UpdateTokenStatusAsync();
                                         await NavigateToMainAsync();
                                         return;
                                     }
@@ -331,6 +354,8 @@ namespace YessGoFront.Views
                                         if (hasValidAccessToken)
                                         {
                                             System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh failure");
+                                            // Обновляем статус токенов
+                                            await UpdateTokenStatusAsync();
                                             await NavigateToMainAsync();
                                             return;
                                         }
@@ -660,6 +685,8 @@ namespace YessGoFront.Views
                             if (tokensValid)
                             {
                                 System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens are valid after PIN verification");
+                                // Обновляем статус токенов после успешного обновления
+                                await UpdateTokenStatusAsync();
                                 await NavigateToMainAsync();
                                 return;
                             }
@@ -676,6 +703,8 @@ namespace YessGoFront.Views
                                 if (hasValidAccessToken)
                                 {
                                     System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh failure");
+                                    // Обновляем статус токенов
+                                    await UpdateTokenStatusAsync();
                                     await NavigateToMainAsync();
                                     return;
                                 }

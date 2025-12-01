@@ -21,9 +21,15 @@ namespace YessGoFront.Views
             set
             {
                 partnerId = value;
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] PartnerId set to: '{partnerId}'");
                 if (!string.IsNullOrWhiteSpace(partnerId))
                 {
+                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Loading partner with ID: '{partnerId}'");
                     LoadPartner(partnerId);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] PartnerId is null or empty, not loading partner");
                 }
             }
         }
@@ -39,9 +45,12 @@ namespace YessGoFront.Views
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LoadPartner called with id: '{id}'");
                 if (_partnersService != null)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Calling GetPartnerByIdAsync with id: '{id}'");
                     var partner = await _partnersService.GetPartnerByIdAsync(id);
+                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] GetPartnerByIdAsync returned: {(partner != null ? $"Partner '{partner.Name}' (Id: {partner.Id})" : "null")}");
                     
                     if (partner != null)
                     {
@@ -76,34 +85,78 @@ namespace YessGoFront.Views
                             System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Описание пустое или null, скрываем поле");
                         }
                         
-                        // Загружаем логотип
+                        // Загружаем логотип или показываем текст
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ===== ЗАГРУЗКА ЛОГОТИПА =====");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LogoUrl: '{partner.LogoUrl}'");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LogoUrl is null: {partner.LogoUrl == null}");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LogoUrl is empty: {string.IsNullOrEmpty(partner.LogoUrl)}");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LogoUrl is whitespace: {string.IsNullOrWhiteSpace(partner.LogoUrl)}");
+                        
+                        // Получаем ссылки на элементы
+                        var logoText = this.FindByName("LogoText") as Label;
+                        var logoFrame = this.FindByName("LogoFrame") as Frame;
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] logoText found: {logoText != null}");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] logoFrame found: {logoFrame != null}");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] PartnerLogo found: {PartnerLogo != null}");
+                        
                         if (!string.IsNullOrWhiteSpace(partner.LogoUrl))
                         {
                             try
                             {
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Вызываем конвертер для: '{partner.LogoUrl}'");
                                 var converter = new StringToImageSourceConverter();
                                 var imageSource = converter.Convert(partner.LogoUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                                
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Конвертер вернул: {(imageSource != null ? "ImageSource" : "null")}");
+                                
                                 if (imageSource != null)
                                 {
+                                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ✅ Устанавливаем логотип: {partner.LogoUrl}");
                                     PartnerLogo.Source = imageSource;
+                                    PartnerLogo.IsVisible = true; // ✅ Показываем изображение
+                                    
+                                    // Скрываем текст
+                                    if (logoText != null)
+                                    {
+                                        logoText.IsVisible = false;
+                                        System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoText скрыт");
+                                    }
+                                    
+                                    // Убеждаемся, что Frame видим
+                                    if (logoFrame != null)
+                                    {
+                                        logoFrame.IsVisible = true;
+                                        System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoFrame установлен как видимый");
+                                    }
+                                    
+                                    System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] ✅ Логотип установлен и видим");
                                 }
                                 else
                                 {
-                                    // Если конвертер вернул null, скрываем изображение
+                                    // Если конвертер вернул null, показываем текст
+                                    System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] ❌ Конвертер вернул null для логотипа, показываем текст");
+                                    ShowLogoText(partner.Name, logoText, logoFrame);
                                     PartnerLogo.IsVisible = false;
                                 }
                             }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Ошибка загрузки логотипа: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ❌ Ошибка загрузки логотипа: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Stack trace: {ex.StackTrace}");
+                                // При ошибке показываем текст
+                                ShowLogoText(partner.Name, logoText, logoFrame);
                                 PartnerLogo.IsVisible = false;
                             }
                         }
                         else
                         {
-                            // Если URL логотипа пустой, скрываем изображение
+                            // Если URL логотипа пустой, показываем текст
+                            System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoUrl пустой, показываем текст");
+                            ShowLogoText(partner.Name, logoText, logoFrame);
                             PartnerLogo.IsVisible = false;
                         }
+                        
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ===== ЗАГРУЗКА ЛОГОТИПА ЗАВЕРШЕНА =====");
                         
                         // Загружаем обложку
                         if (!string.IsNullOrWhiteSpace(partner.CoverImageUrl))
@@ -136,6 +189,9 @@ namespace YessGoFront.Views
                         PartnerName.Text = $"Партнёр №{id}";
                         PartnerCategory.Text = "Категория: Не указана";
                         PartnerDescription.Text = "Информация о партнёре не найдена.";
+                        var logoText = this.FindByName("LogoText") as Label;
+                        var logoFrame = this.FindByName("LogoFrame") as Frame;
+                        ShowLogoText($"Партнёр №{id}", logoText, logoFrame);
                         PartnerLogo.IsVisible = false;
                     }
                 }
@@ -145,6 +201,9 @@ namespace YessGoFront.Views
                     PartnerName.Text = $"Партнёр №{id}";
                     PartnerCategory.Text = "Категория: Еда и напитки";
                     PartnerDescription.Text = "Описание партнёра, информация о скидках, адрес и контакты.";
+                    var logoText = this.FindByName("LogoText") as Label;
+                    var logoFrame = this.FindByName("LogoFrame") as Frame;
+                    ShowLogoText($"Партнёр №{id}", logoText, logoFrame);
                     PartnerLogo.IsVisible = false;
                 }
             }
@@ -154,7 +213,34 @@ namespace YessGoFront.Views
                 PartnerName.Text = $"Партнёр №{id}";
                 PartnerCategory.Text = "Ошибка загрузки";
                 PartnerDescription.Text = "Не удалось загрузить информацию о партнёре.";
+                var logoText = this.FindByName("LogoText") as Label;
+                var logoFrame = this.FindByName("LogoFrame") as Frame;
+                ShowLogoText($"Партнёр №{id}", logoText, logoFrame);
                 PartnerLogo.IsVisible = false;
+            }
+        }
+
+        private void ShowLogoText(string partnerName, Label? logoText, Frame? logoFrame)
+        {
+            if (logoText != null)
+            {
+                // Берем первые буквы имени партнёра (максимум 10 символов) и делаем заглавными
+                var text = string.IsNullOrWhiteSpace(partnerName) 
+                    ? "?" 
+                    : (partnerName.Length > 10 
+                        ? partnerName.Substring(0, 10).ToUpper() 
+                        : partnerName.ToUpper());
+                
+                logoText.Text = text;
+                logoText.IsVisible = true;
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Показываем текст логотипа: '{text}'");
+            }
+            
+            // Убеждаемся, что Frame видим
+            if (logoFrame != null)
+            {
+                logoFrame.IsVisible = true;
+                System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoFrame установлен как видимый для текста");
             }
         }
 

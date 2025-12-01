@@ -63,10 +63,10 @@ public class PartnerDto
     [JsonPropertyName("description")]
     public string? Description { get; set; }
     
-    [JsonPropertyName("logoUrl")] 
+    [JsonPropertyName("logo_url")] 
     public string? LogoUrl { get; set; }
     
-    [JsonPropertyName("coverImageUrl")] 
+    [JsonPropertyName("cover_image_url")] 
     public string? CoverImageUrl { get; set; }
     
     [JsonPropertyName("qr_code_url")]

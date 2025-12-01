@@ -64,7 +64,7 @@
                                TextColor="#0F6B53"
                                FontSize="16"
                                FontAttributes="Bold"/>
-                        <Label Text="+996 (555) 123 456"
+                        <Label Text="+996 (990) 500 757"
                                TextColor="#6B7280"
                                FontSize="14"/>
                     </VerticalStackLayout>
@@ -94,7 +94,7 @@
                                TextColor="#0F6B53"
                                FontSize="16"
                                FontAttributes="Bold"/>
-                        <Label Text="[Указать полный юридический адрес, не 'до востребования']"
+                        <Label Text="г. Бишкек, ул. Токтогула, 87"
                                TextColor="#6B7280"
                                FontSize="14"
                                LineBreakMode="WordWrap"/>
@@ -110,7 +110,7 @@
                                TextColor="#0F6B53"
                                FontSize="16"
                                FontAttributes="Bold"/>
-                        <Label Text="[Указать полный фактический адрес]"
+                        <Label Text="г. Бишкек, ул. Токтогула, 87"
                                TextColor="#6B7280"
                                FontSize="14"
                                LineBreakMode="WordWrap"/>

@@ -171,8 +171,8 @@
                             <Span Text="10. Контакты" FontAttributes="Bold"/>
                             <Span Text="&#10;--------------------------------------" />
                             <Span Text="&#10;Если у вас есть вопросы:" />
-                            <Span Text="&#10;📧 [почта]" />
-                            <Span Text="&#10;🌐 [сайт]" />
+                            <Span Text="&#10;📧 support@yessgo.kg" />
+                            <Span Text="&#10;🌐 www.yessgo.kg" />
 
                         </FormattedString>
                     </Label.FormattedText>

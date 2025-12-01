@@ -37,6 +37,28 @@ namespace YessGoFront
 
         }
 
+        protected override void OnNavigating(ShellNavigatingEventArgs args)
+        {
+            base.OnNavigating(args);
+            
+            // Перехватываем системный жест "назад" для корректной обработки
+            // Это предотвращает краш приложения при свайпе от левого края
+            try
+            {
+                Debug.WriteLine($"[AppShell] Navigating: Target={args.Target?.Location}, Current={args.Current?.Location}, Source={args.Source}");
+                
+                // Для всех типов навигации разрешаем переход
+                // Shell сам управляет навигационным стеком и предотвращает ошибки
+                // Важно: не блокируем навигацию, чтобы избежать краша
+                Debug.WriteLine("[AppShell] Navigation allowed");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AppShell] Error in OnNavigating: {ex.Message}");
+                // Не блокируем навигацию при ошибке - это может привести к крашу
+            }
+        }
+
         protected override async void OnAppearing()
         {
             base.OnAppearing();

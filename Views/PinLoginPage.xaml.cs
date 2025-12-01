@@ -265,31 +265,115 @@ namespace YessGoFront.Views
                     var biometricSuccess = await _authService.AuthenticateWithBiometricsAsync();
                     if (biometricSuccess)
                     {
-                        // Биометрия успешна - обновляем токены перед переходом
-                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Biometric authentication successful, refreshing tokens");
-                        try
+                        // Биометрия успешна - проверяем токены и обновляем только если нужно
+                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Biometric authentication successful, checking tokens");
+                        var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+                        if (authService != null)
                         {
-                            var refreshed = await _authService.RefreshTokenAsync();
-                            if (refreshed)
+                            var accessToken = await authService.GetAccessTokenAsync();
+                            var refreshToken = await authService.GetRefreshTokenAsync();
+                            
+                            // Если нет токенов - требуем перелогиниться
+                            if (string.IsNullOrWhiteSpace(accessToken) && string.IsNullOrWhiteSpace(refreshToken))
                             {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens refreshed successfully after biometric auth");
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] No tokens found after biometric, redirecting to login");
+                                await DisplayAlert(
+                                    "Требуется повторный вход",
+                                    "Для продолжения работы необходимо войти заново.",
+                                    "OK");
+                                
+                                var pinService = new Services.PinStorageService();
+                                await pinService.ClearPinAsync();
+                                await authService.ClearTokensAsync();
+                                AccountStore.Instance.SignOut();
+                                await Shell.Current.GoToAsync("///login", animate: true);
+                                return;
+                            }
+                            
+                            // Всегда обновляем токены при успешной авторизации через биометрию
+                            // Это продлевает refresh token на неделю каждый раз при открытии приложения
+                            if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
+                            {
+                                try
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refreshing tokens after biometric auth to extend session");
+                                    var refreshed = await _authService.RefreshTokenAsync();
+                                    if (refreshed)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens refreshed successfully after biometric auth");
+                                        await NavigateToMainAsync();
+                                        return;
+                                    }
+                                    else
+                                    {
+                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens after biometric, but continuing if access token is valid");
+                                        // Проверяем, может access token еще валиден и можно продолжить
+                                        bool hasValidAccessToken = false;
+                                        if (!string.IsNullOrWhiteSpace(accessToken))
+                                        {
+                                            hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                                        }
+                                        
+                                        if (hasValidAccessToken)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh failure");
+                                            await NavigateToMainAsync();
+                                            return;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens after biometric: {ex.Message}");
+                                    // Проверяем, может access token еще валиден и можно продолжить
+                                    bool hasValidAccessToken = false;
+                                    if (!string.IsNullOrWhiteSpace(accessToken))
+                                    {
+                                        hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                                    }
+                                    
+                                    if (hasValidAccessToken)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh error");
+                                        await NavigateToMainAsync();
+                                        return;
+                                    }
+                                }
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens after biometric auth, but continuing");
+                                // Нет refresh token - проверяем access token
+                                bool hasValidAccessToken = false;
+                                if (!string.IsNullOrWhiteSpace(accessToken))
+                                {
+                                    hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                                }
+                                
+                                if (hasValidAccessToken)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] No refresh token but access token valid after biometric, navigating to main");
+                                    await NavigateToMainAsync();
+                                    return;
+                                }
+                                
+                                // Нет refresh token и access token невалиден - требуем перелогиниться
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] No refresh token and access token invalid after biometric, redirecting to login");
+                                await DisplayAlert(
+                                    "Требуется повторный вход",
+                                    "Сессия истекла. Пожалуйста, войдите заново.",
+                                    "OK");
+                                
+                                var pinService2 = new Services.PinStorageService();
+                                await pinService2.ClearPinAsync();
+                                await authService.ClearTokensAsync();
+                                AccountStore.Instance.SignOut();
+                                await Shell.Current.GoToAsync("///login", animate: true);
+                                return;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens after biometric auth: {ex.Message}");
-                            // Продолжаем даже если обновление не удалось
-                        }
-                        
-                        // Переходим дальше
-                        await NavigateToMainAsync();
                     }
-                    // Если биометрия недоступна или пользователь отменил - продолжаем с PIN
                 }
+                // Если биометрия недоступна или пользователь отменил - продолжаем с PIN
             }
             catch
             {
@@ -537,51 +621,42 @@ namespace YessGoFront.Views
                         return;
                     }
                     
-                    // PIN валиден - ВСЕГДА обновляем токены перед входом
-                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN valid, refreshing tokens before navigation");
+                    // Всегда обновляем токены при успешной авторизации через PIN
+                    // Это продлевает refresh token на неделю каждый раз при открытии приложения
                     if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
                     {
                         try
                         {
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refreshing tokens after PIN verification to extend session");
                             var refreshed = await _authService.RefreshTokenAsync();
                             if (refreshed)
                             {
                                 System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens refreshed successfully after PIN verification");
+                                await NavigateToMainAsync();
+                                return;
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens after PIN verification, but continuing");
-                                // Если refresh не сработал и нет access token - требуем перелогиниться
-                                if (string.IsNullOrWhiteSpace(accessToken))
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens, checking if access token is still valid");
+                                // Проверяем, может access token еще валиден и можно продолжить
+                                bool hasValidAccessToken = false;
+                                if (!string.IsNullOrWhiteSpace(accessToken))
                                 {
-                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] No access token and refresh failed, redirecting to login");
-                                    await DisplayAlert(
-                                        "Требуется повторный вход",
-                                        "Не удалось обновить токен доступа. Пожалуйста, войдите заново.",
-                                        "OK");
-                                    
-                                    // Очищаем PIN и токены
-                                    var pinService = new Services.PinStorageService();
-                                    await pinService.ClearPinAsync();
-                                    await authService.ClearTokensAsync();
-                                    AccountStore.Instance.SignOut();
-                                    
-                                    // Переходим на страницу входа
-                                    await Shell.Current.GoToAsync("///login", animate: true);
+                                    hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                                }
+                                
+                                if (hasValidAccessToken)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh failure");
+                                    await NavigateToMainAsync();
                                     return;
                                 }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens after PIN verification: {ex.Message}");
-                            // Если refresh не сработал и нет access token - требуем перелогиниться
-                            if (string.IsNullOrWhiteSpace(accessToken))
-                            {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] No access token and refresh error, redirecting to login");
+                                
+                                // Если refresh не удался и access token тоже невалиден - требуем перелогиниться
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Both refresh and access tokens invalid, redirecting to login");
                                 await DisplayAlert(
                                     "Требуется повторный вход",
-                                    "Не удалось обновить токен доступа. Пожалуйста, войдите заново.",
+                                    "Сессия истекла. Пожалуйста, войдите заново.",
                                     "OK");
                                 
                                 // Очищаем PIN и токены
@@ -594,13 +669,79 @@ namespace YessGoFront.Views
                                 await Shell.Current.GoToAsync("///login", animate: true);
                                 return;
                             }
-                            // Если есть access token, продолжаем даже при ошибке refresh
                         }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens: {ex.Message}");
+                            
+                            // Проверяем, может access token еще валиден и можно продолжить
+                            bool hasValidAccessToken = false;
+                            if (!string.IsNullOrWhiteSpace(accessToken))
+                            {
+                                hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                            }
+                            
+                            if (hasValidAccessToken)
+                            {
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Access token still valid, navigating to main despite refresh error");
+                                await NavigateToMainAsync();
+                                return;
+                            }
+                            
+                            // Если ошибка и access token невалиден - требуем перелогиниться
+                            await DisplayAlert(
+                                "Требуется повторный вход",
+                                "Не удалось обновить сессию. Пожалуйста, войдите заново.",
+                                "OK");
+                            
+                            // Очищаем PIN и токены
+                            var pinService = new Services.PinStorageService();
+                            await pinService.ClearPinAsync();
+                            await authService.ClearTokensAsync();
+                            AccountStore.Instance.SignOut();
+                            
+                            // Переходим на страницу входа
+                            await Shell.Current.GoToAsync("///login", animate: true);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Нет refresh token - проверяем access token
+                        bool hasValidAccessToken = false;
+                        if (!string.IsNullOrWhiteSpace(accessToken))
+                        {
+                            hasValidAccessToken = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
+                        }
+                        
+                        if (hasValidAccessToken)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] No refresh token but access token valid, navigating to main");
+                            await NavigateToMainAsync();
+                            return;
+                        }
+                        
+                        // Нет refresh token и access token невалиден - требуем перелогиниться
+                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] No refresh token and access token invalid, redirecting to login");
+                        await DisplayAlert(
+                            "Требуется повторный вход",
+                            "Сессия истекла. Пожалуйста, войдите заново.",
+                            "OK");
+                        
+                        // Очищаем PIN и токены
+                        var pinService = new Services.PinStorageService();
+                        await pinService.ClearPinAsync();
+                        await authService.ClearTokensAsync();
+                        AccountStore.Instance.SignOut();
+                        
+                        // Переходим на страницу входа
+                        await Shell.Current.GoToAsync("///login", animate: true);
+                        return;
                     }
                 }
                 
-                // PIN валиден - переходим в приложение
-                System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN valid, navigating to main");
+                // Если authService недоступен, просто переходим (на случай ошибки)
+                System.Diagnostics.Debug.WriteLine("[PinLoginPage] AuthService unavailable, navigating to main");
                 await NavigateToMainAsync();
             }
             else

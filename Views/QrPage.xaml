@@ -15,6 +15,7 @@
             Grid.RowSpan="3"
             BarcodesDetected="BarCodeReader_BarcodesDetected"
             IsTorchOn="{Binding IsTorchOn}"
+            IsDetecting="False"
             HorizontalOptions="Fill"
             VerticalOptions="Fill"/>
 
@@ -135,7 +136,6 @@
                    BackgroundColor="White"
                    Padding="20"
                    WidthRequest="300"
-                   Shadow="15"
                    VerticalOptions="Center"
                    HorizontalOptions="Center">
 

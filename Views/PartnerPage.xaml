@@ -16,9 +16,7 @@
                      Grid.Row="1"
                      Orientation="Horizontal"
                      Margin="16,16,16,0"
-                     VerticalOptions="Center"
-                     Opacity="0"
-                     TranslationY="-20">
+                     VerticalOptions="Center">
 
             <Frame CornerRadius="10"
                    Padding="0"
@@ -54,9 +52,7 @@
                         Margin="12,8,12,0"
                         SelectionMode="None"
                         VerticalOptions="FillAndExpand"
-                        HorizontalOptions="FillAndExpand"
-                        Opacity="0"
-                        TranslationY="30">
+                        HorizontalOptions="FillAndExpand">
 
             <CollectionView.ItemsLayout>
                 <!-- Автоматическая адаптация под платформу -->
@@ -66,17 +62,13 @@
 
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <!-- Каждый элемент сам себя анимирует при Loaded -->
                     <Frame Padding="10"
                            CornerRadius="16"
                            HasShadow="False"
                            BackgroundColor="White"
                            Margin="8"
                            HorizontalOptions="FillAndExpand"
-                           VerticalOptions="FillAndExpand"
-                           Loaded="CategoryFrame_Loaded"
-                           Opacity="0"
-                           TranslationY="20">
+                           VerticalOptions="FillAndExpand">
                         <Frame.GestureRecognizers>
                             <TapGestureRecognizer
                                 Tapped="Category_Tapped"
@@ -104,8 +96,6 @@
         <!-- Нижняя панель навигации -->
         <controls:BottomNavBar x:Name="BottomBar"
                                Grid.Row="3"
-                               Margin="0,4,0,0"
-                               Opacity="0"
-                               TranslationY="30" />
+                               Margin="0,4,0,0" />
     </Grid>
 </ContentPage>

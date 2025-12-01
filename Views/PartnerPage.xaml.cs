@@ -17,9 +17,6 @@ namespace YessGoFront.Views
         public ObservableCollection<CategoryItem> Categories { get; set; }
         private string _searchQuery = string.Empty;
 
-        // счётчик, чтобы делать небольшую задержку между карточками
-        private int _categoryAnimationIndex = 0;
-
         public PartnerPage()
         {
             InitializeComponent();
@@ -33,13 +30,8 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
-            // сбрасываем счётчик, когда возвращаемся на страницу
-            _categoryAnimationIndex = 0;
-
             // Загружаем категории из API
             await LoadCategoriesAsync();
-
-            await AnimatePageAsync();
         }
 
         private async Task LoadCategoriesAsync()
@@ -121,61 +113,6 @@ namespace YessGoFront.Views
             };
         }
 
-        private async Task AnimatePageAsync()
-        {
-            try
-            {
-                // верх
-                await Task.WhenAll(
-                    SearchContainer.FadeTo(1, 350, Easing.CubicOut),
-                    SearchContainer.TranslateTo(0, 0, 350, Easing.CubicOut)
-                );
-
-                // список целиком (без карточек)
-                await Task.WhenAll(
-                    CategoriesCollection.FadeTo(1, 350, Easing.CubicOut),
-                    CategoriesCollection.TranslateTo(0, 0, 350, Easing.CubicOut)
-                );
-
-                // низ
-                await Task.WhenAll(
-                    BottomBar.FadeTo(1, 300, Easing.CubicOut),
-                    BottomBar.TranslateTo(0, 0, 300, Easing.CubicOut)
-                );
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Animation error: {ex.Message}");
-            }
-        }
-
-        // 👉 Анимация для КАЖДОЙ карточки — вызывается из XAML (Loaded="CategoryFrame_Loaded")
-        private async void CategoryFrame_Loaded(object sender, EventArgs e)
-        {
-            if (sender is VisualElement view)
-            {
-                try
-                {
-                    // небольшая ступенчатая задержка, чтобы было по очереди
-                    int delay = 60 * _categoryAnimationIndex;
-                    _categoryAnimationIndex++;
-
-                    await Task.Delay(delay);
-
-                    view.Opacity = 0;
-                    view.TranslationY = 20;
-
-                    await Task.WhenAll(
-                        view.FadeTo(1, 280, Easing.CubicOut),
-                        view.TranslateTo(0, 0, 280, Easing.CubicOut)
-                    );
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Item animation error: {ex.Message}");
-                }
-            }
-        }
 
         private async void OnBackTapped(object? sender, EventArgs e)
         {

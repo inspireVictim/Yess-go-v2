@@ -19,7 +19,6 @@ namespace YessGoFront
             
             // Основные страницы (уже в ShellContent в XAML) - НЕ регистрируем здесь:
             // - WalletPage (в TabBar)
-            // - PartnersListPage (ShellContent)
             // - PartnerPage (в TabBar)
             // - partnerdetails/PartnerDetailPage (ShellContent)
             // - TransactionsPage (ShellContent)
@@ -27,6 +26,7 @@ namespace YessGoFront
             // - CertificatePage (ShellContent)
             
             // Подстраницы, которые работают через стек навигации:
+            Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
             Routing.RegisterRoute("PartnerDetailViewPage", typeof(Views.PartnerDetailViewPage));
             Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
             

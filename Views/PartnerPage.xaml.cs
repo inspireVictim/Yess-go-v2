@@ -163,7 +163,8 @@ namespace YessGoFront.Views
                     var categoryName = Uri.EscapeDataString(category.Name);
                     var searchQuery = Uri.EscapeDataString(_searchQuery);
                     
-                    var route = $"///PartnersListPage?categorySlug={Uri.EscapeDataString(categorySlug)}&categoryName={categoryName}&searchQuery={searchQuery}";
+                    // Используем относительный путь (БЕЗ ///) для сохранения стека навигации
+                    var route = $"PartnersListPage?categorySlug={Uri.EscapeDataString(categorySlug)}&categoryName={categoryName}&searchQuery={searchQuery}";
                     await Shell.Current.GoToAsync(route);
                 }
             }

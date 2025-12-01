@@ -3,6 +3,24 @@ using System.Text.Json.Serialization;
 namespace YessGoFront.Models;
 
 /// <summary>
+/// Обёртка для пагинированного ответа API с товарами
+/// </summary>
+public class PagedProductsResponse
+{
+    [JsonPropertyName("items")]
+    public List<ProductDto> Items { get; set; } = new();
+    
+    [JsonPropertyName("total")]
+    public int Total { get; set; }
+    
+    [JsonPropertyName("page")]
+    public int Page { get; set; }
+    
+    [JsonPropertyName("page_size")]
+    public int PageSize { get; set; }
+}
+
+/// <summary>
 /// DTO для продукта партнёра
 /// </summary>
 public class ProductDto

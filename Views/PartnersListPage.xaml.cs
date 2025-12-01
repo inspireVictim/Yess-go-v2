@@ -310,11 +310,50 @@ namespace YessGoFront.Views
         {
             try
             {
-                await Shell.Current.GoToAsync(nameof(PartnerPage));
+                if (Shell.Current == null)
+                {
+                    return;
+                }
+
+                // Сначала пытаемся использовать Navigation.PopAsync (более надежный способ)
+                if (Shell.Current.Navigation != null && Shell.Current.Navigation.NavigationStack.Count > 1)
+                {
+                    await Shell.Current.Navigation.PopAsync(animated: true);
+                    return;
+                }
+
+                // Если Navigation.PopAsync не сработал, используем Shell навигацию назад
+                await Shell.Current.GoToAsync("..", animate: true);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Navigation error: {ex.Message}");
+                Debug.WriteLine($"[PartnersListPage] Navigation error: {ex.Message}");
+                Debug.WriteLine($"[PartnersListPage] StackTrace: {ex.StackTrace}");
+                
+                // Fallback: попытка вернуться назад через Shell навигацию
+                try
+                {
+                    if (Shell.Current != null)
+                    {
+                        await Shell.Current.GoToAsync("..", animate: true);
+                    }
+                }
+                catch (Exception fallbackEx)
+                {
+                    Debug.WriteLine($"[PartnersListPage] Fallback navigation error: {fallbackEx.Message}");
+                    // Последний fallback: абсолютный путь к PartnerPage
+                    try
+                    {
+                        if (Shell.Current != null)
+                        {
+                            await Shell.Current.GoToAsync("///main/partner", animate: true);
+                        }
+                    }
+                    catch
+                    {
+                        // Игнорируем последнюю ошибку
+                    }
+                }
             }
         }
 

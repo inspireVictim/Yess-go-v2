@@ -126,8 +126,104 @@ public class PartnersApiService : ApiClient, IPartnersApiService
             throw new ArgumentException($"Invalid partner ID: {partnerId}", nameof(partnerId));
         }
         var endpoint = ApiEndpoints.PartnersEndpoints.Products(id);
-        var result = await GetAsync<List<ProductDto>>(endpoint, ct);
-        return result ?? new List<ProductDto>();
+        
+        Logger?.LogInformation("[PartnersApiService] Loading products from endpoint: {Endpoint}", endpoint);
+        System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Loading products from: {endpoint}");
+        
+        try
+        {
+            // Получаем сырой JSON для логирования и обработки
+            var uri = BuildUri(endpoint);
+            var response = await HttpClient.GetAsync(uri, ct);
+            await EnsureSuccessStatusCode(response);
+            
+            var jsonContent = await response.Content.ReadAsStringAsync(ct);
+            
+            // Логируем сырой JSON
+            Logger?.LogInformation("[PartnersApiService] Products API raw JSON response (first 2000 chars): {Json}", 
+                jsonContent.Length > 2000 ? jsonContent.Substring(0, 2000) + "..." : jsonContent);
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Products API raw JSON: {(jsonContent.Length > 2000 ? jsonContent.Substring(0, 2000) + "..." : jsonContent)}");
+#if ANDROID
+            Log.Info("PartnersApiService", $"[GetProductsAsync] Products API raw JSON (first 2000 chars): {(jsonContent.Length > 2000 ? jsonContent.Substring(0, 2000) + "..." : jsonContent)}");
+#endif
+            
+            // Пытаемся десериализовать как пагинированный ответ (объект с полем "items")
+            List<ProductDto>? products = null;
+            try
+            {
+                // Сначала пробуем как пагинированный ответ (формат backend: { "items": [...], "total": 2, ... })
+                var pagedResponse = System.Text.Json.JsonSerializer.Deserialize<PagedProductsResponse>(jsonContent, JsonOptions);
+                if (pagedResponse != null && pagedResponse.Items != null)
+                {
+                    products = pagedResponse.Items;
+                    Logger?.LogInformation("[PartnersApiService] Successfully deserialized {Count} products from 'items' field (total: {Total}, page: {Page})", 
+                        products.Count, pagedResponse.Total, pagedResponse.Page);
+                    System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Successfully deserialized {products.Count} products from 'items' field");
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Если не получилось, пробуем как прямой массив
+                try
+                {
+                    products = System.Text.Json.JsonSerializer.Deserialize<List<ProductDto>>(jsonContent, JsonOptions);
+                    if (products != null)
+                    {
+                        Logger?.LogInformation("[PartnersApiService] Successfully deserialized products as direct array");
+                    }
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    // Если и это не сработало, пробуем другие форматы
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(jsonContent);
+                        var root = doc.RootElement;
+                        
+                        // Проверяем, есть ли поле "data"
+                        if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            products = System.Text.Json.JsonSerializer.Deserialize<List<ProductDto>>(dataElement.GetRawText(), JsonOptions);
+                            Logger?.LogInformation("[PartnersApiService] Successfully deserialized products from 'data' field");
+                        }
+                        // Проверяем, есть ли поле "products"
+                        else if (root.TryGetProperty("products", out var productsElement) && productsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            products = System.Text.Json.JsonSerializer.Deserialize<List<ProductDto>>(productsElement.GetRawText(), JsonOptions);
+                            Logger?.LogInformation("[PartnersApiService] Successfully deserialized products from 'products' field");
+                        }
+                        else
+                        {
+                            Logger?.LogWarning("[PartnersApiService] JSON structure is not recognized. Root element type: {ValueKind}", root.ValueKind);
+                            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] JSON structure is not recognized. Root element type: {root.ValueKind}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogError(ex, "[PartnersApiService] Failed to parse JSON structure. JSON: {Json}", 
+                            jsonContent.Length > 1000 ? jsonContent.Substring(0, 1000) + "..." : jsonContent);
+                        throw;
+                    }
+                }
+            }
+            
+            if (products == null)
+            {
+                Logger?.LogWarning("[PartnersApiService] Products deserialization returned null");
+                return new List<ProductDto>();
+            }
+            
+            Logger?.LogInformation("[PartnersApiService] Successfully loaded {Count} products for partner {PartnerId}", products.Count, id);
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Successfully loaded {products.Count} products for partner {id}");
+            
+            return products;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "[PartnersApiService] Error loading products for partner {PartnerId}: {Message}", id, ex.Message);
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Error loading products: {ex.Message}");
+            throw;
+        }
     }
 }
 

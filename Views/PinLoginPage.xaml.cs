@@ -292,21 +292,35 @@ namespace YessGoFront.Views
                             
                             // Всегда обновляем токены при успешной авторизации через биометрию
                             // Это продлевает refresh token на неделю каждый раз при открытии приложения
-                            if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
+                            if (!string.IsNullOrWhiteSpace(refreshToken))
                             {
                                 try
                                 {
-                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refreshing tokens after biometric auth to extend session");
-                                    var refreshed = await _authService.RefreshTokenAsync();
-                                    if (refreshed)
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Ensuring valid tokens after biometric auth");
+                                    
+                                    // Используем GlobalAuthService для централизованного управления токенами
+                                    var globalAuthService = MauiProgram.Services?.GetService<YessGoFront.Services.GlobalAuthService>();
+                                    bool tokensValid = false;
+                                    
+                                    if (globalAuthService != null)
                                     {
-                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens refreshed successfully after biometric auth");
+                                        tokensValid = await globalAuthService.EnsureValidTokensAsync();
+                                    }
+                                    else if (_authService != null)
+                                    {
+                                        // Fallback на старый метод
+                                        tokensValid = await _authService.RefreshTokenAsync();
+                                    }
+                                    
+                                    if (tokensValid)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens are valid after biometric auth");
                                         await NavigateToMainAsync();
                                         return;
                                     }
                                     else
                                     {
-                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens after biometric, but continuing if access token is valid");
+                                        System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to ensure valid tokens after biometric, checking if access token is still valid");
                                         // Проверяем, может access token еще валиден и можно продолжить
                                         bool hasValidAccessToken = false;
                                         if (!string.IsNullOrWhiteSpace(accessToken))
@@ -324,7 +338,7 @@ namespace YessGoFront.Views
                                 }
                                 catch (Exception ex)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens after biometric: {ex.Message}");
+                                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error ensuring valid tokens after biometric: {ex.Message}");
                                     // Проверяем, может access token еще валиден и можно продолжить
                                     bool hasValidAccessToken = false;
                                     if (!string.IsNullOrWhiteSpace(accessToken))
@@ -623,21 +637,35 @@ namespace YessGoFront.Views
                     
                     // Всегда обновляем токены при успешной авторизации через PIN
                     // Это продлевает refresh token на неделю каждый раз при открытии приложения
-                    if (!string.IsNullOrWhiteSpace(refreshToken) && _authService != null)
+                    if (!string.IsNullOrWhiteSpace(refreshToken))
                     {
                         try
                         {
-                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Refreshing tokens after PIN verification to extend session");
-                            var refreshed = await _authService.RefreshTokenAsync();
-                            if (refreshed)
+                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Ensuring valid tokens after PIN verification");
+                            
+                            // Используем GlobalAuthService для централизованного управления токенами
+                            var globalAuthService = MauiProgram.Services?.GetService<YessGoFront.Services.GlobalAuthService>();
+                            bool tokensValid = false;
+                            
+                            if (globalAuthService != null)
                             {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens refreshed successfully after PIN verification");
+                                tokensValid = await globalAuthService.EnsureValidTokensAsync();
+                            }
+                            else if (_authService != null)
+                            {
+                                // Fallback на старый метод
+                                tokensValid = await _authService.RefreshTokenAsync();
+                            }
+                            
+                            if (tokensValid)
+                            {
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Tokens are valid after PIN verification");
                                 await NavigateToMainAsync();
                                 return;
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to refresh tokens, checking if access token is still valid");
+                                System.Diagnostics.Debug.WriteLine("[PinLoginPage] Failed to ensure valid tokens, checking if access token is still valid");
                                 // Проверяем, может access token еще валиден и можно продолжить
                                 bool hasValidAccessToken = false;
                                 if (!string.IsNullOrWhiteSpace(accessToken))
@@ -672,7 +700,7 @@ namespace YessGoFront.Views
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error refreshing tokens: {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error ensuring valid tokens: {ex.Message}");
                             
                             // Проверяем, может access token еще валиден и можно продолжить
                             bool hasValidAccessToken = false;

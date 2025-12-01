@@ -276,6 +276,16 @@ public static class MauiProgram
         services.AddSingleton<YessGoFront.Services.BalanceRefreshService>();
 
         services.AddScoped<IAuthService, AuthService>();
+        
+        // Глобальный сервис аутентификации (singleton для централизованного управления токенами)
+        services.AddSingleton<YessGoFront.Services.GlobalAuthService>(sp =>
+        {
+            var authService = sp.GetRequiredService<IAuthenticationService>();
+            var domainAuthService = sp.GetRequiredService<IAuthService>();
+            var logger = sp.GetService<ILogger<YessGoFront.Services.GlobalAuthService>>();
+            return new YessGoFront.Services.GlobalAuthService(authService, domainAuthService, logger);
+        });
+        
         services.AddScoped<IPartnersService, PartnersService>();
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<YessGoFront.Services.QRService.IQRService, YessGoFront.Services.QRService.QRService>();

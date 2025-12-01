@@ -56,7 +56,20 @@ public class AuthHandler : DelegatingHandler
         {
             _logger?.LogWarning("Received 401 Unauthorized, attempting token refresh");
             
-            var refreshed = await _authService.RefreshTokenAsync();
+            // Используем GlobalAuthService для обработки 401, если доступен
+            var globalAuthService = MauiProgram.Services?.GetService<YessGoFront.Services.GlobalAuthService>();
+            bool refreshed = false;
+            
+            if (globalAuthService != null)
+            {
+                refreshed = await globalAuthService.HandleUnauthorizedAsync(cancellationToken);
+            }
+            else
+            {
+                // Fallback на старый метод, если GlobalAuthService не зарегистрирован
+                refreshed = await _authService.RefreshTokenAsync();
+            }
+            
             if (refreshed)
             {
                 // Повторяем запрос с новым токеном

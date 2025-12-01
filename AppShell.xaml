@@ -60,11 +60,6 @@
         </Tab>
     </TabBar>
 
-    <!-- 🔹 Страница списка партнёров -->
-    <ShellContent
-        Route="PartnersListPage"
-        ContentTemplate="{DataTemplate views:PartnersListPage}" />
-
     <!-- 🔹 Страница деталей партнёра -->
     <ShellContent
         Route="partnerdetails"
@@ -91,7 +86,7 @@
         ContentTemplate="{DataTemplate views:CertificatePage}" />
 
     <!-- 
-    Примечание: PartnerDetailViewPage и BasketPage зарегистрированы только через 
+    Примечание: PartnersListPage, PartnerDetailViewPage и BasketPage зарегистрированы только через 
     Routing.RegisterRoute в AppShell.xaml.cs, так как это подстраницы, 
     которые должны работать через стек навигации (для корректной работы кнопки "Назад")
     -->

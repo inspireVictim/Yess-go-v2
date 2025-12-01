@@ -40,30 +40,17 @@ public partial class BasketPage : ContentPage
         {
             if (Shell.Current == null)
             {
-                System.Diagnostics.Debug.WriteLine("[BasketPage] Shell.Current is null");
                 return;
             }
 
-            // Если есть товары в корзине, переходим к первому партнёру
-            if (_viewModel != null && _viewModel.PartnerGroups.Count > 0)
+            // Сначала пытаемся использовать Navigation.PopAsync (более надежный способ)
+            if (Shell.Current.Navigation != null && Shell.Current.Navigation.NavigationStack.Count > 1)
             {
-                var firstPartner = _viewModel.PartnerGroups.FirstOrDefault();
-                if (firstPartner != null)
-                {
-                    var partnerId = firstPartner.PartnerId.ToString();
-                    // Используем абсолютный путь для гарантированного перехода
-                    var route = $"///PartnerDetailViewPage?partnerId={Uri.EscapeDataString(partnerId)}";
-                    
-                    System.Diagnostics.Debug.WriteLine($"[BasketPage] Navigating to PartnerDetailViewPage with partnerId: {partnerId}");
-                    System.Diagnostics.Debug.WriteLine($"[BasketPage] Route: {route}");
-                    
-                    await Shell.Current.GoToAsync(route, animate: true);
-                    return;
-                }
+                await Shell.Current.Navigation.PopAsync(animated: true);
+                return;
             }
-            
-            // Если корзина пуста, пытаемся вернуться назад стандартным способом
-            System.Diagnostics.Debug.WriteLine("[BasketPage] Cart is empty, trying to go back");
+
+            // Если Navigation.PopAsync не сработал, используем Shell навигацию
             await Shell.Current.GoToAsync("..", animate: true);
         }
         catch (Exception ex)
@@ -71,7 +58,7 @@ public partial class BasketPage : ContentPage
             System.Diagnostics.Debug.WriteLine($"[BasketPage] Navigation error: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"[BasketPage] StackTrace: {ex.StackTrace}");
             
-            // Fallback: попытка вернуться назад
+            // Fallback: попытка вернуться назад через Shell навигацию
             try
             {
                 if (Shell.Current != null)

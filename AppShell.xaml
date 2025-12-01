@@ -70,11 +70,6 @@
         Route="partnerdetails"
         ContentTemplate="{DataTemplate views:PartnerDetailPage}" />
 
-    <!-- 🔹 Страница продуктов партнёра -->
-    <ShellContent
-        Route="PartnerDetailViewPage"
-        ContentTemplate="{DataTemplate views:PartnerDetailViewPage}" />
-
     <!-- 🔹 Страница промокодов -->
     <ShellContent
         Route="PromocodePage"
@@ -95,10 +90,10 @@
         Route="CertificatePage"
         ContentTemplate="{DataTemplate views:CertificatePage}" />
 
-    <!-- 🔹 Страница корзины -->
-    <ShellContent
-        Route="BasketPage"
-        ContentTemplate="{DataTemplate views:BasketPage}" />
-
+    <!-- 
+    Примечание: PartnerDetailViewPage и BasketPage зарегистрированы только через 
+    Routing.RegisterRoute в AppShell.xaml.cs, так как это подстраницы, 
+    которые должны работать через стек навигации (для корректной работы кнопки "Назад")
+    -->
 
 </Shell>

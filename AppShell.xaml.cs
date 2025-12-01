@@ -14,13 +14,23 @@ namespace YessGoFront
         {
             InitializeComponent();
 
-            // Регистрация внутренних маршрутов
-            Routing.RegisterRoute(nameof(Views.WalletPage), typeof(Views.WalletPage));
-            Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
-            Routing.RegisterRoute(nameof(Views.PartnerPage), typeof(Views.PartnerPage));
-            Routing.RegisterRoute("partnerdetails", typeof(Views.PartnerDetailPage));
+            // Регистрация внутренних маршрутов (только для подстраниц, которые НЕ объявлены как ShellContent в XAML)
+            // Страницы, объявленные как ShellContent в XAML, регистрировать НЕ нужно (это создает дубликаты)
+            
+            // Основные страницы (уже в ShellContent в XAML) - НЕ регистрируем здесь:
+            // - WalletPage (в TabBar)
+            // - PartnersListPage (ShellContent)
+            // - PartnerPage (в TabBar)
+            // - partnerdetails/PartnerDetailPage (ShellContent)
+            // - TransactionsPage (ShellContent)
+            // - FeedbackPage (ShellContent)
+            // - CertificatePage (ShellContent)
+            
+            // Подстраницы, которые работают через стек навигации:
             Routing.RegisterRoute("PartnerDetailViewPage", typeof(Views.PartnerDetailViewPage));
-            Routing.RegisterRoute(nameof(Views.TransactionsPage), typeof(Views.TransactionsPage));
+            Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
+            
+            // Другие подстраницы:
             Routing.RegisterRoute(nameof(Views.TransactionDetailsPage), typeof(Views.TransactionDetailsPage));
             Routing.RegisterRoute(nameof(Views.PolicyPage), typeof(Views.PolicyPage));
             Routing.RegisterRoute(nameof(Views.ConditionsPage), typeof(Views.ConditionsPage));
@@ -29,9 +39,6 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.RefundPolicyPage), typeof(Views.RefundPolicyPage));
             Routing.RegisterRoute(nameof(Views.PaymentSecurityPage), typeof(Views.PaymentSecurityPage));
             Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
-            Routing.RegisterRoute(nameof(Views.FeedbackPage), typeof(Views.FeedbackPage));
-            Routing.RegisterRoute(nameof(Views.CertificatePage), typeof(Views.CertificatePage));
-            Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
             Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
 
 

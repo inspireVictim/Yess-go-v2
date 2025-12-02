@@ -16,6 +16,9 @@
 
                 <!-- Карточка профиля (без стрелки) -->
                 <Frame BackgroundColor="White" CornerRadius="16" HasShadow="True" Padding="14">
+                    <Frame.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnProfileTapped"/>
+                    </Frame.GestureRecognizers>
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" FlowDirection="LeftToRight">
                         <!-- Аватар -->
                         <Frame Grid.Column="0"

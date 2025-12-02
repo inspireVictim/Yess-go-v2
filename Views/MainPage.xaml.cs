@@ -418,6 +418,33 @@ namespace YessGoFront.Views
             }
         }
 
+        private async void OnProfileTapped(object? sender, EventArgs e)
+        {
+            if (_isNavigating) return;
+            _isNavigating = true;
+
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(Profile), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Ошибка навигации к Profile: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("Profile", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainPage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+            finally
+            {
+                _isNavigating = false;
+            }
+        }
+
 
         private async void OnMoreTapped(object sender, EventArgs e)
         {

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="YessGoFront.Views.Profile"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F4F6F8">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Заголовок -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Кнопка назад -->
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+
+                <!-- Заголовок -->
+                <Label Grid.Column="1"
+                       Text="Редактирование профиля"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+
+                <!-- Пустое место справа для балансировки -->
+                <BoxView Grid.Column="2"
+                         WidthRequest="30"
+                         Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <!-- Контент -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="16" Padding="16">
+                
+                <!-- Имя -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Имя"
+                               FontSize="14"
+                               TextColor="#6B7280"
+                               FontAttributes="Bold"/>
+                        <Entry x:Name="FirstNameEntry"
+                               Placeholder="Введите имя"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"
+                               BackgroundColor="#F8F9FA"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Фамилия -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Фамилия"
+                               FontSize="14"
+                               TextColor="#6B7280"
+                               FontAttributes="Bold"/>
+                        <Entry x:Name="LastNameEntry"
+                               Placeholder="Введите фамилию"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"
+                               BackgroundColor="#F8F9FA"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Номер телефона -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Номер телефона"
+                               FontSize="14"
+                               TextColor="#6B7280"
+                               FontAttributes="Bold"/>
+                        <Entry x:Name="PhoneEntry"
+                               Placeholder="Введите номер телефона"
+                               Keyboard="Telephone"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"
+                               BackgroundColor="#F8F9FA"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Email -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Email"
+                               FontSize="14"
+                               TextColor="#6B7280"
+                               FontAttributes="Bold"/>
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="Введите email"
+                               Keyboard="Email"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"
+                               BackgroundColor="#F8F9FA"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Пароль -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Новый пароль (оставьте пустым, если не хотите менять)"
+                               FontSize="14"
+                               TextColor="#6B7280"
+                               FontAttributes="Bold"
+                               LineBreakMode="WordWrap"/>
+                        <Entry x:Name="PasswordEntry"
+                               Placeholder="Введите новый пароль"
+                               IsPassword="True"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"
+                               BackgroundColor="#F8F9FA"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Кнопка сохранения -->
+                <Button x:Name="SaveButton"
+                        Text="Сохранить изменения"
+                        BackgroundColor="#0F6B53"
+                        TextColor="White"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        CornerRadius="12"
+                        HeightRequest="50"
+                        Clicked="OnSaveClicked"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

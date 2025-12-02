@@ -29,6 +29,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
             Routing.RegisterRoute("PartnerDetailViewPage", typeof(Views.PartnerDetailViewPage));
             Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
+            Routing.RegisterRoute(nameof(Views.Acquiring), typeof(Views.Acquiring));
             
             // Другие подстраницы:
             Routing.RegisterRoute(nameof(Views.TransactionDetailsPage), typeof(Views.TransactionDetailsPage));

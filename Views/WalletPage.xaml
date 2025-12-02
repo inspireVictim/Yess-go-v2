@@ -5,6 +5,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Shell.NavBarIsVisible="False">
 
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Style TargetType="RadioButton" x:Key="TopUpRadioButtonStyle">
+                <Setter Property="TextColor" Value="#333333"/>
+                <Setter Property="BackgroundColor" Value="Transparent"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Фон с градиентом -->
@@ -17,16 +26,17 @@
 
         <!-- Верхняя панель: Назад -->
         <Grid Grid.Row="0" Padding="12,44,12,8" ColumnDefinitions="Auto,*,Auto">
-            <Button Grid.Column="0"
-                    Text="←"
-                    WidthRequest="40" 
-                    HeightRequest="40"
-                    CornerRadius="20"
-                    BackgroundColor="#FFFFFF22"
-                    TextColor="White"
-                    IsEnabled="True"
-                    InputTransparent="False"
-                    Clicked="OnBackClicked"/>
+            <Border WidthRequest="36" HeightRequest="36"
+                StrokeThickness="0"
+                BackgroundColor="#FFFFFF"
+                StrokeShape="RoundRectangle8">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackClicked" />
+                </Border.GestureRecognizers>
+                <Image Source="back_arrow_icon.png" 
+                    Aspect="AspectFit" 
+                    Margin="8" />
+            </Border>
             <Label Grid.Column="1"
                    Text="Пополнение"
                    HorizontalOptions="Center"
@@ -150,30 +160,73 @@
                 </ScrollView>
 
                 <!-- Выбор суммы -->
-                <Frame BackgroundColor="#FFFFFF" CornerRadius="16" HasShadow="False" Padding="14">
+                <Border BackgroundColor="#F8F9FA" 
+                        StrokeShape="RoundRectangle 16" 
+                        Stroke="#E0E0E0" 
+                        StrokeThickness="1"
+                        Padding="14">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Выберите сумму пополнения:"
                                TextColor="#0F6B53"
                                FontAttributes="Bold"
                                FontSize="14"/>
 
-                        <RadioButton x:Name="rb1000" Content="1000 KGS" GroupName="topup" Value="1000"/>
-                        <RadioButton x:Name="rb800"  Content="800 KGS"  GroupName="topup" Value="800"/>
-                        <RadioButton x:Name="rb600"  Content="600 KGS"  GroupName="topup" Value="600"/>
-                        <RadioButton x:Name="rb500"  Content="500 KGS"  GroupName="topup" Value="500"/>
-                        <RadioButton x:Name="rb300"  Content="300 KGS"  GroupName="topup" Value="300"/>
-                        <RadioButton x:Name="rb100"  Content="100 KGS"  GroupName="topup" Value="100" IsChecked="True"/>
+                        <RadioButton x:Name="rb1000" 
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="1000 KGS" 
+                                     GroupName="topup" 
+                                     Value="1000"/>
+                        <RadioButton x:Name="rb800"  
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="800 KGS"  
+                                     GroupName="topup" 
+                                     Value="800"/>
+                        <RadioButton x:Name="rb600"  
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="600 KGS"  
+                                     GroupName="topup" 
+                                     Value="600"/>
+                        <RadioButton x:Name="rb500"  
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="500 KGS"  
+                                     GroupName="topup" 
+                                     Value="500"/>
+                        <RadioButton x:Name="rb300"  
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="300 KGS"  
+                                     GroupName="topup" 
+                                     Value="300"/>
+                        <RadioButton x:Name="rb100"  
+                                     Style="{StaticResource TopUpRadioButtonStyle}"
+                                     Content="100 KGS"  
+                                     GroupName="topup" 
+                                     Value="100" 
+                                     IsChecked="True"/>
 
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                            <RadioButton x:Name="rbOther" Content="Другая сумма" GroupName="topup" CheckedChanged="OnOtherCheckedChanged"/>
+                        <Grid x:Name="OtherAmountGrid" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <RadioButton x:Name="rbOther" 
+                                         Style="{StaticResource TopUpRadioButtonStyle}"
+                                         Content="Другая сумма" 
+                                         GroupName="topup" 
+                                         CheckedChanged="OnOtherCheckedChanged"/>
                             <Entry x:Name="entryOther"
                                    Grid.Column="1"
                                    Placeholder="Введите сумму, KGS"
                                    Keyboard="Numeric"
-                                   IsEnabled="False"/>
+                                   IsEnabled="False"
+                                   IsVisible="False"/>
                         </Grid>
+                        
+                        <!-- Entry для ввода суммы (показывается при выборе "Другая сумма") -->
+                        <Entry x:Name="entryOtherFull"
+                               Placeholder="Введите сумму, KGS"
+                               Keyboard="Numeric"
+                               IsVisible="False"
+                               BackgroundColor="White"
+                               TextColor="#333333"
+                               PlaceholderColor="#999"/>
                     </VerticalStackLayout>
-                </Frame>
+                </Border>
 
             </VerticalStackLayout>
         </ScrollView>

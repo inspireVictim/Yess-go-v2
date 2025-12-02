@@ -87,9 +87,32 @@ namespace YessGoFront.Views
 
         private void OnOtherCheckedChanged(object? sender, CheckedChangedEventArgs e)
         {
-            // Разрешаем ввод «другой суммы», если выбран соответствующий пункт
-            if (entryOther != null)
-                entryOther.IsEnabled = rbOther?.IsChecked == true;
+            if (rbOther == null) return;
+
+            if (rbOther.IsChecked)
+            {
+                // Скрываем RadioButton "Другая сумма" и показываем Entry для ввода
+                if (OtherAmountGrid != null)
+                    OtherAmountGrid.IsVisible = false;
+                
+                if (entryOtherFull != null)
+                {
+                    entryOtherFull.IsVisible = true;
+                    entryOtherFull.Focus();
+                }
+            }
+            else
+            {
+                // Показываем RadioButton обратно и скрываем Entry
+                if (OtherAmountGrid != null)
+                    OtherAmountGrid.IsVisible = true;
+                
+                if (entryOtherFull != null)
+                {
+                    entryOtherFull.IsVisible = false;
+                    entryOtherFull.Text = string.Empty;
+                }
+            }
         }
 
         private async void OnAboutCoinsClicked(object? sender, EventArgs e)
@@ -105,7 +128,9 @@ namespace YessGoFront.Views
 
                 if (rbOther?.IsChecked == true)
                 {
-                    if (string.IsNullOrWhiteSpace(entryOther?.Text) || !decimal.TryParse(entryOther.Text, out amount) || amount <= 0)
+                    // Используем entryOtherFull для ввода суммы
+                    var amountText = entryOtherFull?.Text ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(amountText) || !decimal.TryParse(amountText, out amount) || amount <= 0)
                     {
                         await DisplayAlert("Ошибка", "Введите корректную сумму.", "OK");
                         return;
@@ -122,11 +147,12 @@ namespace YessGoFront.Views
                     }
                 }
 
-                // Обновляем общий баланс
-                decimal coefficient = 2m;
-                BalanceStore.Instance.Balance += amount * coefficient;
-
-                await DisplayAlert("Готово", $"Баланс пополнен на {amount:0.##} KGS.", "OK");
+                // Переходим на страницу эквайринга с параметром суммы
+                if (Shell.Current != null)
+                {
+                    var route = $"Acquiring?amount={Uri.EscapeDataString(amount.ToString("F2"))}";
+                    await Shell.Current.GoToAsync(route, animate: true);
+                }
             }
             catch (Exception ex)
             {

@@ -98,7 +98,11 @@
                                             <Label Text="Yess!Coin"
                                                    TextColor="#0F6B53"
                                                    FontAttributes="Bold"
-                                                   FontSize="13"/>
+                                                   FontSize="13"
+                                                   HorizontalTextAlignment="Center"
+                                                   VerticalTextAlignment="Center"
+                                                   LineBreakMode="TailTruncation"
+                                                   MaxLines="1"/>
                                         </Frame>
                                     </HorizontalStackLayout>
                                     <Image Grid.Column="1"

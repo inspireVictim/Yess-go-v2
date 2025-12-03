@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Data;
 using YessGoFront.Data.Entities;
@@ -81,16 +83,52 @@ public class PartnersService : IPartnersService
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Id cannot be empty", nameof(id));
 
-            _logger?.LogDebug("Getting partner by id: {Id}", id);
-            return await _apiService.GetByIdAsync(id, ct);
+            _logger?.LogDebug("Getting partner by id from remote API: {Id}", id);
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] Загрузка партнёра из удалённой БД (API): {id}");
+#if ANDROID
+            Android.Util.Log.Info("PartnersService", $"[GetPartnerByIdAsync] Загрузка партнёра из API: {id}");
+#endif
+
+            // Загружаем партнёра из удалённой БД через API
+            var partnerDto = await _apiService.GetByIdAsync(id, ct);
+
+            if (partnerDto == null)
+            {
+                _logger?.LogWarning("Partner {Id} not found in remote database", id);
+                System.Diagnostics.Debug.WriteLine($"[PartnersService] Партнёр {id} не найден в удалённой БД");
+                throw new KeyNotFoundException($"Партнёр с ID {id} не найден");
+            }
+
+            _logger?.LogInformation("Successfully loaded partner {Id} from remote database: {Name}", id, partnerDto.Name);
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] ✅ Партнёр загружен из удалённой БД: {partnerDto.Name}");
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] Address: {partnerDto.Address}, Phone: {partnerDto.Phone}, LogoUrl: {partnerDto.LogoUrl}");
+#if ANDROID
+            Android.Util.Log.Info("PartnersService", $"[GetPartnerByIdAsync] ✅ Партнёр загружен: {partnerDto.Name}");
+#endif
+
+            return partnerDto;
         }
-        catch (ApiException)
+        catch (ApiException apiEx)
         {
+            _logger?.LogError(apiEx, "API error getting partner {Id}: {Message}", id, apiEx.Message);
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] ❌ API ошибка при загрузке партнёра {id}: {apiEx.Message}");
+#if ANDROID
+            Android.Util.Log.Error("PartnersService", $"[GetPartnerByIdAsync] API ошибка: {apiEx.Message}");
+#endif
+            throw new NetworkException("Не удалось загрузить информацию о партнёре из удалённой БД", apiEx);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Пробрасываем KeyNotFoundException дальше
             throw;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Unexpected error getting partner {Id}", id);
+            _logger?.LogError(ex, "Unexpected error getting partner {Id} from remote database", id);
+            System.Diagnostics.Debug.WriteLine($"[PartnersService] ❌ Неожиданная ошибка при загрузке партнёра {id}: {ex.Message}");
+#if ANDROID
+            Android.Util.Log.Error("PartnersService", $"[GetPartnerByIdAsync] Неожиданная ошибка: {ex.Message}");
+#endif
             throw new NetworkException("Не удалось загрузить информацию о партнёре", ex);
         }
     }

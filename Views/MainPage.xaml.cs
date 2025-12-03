@@ -21,6 +21,7 @@ namespace YessGoFront.Views
         // ============================
         private bool _isNavigating;
         private const string WalletRoute = "///wallet";
+        private const string TransactionsRoute = "///TransactionsPage";
 
         // ============================
         // Story Crossfade
@@ -410,7 +411,11 @@ namespace YessGoFront.Views
 
             try
             {
-                await Shell.Current.GoToAsync(nameof(TransactionsPage));
+                await Shell.Current.GoToAsync(TransactionsRoute);
+            }
+            catch
+            {
+                try { await Shell.Current.GoToAsync("//TransactionsPage"); } catch { }
             }
             finally
             {

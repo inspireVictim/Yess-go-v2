@@ -1,10 +1,14 @@
-﻿using Microsoft.Maui.Controls;
+﻿using System;
+using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Devices.Sensors;
 using YessGoFront.Models;
 using YessGoFront.Services.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Converters;
+#if ANDROID
+using Android.Util;
+#endif
 
 namespace YessGoFront.Views
 {
@@ -46,44 +50,73 @@ namespace YessGoFront.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] LoadPartner called with id: '{id}'");
+#if ANDROID
+                Android.Util.Log.Info("PartnerDetailPage", $"[LoadPartner] Загрузка партнёра с ID: {id}");
+#endif
+                
                 if (_partnersService != null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Calling GetPartnerByIdAsync with id: '{id}'");
+#if ANDROID
+                    Android.Util.Log.Info("PartnerDetailPage", $"[LoadPartner] Вызов GetPartnerByIdAsync для ID: {id}");
+#endif
+                    
                     var partner = await _partnersService.GetPartnerByIdAsync(id);
                     System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] GetPartnerByIdAsync returned: {(partner != null ? $"Partner '{partner.Name}' (Id: {partner.Id})" : "null")}");
+#if ANDROID
+                    Android.Util.Log.Info("PartnerDetailPage", $"[LoadPartner] Партнёр получен: {(partner != null ? partner.Name : "null")}");
+#endif
                     
                     if (partner != null)
                     {
-                        PartnerName.Text = partner.Name;
-                        
-                        // Отображаем категории
-                        if (partner.Categories != null && partner.Categories.Count > 0)
+                        // Обновляем UI на главном потоке
+                        await MainThread.InvokeOnMainThreadAsync(() =>
                         {
-                            var categoryNames = partner.Categories.Select(c => c.Name).ToList();
-                            PartnerCategory.Text = $"Категории: {string.Join(", ", categoryNames)}";
-                        }
-                        else if (!string.IsNullOrWhiteSpace(partner.Category))
-                        {
-                            PartnerCategory.Text = $"Категория: {partner.Category}";
-                        }
-                        else
-                        {
-                            PartnerCategory.Text = "Категория: Не указана";
-                        }
-                        
-                        // Описание - показываем только если оно есть
-                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Description: '{partner.Description}'");
-                        if (!string.IsNullOrWhiteSpace(partner.Description))
-                        {
-                            PartnerDescription.Text = partner.Description;
-                            PartnerDescription.IsVisible = true;
-                            System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Описание отображается: {partner.Description.Substring(0, Math.Min(50, partner.Description.Length))}...");
-                        }
-                        else
-                        {
-                            PartnerDescription.IsVisible = false;
-                            System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Описание пустое или null, скрываем поле");
-                        }
+                            PartnerName.Text = partner.Name ?? "Партнёр";
+                            
+                            // Отображаем категории
+                            if (partner.Categories != null && partner.Categories.Count > 0)
+                            {
+                                var categoryNames = partner.Categories.Select(c => c.Name).ToList();
+                                PartnerCategory.Text = $"Категории: {string.Join(", ", categoryNames)}";
+                            }
+                            else if (!string.IsNullOrWhiteSpace(partner.Category))
+                            {
+                                PartnerCategory.Text = $"Категория: {partner.Category}";
+                            }
+                            else
+                            {
+                                PartnerCategory.Text = "Категория: Не указана";
+                            }
+                            
+                            // Описание - показываем только если оно есть
+                            System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Description: '{partner.Description}'");
+                            if (!string.IsNullOrWhiteSpace(partner.Description))
+                            {
+                                PartnerDescription.Text = partner.Description;
+                                PartnerDescription.IsVisible = true;
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Описание отображается: {partner.Description.Substring(0, Math.Min(50, partner.Description.Length))}...");
+                            }
+                            else
+                            {
+                                PartnerDescription.IsVisible = false;
+                                System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Описание пустое или null, скрываем поле");
+                            }
+                            
+                            // Кэшбэк и скидки
+                            CashbackLabel.Text = $"{partner.CashbackRate ?? partner.DefaultCashbackRate:F0}%";
+                            DiscountLabel.Text = $"{partner.MaxDiscountPercent ?? 10:F0}%";
+                            
+                            // Контакты
+                            PartnerPhone.Text = partner.Phone ?? "Не указан";
+                            PartnerWebsite.Text = partner.Website ?? "Не указан";
+                            PartnerAddress.Text = partner.Address ?? "Не указан";
+                            
+                            // Скрываем адрес, если он не указан
+                            bool hasAddress = !string.IsNullOrWhiteSpace(partner.Address);
+                            AddressContainer.IsVisible = hasAddress;
+                            AddressSeparator.IsVisible = hasAddress;
+                        });
                         
                         // Загружаем логотип или показываем текст
                         System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ===== ЗАГРУЗКА ЛОГОТИПА =====");
@@ -99,35 +132,54 @@ namespace YessGoFront.Views
                         System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] logoFrame found: {logoFrame != null}");
                         System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] PartnerLogo found: {PartnerLogo != null}");
                         
-                        if (!string.IsNullOrWhiteSpace(partner.LogoUrl))
+                        // Нормализуем URL логотипа перед загрузкой
+                        string? logoUrl = partner.LogoUrl?.Trim();
+                        if (!string.IsNullOrWhiteSpace(logoUrl))
+                        {
+                            // Если URL не начинается с http/https, но начинается с /, это относительный путь
+                            // Конвертер сам добавит базовый URL
+                            if (!logoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !logoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                !logoUrl.StartsWith("/"))
+                            {
+                                // Если URL не начинается с /, добавляем его
+                                logoUrl = "/" + logoUrl.TrimStart('/');
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Нормализован URL логотипа: '{partner.LogoUrl}' -> '{logoUrl}'");
+                            }
+                        }
+                        
+                        if (!string.IsNullOrWhiteSpace(logoUrl))
                         {
                             try
                             {
-                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Вызываем конвертер для: '{partner.LogoUrl}'");
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Вызываем конвертер для: '{logoUrl}'");
                                 var converter = new StringToImageSourceConverter();
-                                var imageSource = converter.Convert(partner.LogoUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                                var imageSource = converter.Convert(logoUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
                                 
                                 System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Конвертер вернул: {(imageSource != null ? "ImageSource" : "null")}");
                                 
                                 if (imageSource != null)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ✅ Устанавливаем логотип: {partner.LogoUrl}");
-                                    PartnerLogo.Source = imageSource;
-                                    PartnerLogo.IsVisible = true; // ✅ Показываем изображение
+                                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ✅ Устанавливаем логотип: {logoUrl}");
                                     
-                                    // Скрываем текст
-                                    if (logoText != null)
+                                    // Устанавливаем на главном потоке
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
                                     {
-                                        logoText.IsVisible = false;
-                                        System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoText скрыт");
-                                    }
-                                    
-                                    // Убеждаемся, что Frame видим
-                                    if (logoFrame != null)
-                                    {
-                                        logoFrame.IsVisible = true;
-                                        System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoFrame установлен как видимый");
-                                    }
+                                        PartnerLogo.Source = imageSource;
+                                        PartnerLogo.IsVisible = true;
+                                        
+                                        // Скрываем текст
+                                        if (logoText != null)
+                                        {
+                                            logoText.IsVisible = false;
+                                        }
+                                        
+                                        // Убеждаемся, что Frame видим
+                                        if (logoFrame != null)
+                                        {
+                                            logoFrame.IsVisible = true;
+                                        }
+                                    });
                                     
                                     System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] ✅ Логотип установлен и видим");
                                 }
@@ -135,8 +187,11 @@ namespace YessGoFront.Views
                                 {
                                     // Если конвертер вернул null, показываем текст
                                     System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] ❌ Конвертер вернул null для логотипа, показываем текст");
-                                    ShowLogoText(partner.Name, logoText, logoFrame);
-                                    PartnerLogo.IsVisible = false;
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                    {
+                                        ShowLogoText(partner.Name, logoText, logoFrame);
+                                        PartnerLogo.IsVisible = false;
+                                    });
                                 }
                             }
                             catch (Exception ex)
@@ -144,40 +199,86 @@ namespace YessGoFront.Views
                                 System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ❌ Ошибка загрузки логотипа: {ex.Message}");
                                 System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Stack trace: {ex.StackTrace}");
                                 // При ошибке показываем текст
-                                ShowLogoText(partner.Name, logoText, logoFrame);
-                                PartnerLogo.IsVisible = false;
+                                await MainThread.InvokeOnMainThreadAsync(() =>
+                                {
+                                    ShowLogoText(partner.Name, logoText, logoFrame);
+                                    PartnerLogo.IsVisible = false;
+                                });
                             }
                         }
                         else
                         {
                             // Если URL логотипа пустой, показываем текст
                             System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] LogoUrl пустой, показываем текст");
-                            ShowLogoText(partner.Name, logoText, logoFrame);
-                            PartnerLogo.IsVisible = false;
+                            await MainThread.InvokeOnMainThreadAsync(() =>
+                            {
+                                ShowLogoText(partner.Name, logoText, logoFrame);
+                                PartnerLogo.IsVisible = false;
+                            });
                         }
                         
                         System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ===== ЗАГРУЗКА ЛОГОТИПА ЗАВЕРШЕНА =====");
                         
                         // Загружаем обложку
-                        if (!string.IsNullOrWhiteSpace(partner.CoverImageUrl))
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ===== ЗАГРУЗКА ОБЛОЖКИ =====");
+                        System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] CoverImageUrl: '{partner.CoverImageUrl}'");
+                        
+                        // Нормализуем URL обложки перед загрузкой
+                        string? coverImageUrl = partner.CoverImageUrl?.Trim();
+                        if (!string.IsNullOrWhiteSpace(coverImageUrl))
                         {
-                            var converter = new StringToImageSourceConverter();
-                            PartnerCoverImage.Source = converter.Convert(partner.CoverImageUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                            // Если URL не начинается с http/https, но начинается с /, это относительный путь
+                            if (!coverImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !coverImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                !coverImageUrl.StartsWith("/"))
+                            {
+                                // Если URL не начинается с /, добавляем его
+                                coverImageUrl = "/" + coverImageUrl.TrimStart('/');
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Нормализован URL обложки: '{partner.CoverImageUrl}' -> '{coverImageUrl}'");
+                            }
+                            
+                            try
+                            {
+                                var converter = new StringToImageSourceConverter();
+                                var coverImageSource = converter.Convert(coverImageUrl, typeof(ImageSource), null, System.Globalization.CultureInfo.CurrentCulture) as ImageSource;
+                                
+                                if (coverImageSource != null)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ✅ Обложка установлена: {coverImageUrl}");
+                                    
+                                    // Устанавливаем на главном потоке
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                    {
+                                        PartnerCoverImage.Source = coverImageSource;
+                                        PartnerCoverImage.IsVisible = true;
+                                    });
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ❌ Конвертер вернул null для обложки");
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                    {
+                                        PartnerCoverImage.IsVisible = false;
+                                    });
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] ❌ Ошибка загрузки обложки: {ex.Message}");
+                                await MainThread.InvokeOnMainThreadAsync(() =>
+                                {
+                                    PartnerCoverImage.IsVisible = false;
+                                });
+                            }
                         }
-                        
-                        // Кэшбэк и скидки
-                        CashbackLabel.Text = $"{partner.CashbackRate ?? partner.DefaultCashbackRate:F0}%";
-                        DiscountLabel.Text = $"{partner.MaxDiscountPercent ?? 10:F0}%";
-                        
-                        // Контакты
-                        PartnerPhone.Text = partner.Phone ?? "Не указан";
-                        PartnerWebsite.Text = partner.Website ?? "Не указан";
-                        PartnerAddress.Text = partner.Address ?? "Не указан";
-                        
-                        // Скрываем адрес, если он не указан
-                        bool hasAddress = !string.IsNullOrWhiteSpace(partner.Address);
-                        AddressContainer.IsVisible = hasAddress;
-                        AddressSeparator.IsVisible = hasAddress;
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] CoverImageUrl пустой");
+                            await MainThread.InvokeOnMainThreadAsync(() =>
+                            {
+                                PartnerCoverImage.IsVisible = false;
+                            });
+                        }
                         
                         // Сохраняем данные партнёра для кнопок
                         _currentPartner = partner;

@@ -78,12 +78,9 @@ public class StringToImageSourceConverter : IValueConverter
                                    !imagePath.Contains("/") && !imagePath.Contains("\\") &&
                                    !imagePath.StartsWith("http", StringComparison.OrdinalIgnoreCase);
         
-        // Проверяем, является ли строка относительным URL (начинается с /uploads или /static)
+        // Проверяем, является ли строка относительным URL (начинается с /)
         // Такие URL нужно нормализовать к абсолютному URL
-        if (imagePath.StartsWith("/uploads", StringComparison.OrdinalIgnoreCase) ||
-            imagePath.StartsWith("/static", StringComparison.OrdinalIgnoreCase) ||
-            imagePath.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
-            (imagePath.StartsWith("/") && !looksLikeLocalFile))
+        if (imagePath.StartsWith("/") && !looksLikeLocalFile)
         {
             // Это относительный URL - нормализуем и создаём абсолютный URL
             string normalizedUrl = NormalizeImageUrl(imagePath);
@@ -92,7 +89,8 @@ public class StringToImageSourceConverter : IValueConverter
 #endif
             System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Normalized relative URL: {imagePath} -> {normalizedUrl}");
             
-            if (Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var normalizedUri) 
+            if (!string.IsNullOrWhiteSpace(normalizedUrl) &&
+                Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var normalizedUri) 
                 && (normalizedUri.Scheme == Uri.UriSchemeHttp || normalizedUri.Scheme == Uri.UriSchemeHttps))
             {
                 try
@@ -119,6 +117,13 @@ public class StringToImageSourceConverter : IValueConverter
                     System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Error creating UriImageSource for normalized URL '{normalizedUrl}': {ex.Message}");
                     return null;
                 }
+            }
+            else
+            {
+#if ANDROID
+                Log.Warn("StringToImageSourceConverter", $"[Convert] Failed to normalize URL: {imagePath} -> {normalizedUrl}");
+#endif
+                System.Diagnostics.Debug.WriteLine($"[StringToImageSourceConverter] Failed to normalize URL: {imagePath} -> {normalizedUrl}");
             }
         }
 

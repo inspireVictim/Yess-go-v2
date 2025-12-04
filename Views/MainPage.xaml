@@ -138,19 +138,42 @@
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="models:StoryModel">
                                 <VerticalStackLayout Padding="4" Spacing="4" WidthRequest="80">
+                                    <!-- Градиентная обводка как в Instagram -->
                                     <Border WidthRequest="64" HeightRequest="64"
                                             BackgroundColor="White"
-                                            Stroke="#DAA520" StrokeThickness="2"
-                                            HorizontalOptions="Center" VerticalOptions="Center">
+                                            StrokeThickness="2.8"
+                                            HorizontalOptions="Center" 
+                                            VerticalOptions="Center"
+                                            Padding="2.8">
                                         <Border.StrokeShape>
                                             <RoundRectangle CornerRadius="32"/>
                                         </Border.StrokeShape>
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <!-- Яркая цветная обводка для непросмотренных Stories (как в Instagram) -->
+                                                    <DataTrigger TargetType="Border" Binding="{Binding IsViewed}" Value="False">
+                                                        <Setter Property="Stroke" Value="#E1306C"/>
+                                                        <!-- Розово-оранжевый цвет для непросмотренных (как в Instagram) -->
+                                                    </DataTrigger>
+                                                    <!-- Серая обводка для просмотренных Stories -->
+                                                    <DataTrigger TargetType="Border" Binding="{Binding IsViewed}" Value="True">
+                                                        <Setter Property="Stroke" Value="#8E8E93"/>
+                                                        <!-- Серый цвет для просмотренных -->
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer
                                                 Command="{Binding BindingContext.OpenStoryAsyncCommand, Source={x:Reference MainPageElement}}"
                                                 CommandParameter="{Binding .}" />
                                         </Border.GestureRecognizers>
-                                        <Image Source="{Binding Icon}" Aspect="AspectFill"/>
+                                        <Border BackgroundColor="White" 
+                                                StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 30">
+                                            <Image Source="{Binding Icon}" Aspect="AspectFill"/>
+                                        </Border>
                                     </Border>
                                     <Label Text="{Binding Title}"
                                            FontSize="12"
@@ -591,9 +614,13 @@
         <!-- ====== OVERLAY: Story (full-screen) ====== -->
         <Grid Grid.RowSpan="2"
               IsVisible="{Binding IsStoryOpen}"
-              BackgroundColor="#000000CC"
+              BackgroundColor="#000000"
               InputTransparent="False"
               ZIndex="9999">
+            <Grid.GestureRecognizers>
+                <SwipeGestureRecognizer Direction="Up" Command="{Binding CloseStoryCommand}"/>
+                <SwipeGestureRecognizer Direction="Down" Command="{Binding CloseStoryCommand}"/>
+            </Grid.GestureRecognizers>
             
             <!-- Сцена сторис (фон) -->
             <Grid>
@@ -652,38 +679,62 @@
                 </HorizontalStackLayout>
             </Grid>
 
-            <!-- Аватарка и название - поверх картинки -->
-            <HorizontalStackLayout Spacing="12"
-                                   Padding="16,48,16,0"
-                                   HorizontalOptions="Start"
-                                   VerticalOptions="Start"
-                                   InputTransparent="True">
+            <!-- Верхняя панель: аватарка, название и кнопка закрытия -->
+            <Grid Padding="16,48,16,0" 
+                  RowDefinitions="Auto"
+                  ColumnDefinitions="*,Auto">
+                <!-- Аватарка и название -->
+                <HorizontalStackLayout Grid.Column="0"
+                                       Spacing="12"
+                                       HorizontalOptions="Start"
+                                       VerticalOptions="Start"
+                                       InputTransparent="True">
+                    <Border WidthRequest="56" HeightRequest="56"
+                            Stroke="White" StrokeThickness="2"
+                            BackgroundColor="Transparent"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="28" />
+                        </Border.StrokeShape>
+                        <Image Source="{Binding CurrentStory.Icon, Converter={StaticResource ImageSourceConverter}}"
+                               Aspect="AspectFill" />
+                    </Border>
 
-                <Border WidthRequest="56" HeightRequest="56"
-                        Stroke="White" StrokeThickness="2"
+                    <Label Text="{Binding CurrentStory.Title}"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           VerticalOptions="Center">
+                        <Label.Shadow>
+                            <Shadow Brush="#000000"
+                                    Opacity="0.8"
+                                    Radius="5"
+                                    Offset="1,1"/>
+                        </Label.Shadow>
+                    </Label>
+                </HorizontalStackLayout>
+                
+                <!-- Кнопка закрытия (X) -->
+                <Button Grid.Column="1"
+                        Text="✕"
+                        FontSize="24"
+                        TextColor="White"
                         BackgroundColor="Transparent"
-                        HorizontalOptions="Start"
-                        VerticalOptions="Center">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="28" />
-                    </Border.StrokeShape>
-                    <Image Source="{Binding CurrentStory.Icon, Converter={StaticResource ImageSourceConverter}}"
-                           Aspect="AspectFill" />
-                </Border>
-
-                <Label Text="{Binding CurrentStory.Title}"
-                       FontSize="18"
-                       FontAttributes="Bold"
-                       TextColor="White"
-                       VerticalOptions="Center">
-                    <Label.Shadow>
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        Padding="0"
+                        HorizontalOptions="End"
+                        VerticalOptions="Start"
+                        Command="{Binding CloseStoryCommand}">
+                    <Button.Shadow>
                         <Shadow Brush="#000000"
-                                Opacity="0.8"
-                                Radius="5"
-                                Offset="1,1"/>
-                    </Label.Shadow>
-                </Label>
-            </HorizontalStackLayout>
+                                Opacity="0.6"
+                                Radius="3"
+                                Offset="0,1"/>
+                    </Button.Shadow>
+                </Button>
+            </Grid>
 
             <!-- Навигация сторис -->
             <Grid>

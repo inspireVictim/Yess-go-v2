@@ -115,11 +115,12 @@
                                         <CollectionView.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
-                                                    <!-- Изображение товара -->
+                                                    <!-- Изображение товара (показываем только если есть в БД) -->
                                                     <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
                                                           WidthRequest="100"
                                                           HeightRequest="100"
-                                                          Margin="0,0,12,0">
+                                                          Margin="0,0,12,0"
+                                                          IsVisible="{Binding ProductImageUrl, Converter={StaticResource IsNotNullConverter}}">
                                                         <Border BackgroundColor="#F0F0F0"
                                                                 StrokeShape="RoundRectangle 8">
                                                             <Image Source="{Binding ProductImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
@@ -190,29 +191,41 @@
 
                                                     <!-- Управление количеством -->
                                                     <HorizontalStackLayout Grid.Row="1" Grid.Column="1"
-                                                                           Spacing="8"
+                                                                           Spacing="12"
                                                                            HorizontalOptions="End"
                                                                            VerticalOptions="End">
-                                                        <ImageButton Source="basket.svg"
-                                                                     WidthRequest="24"
-                                                                     HeightRequest="24"
-                                                                     BackgroundColor="Transparent"
-                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveItemCommand}"
-                                                                     CommandParameter="{Binding .}"/>
+                                                        <!-- Кнопка уменьшения количества -->
+                                                        <Button Text="-"
+                                                                FontSize="20"
+                                                                FontAttributes="Bold"
+                                                                BackgroundColor="#DC2626"
+                                                                TextColor="White"
+                                                                WidthRequest="36"
+                                                                HeightRequest="36"
+                                                                CornerRadius="18"
+                                                                Padding="0"
+                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DecreaseQuantityCommand}"
+                                                                CommandParameter="{Binding .}"/>
+                                                        
+                                                        <!-- Количество -->
                                                         <Label Text="{Binding Quantity}"
-                                                               FontSize="16"
+                                                               FontSize="18"
                                                                FontAttributes="Bold"
                                                                TextColor="Black"
                                                                VerticalOptions="Center"
-                                                               Margin="8,0"/>
+                                                               HorizontalOptions="Center"
+                                                               WidthRequest="40"
+                                                               HorizontalTextAlignment="Center"/>
+                                                        
+                                                        <!-- Кнопка увеличения количества -->
                                                         <Button Text="+"
-                                                                FontSize="18"
+                                                                FontSize="20"
                                                                 FontAttributes="Bold"
                                                                 BackgroundColor="#0B4A3B"
                                                                 TextColor="White"
-                                                                WidthRequest="32"
-                                                                HeightRequest="32"
-                                                                CornerRadius="16"
+                                                                WidthRequest="36"
+                                                                HeightRequest="36"
+                                                                CornerRadius="18"
                                                                 Padding="0"
                                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IncreaseQuantityCommand}"
                                                                 CommandParameter="{Binding .}"/>

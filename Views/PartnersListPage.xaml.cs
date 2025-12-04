@@ -306,6 +306,15 @@ namespace YessGoFront.Views
             DisplayAlert("Ошибка", message, "ОК");
         }
 
+        private async void OnBasketButtonClicked(object? sender, EventArgs e)
+        {
+            // Переход на страницу корзины
+            if (Shell.Current != null)
+            {
+                await Shell.Current.GoToAsync("BasketPage", animate: true);
+            }
+        }
+
         private async void OnBackTapped(object? sender, TappedEventArgs e)
         {
             try

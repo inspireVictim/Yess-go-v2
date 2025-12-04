@@ -777,6 +777,17 @@ namespace YessGoFront.ViewModels
                         OnPropertyChanged(nameof(PageProgressList));
                     }
                 }
+                
+                // Помечаем Story как просмотренный после завершения просмотра
+                if (CurrentStory != null && pages.Count > 0)
+                {
+                    // Помечаем как просмотренный, только если просмотрели все страницы
+                    bool allPagesViewed = PageProgressList.All(prog => prog >= 1.0);
+                    if (allPagesViewed)
+                    {
+                        CurrentStory.IsViewed = true;
+                    }
+                }
             }
 
             CloseStory();
@@ -983,6 +994,16 @@ namespace YessGoFront.ViewModels
                 {
                     PageProgressList[p] = 1.0;
                     OnPropertyChanged(nameof(PageProgressList));
+                }
+            }
+            
+            // Помечаем Story как просмотренный после завершения просмотра всех страниц
+            if (CurrentStory != null && pages.Count > 0)
+            {
+                bool allPagesViewed = PageProgressList.All(prog => prog >= 1.0);
+                if (allPagesViewed)
+                {
+                    CurrentStory.IsViewed = true;
                 }
             }
 

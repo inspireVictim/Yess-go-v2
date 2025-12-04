@@ -67,11 +67,54 @@ public partial class PartnerDetailViewPage : ContentPage
 
         // Подписываемся на изменения коллекции продуктов
         _viewModel.Products.CollectionChanged += OnProductsCollectionChanged;
+        
+        // Подписываемся на изменения выбранной категории для обновления стилей кнопок
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+    
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PartnerDetailViewModel.SelectedCategory))
+        {
+            UpdateCategoryButtonsStyle();
+        }
+    }
+    
+    private void UpdateCategoryButtonsStyle()
+    {
+        if (_viewModel == null || CategoriesScrollView == null)
+            return;
+            
+        // Находим все кнопки категорий и обновляем их стиль
+        var horizontalStackLayout = CategoriesScrollView.Content as HorizontalStackLayout;
+        if (horizontalStackLayout != null)
+        {
+            foreach (var child in horizontalStackLayout.Children)
+            {
+                if (child is Button button)
+                {
+                    // Используем CommandParameter или Text для определения категории
+                    var categoryName = button.CommandParameter as string ?? button.Text;
+                    
+                    if (categoryName == _viewModel.SelectedCategory)
+                    {
+                        button.BackgroundColor = Color.FromArgb("#0B4A3B");
+                        button.TextColor = Colors.White;
+                    }
+                    else
+                    {
+                        button.BackgroundColor = Color.FromArgb("#E0E0E0");
+                        button.TextColor = Color.FromArgb("#666");
+                    }
+                }
+            }
+        }
     }
 
     private void OnProductsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         UpdateEmptyProductsMessage();
+        UpdateCategoryButtonsStyle();
     }
 
     private void UpdateEmptyProductsMessage()
@@ -89,6 +132,21 @@ public partial class PartnerDetailViewPage : ContentPage
         if (sender is Button button && button.CommandParameter is ProductDto product && _viewModel != null)
         {
             await _viewModel.AddToCartCommand.ExecuteAsync(product);
+        }
+    }
+    
+    private void OnCategoryButtonClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button button && _viewModel != null)
+        {
+            // Используем CommandParameter, если доступен, иначе Text
+            var categoryName = button.CommandParameter as string ?? button.Text;
+            
+            if (!string.IsNullOrWhiteSpace(categoryName))
+            {
+                _viewModel.SelectCategoryCommand.Execute(categoryName);
+                UpdateCategoryButtonsStyle();
+            }
         }
     }
 }

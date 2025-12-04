@@ -27,7 +27,7 @@
 
 
         <!-- ===== Шапка ===== -->
-		<Grid Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*"
+		<Grid Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="12" Padding="0,0,0,12">
 
 			<!-- Назад -->
@@ -60,6 +60,16 @@
                            TextChanged="OnSearchTextChanged" />
 				</Grid>
 			</Frame>
+			
+			<!-- Кнопка корзины -->
+			<ImageButton Grid.Column="2"
+                         Source="basket.svg"
+                         WidthRequest="30"
+                         HeightRequest="30"
+                         BackgroundColor="Transparent"
+                         Aspect="AspectFit"
+                         VerticalOptions="Center"
+                         Clicked="OnBasketButtonClicked"/>
 
 			<!-- Категории: горизонтальный ScrollView с BindableLayout -->
 			<ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" Grid.ColumnSpan="2" Margin="0,8,0,0">

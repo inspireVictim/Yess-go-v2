@@ -113,6 +113,13 @@ public partial class PartnerDetailViewModel : ObservableObject
     private string selectedTab = "Products"; // "Products" или "Reviews"
 
     public ObservableCollection<ProductDto> Products { get; } = new();
+    
+    private ObservableCollection<ProductDto> _allProducts = new();
+    
+    public ObservableCollection<string> Categories { get; } = new();
+    
+    [ObservableProperty]
+    private string? selectedCategory;
 
     public IAsyncRelayCommand<int> LoadPartnerCommand { get; }
     public IAsyncRelayCommand GoBackCommand { get; }
@@ -132,7 +139,10 @@ public partial class PartnerDetailViewModel : ObservableObject
         GoBackCommand = new AsyncRelayCommand(GoBackAsync);
         AddToCartCommand = new AsyncRelayCommand<ProductDto>(AddToCartAsync);
         SelectTabCommand = new RelayCommand<string>(SelectTab);
+        SelectCategoryCommand = new RelayCommand<string>(SelectCategory);
     }
+    
+    public IRelayCommand<string> SelectCategoryCommand { get; }
 
     private void SelectTab(string? tab)
     {
@@ -330,12 +340,20 @@ public partial class PartnerDetailViewModel : ObservableObject
             
             if (products != null && products.Any())
             {
+                // Сохраняем все продукты
+                _allProducts.Clear();
                 foreach (var product in products)
                 {
-                    Products.Add(product);
+                    _allProducts.Add(product);
                     _logger?.LogInformation("  ➕ Added product to collection: Id={ProductId}, Name={ProductName}, PartnerId={ProductPartnerId}, Price={Price}", 
                         product.Id, product.Name, product.PartnerId, product.Price);
                 }
+
+                // Извлекаем уникальные категории
+                UpdateCategories();
+                
+                // Применяем фильтр (показываем все продукты)
+                ApplyCategoryFilter();
 
                 _logger?.LogInformation("✅ [LoadProductsAsync] Successfully loaded {Count} products for partner {PartnerId}. " +
                     "Total in ObservableCollection: {Total}", products.Count, partnerId, Products.Count);
@@ -354,6 +372,67 @@ public partial class PartnerDetailViewModel : ObservableObject
                 "Exception: {ExceptionMessage}", partnerId, ex.Message);
             // Не устанавливаем ошибку, так как партнёр может быть загружен, а продукты - нет
             Products.Clear();
+            _allProducts.Clear();
+            Categories.Clear();
+        }
+    }
+    
+    private void UpdateCategories()
+    {
+        Categories.Clear();
+        
+        // Добавляем категорию "Все" для показа всех продуктов
+        Categories.Add("Все");
+        
+        // Извлекаем уникальные категории из продуктов
+        var uniqueCategories = _allProducts
+            .Where(p => !string.IsNullOrWhiteSpace(p.Category))
+            .Select(p => p.Category!)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToList();
+        
+        foreach (var category in uniqueCategories)
+        {
+            Categories.Add(category);
+        }
+        
+        // По умолчанию выбираем "Все"
+        SelectedCategory = "Все";
+        
+        _logger?.LogInformation("Updated categories: {Count} categories found", Categories.Count);
+    }
+    
+    private void SelectCategory(string? category)
+    {
+        if (string.IsNullOrWhiteSpace(category))
+            return;
+            
+        SelectedCategory = category;
+        ApplyCategoryFilter();
+        
+        _logger?.LogInformation("Selected category: {Category}, Filtered products: {Count}", category, Products.Count);
+    }
+    
+    private void ApplyCategoryFilter()
+    {
+        Products.Clear();
+        
+        if (string.IsNullOrWhiteSpace(SelectedCategory) || SelectedCategory == "Все")
+        {
+            // Показываем все продукты
+            foreach (var product in _allProducts)
+            {
+                Products.Add(product);
+            }
+        }
+        else
+        {
+            // Фильтруем по выбранной категории
+            foreach (var product in _allProducts.Where(p => p.Category == SelectedCategory))
+            {
+                Products.Add(product);
+            }
         }
     }
 

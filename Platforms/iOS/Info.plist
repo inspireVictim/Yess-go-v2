@@ -29,12 +29,21 @@
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app using barcode scanning to</string>
+	<string>Приложению необходим доступ к камере для сканирования QR-кодов при оплате и получении бонусов</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Для отображения вашего местоположения на карте</string>
+	<string>Приложению необходим доступ к геолокации для отображения вашего местоположения на карте и поиска ближайших партнеров</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Приложению необходим доступ к геолокации для отображения вашего местоположения на карте и поиска ближайших партнеров</string>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleLightContent</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	
+	<!-- ✅ Версии приложения (также настраиваются в .csproj) -->
+	<!-- CFBundleVersion и CFBundleShortVersionString устанавливаются автоматически из .csproj -->
+	
+	<!-- ✅ Дополнительные настройки для App Store -->
+	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 
 </dict>

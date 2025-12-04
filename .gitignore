@@ -19,3 +19,9 @@ Platforms/Android/app/
 .idea/
 .vscode/
 .env
+
+# Android Keystore (критически важно - не коммитить!)
+*.keystore
+*.jks
+keystore.props
+**/keystores/

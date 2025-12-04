@@ -13,6 +13,15 @@
 		<ApplicationId>com.yessgo.front</ApplicationId>
 		<ApplicationIdGuid>5F4C77F0-AC7A-4C4E-9E8B-32B6B1C9F22F</ApplicationIdGuid>
 
+		<!-- ✅ Версии приложения для публикации -->
+		<!-- Версия для Android -->
+		<ApplicationVersion Condition="$(TargetFramework.Contains('-android'))">1</ApplicationVersion>
+		<ApplicationDisplayVersion Condition="$(TargetFramework.Contains('-android'))">1.0.0</ApplicationDisplayVersion>
+		
+		<!-- Версия для iOS -->
+		<CFBundleVersion Condition="$(TargetFramework.Contains('-ios'))">1</CFBundleVersion>
+		<CFBundleShortVersionString Condition="$(TargetFramework.Contains('-ios'))">1.0.0</CFBundleShortVersionString>
+
 		<!-- Минимальные версии платформ -->
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">21</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">15.0</SupportedOSPlatformVersion>
@@ -30,6 +39,16 @@
 	<!-- ✅ Android -->
 	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
 		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+		
+		<!-- 🔐 Настройки подписи для Google Play -->
+		<!-- Раскомментируйте и укажите путь к вашему keystore файлу -->
+		<!-- 
+		<AndroidKeyStore>true</AndroidKeyStore>
+		<AndroidSigningKeyStore>path\to\your\yessgo-release.keystore</AndroidSigningKeyStore>
+		<AndroidSigningStorePass>YOUR_KEYSTORE_PASSWORD</AndroidSigningStorePass>
+		<AndroidSigningKeyAlias>yessgo-key</AndroidSigningKeyAlias>
+		<AndroidSigningKeyPass>YOUR_KEY_PASSWORD</AndroidSigningKeyPass>
+		-->
 	</PropertyGroup>
 
 	<!-- ✅ iOS -->

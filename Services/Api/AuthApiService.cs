@@ -234,6 +234,27 @@ namespace YessGoFront.Services.Api
             }
         }
 
+        public async Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request, CancellationToken ct = default)
+        {
+            try
+            {
+                var response = await PutAsync<UpdateProfileRequest, UserDto>(
+                    ApiEndpoints.UserEndpoints.UpdateProfile,
+                    request,
+                    ct
+                );
+
+                Logger?.LogInformation("Profile updated successfully. Id={Id}, FirstName={FirstName}, LastName={LastName}",
+                    response.Id, response.FirstName ?? "null", response.LastName ?? "null");
+
+                return response;
+            }
+            catch (Exception ex) when (IsNetworkError(ex))
+            {
+                throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+            }
+        }
+
 
         // ----------------- Helpers -----------------
 

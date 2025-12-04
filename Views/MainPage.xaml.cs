@@ -21,6 +21,7 @@ namespace YessGoFront.Views
         // ============================
         private bool _isNavigating;
         private const string WalletRoute = "///wallet";
+        private const string TransactionsRoute = "///TransactionsPage";
 
         // ============================
         // Story Crossfade
@@ -410,7 +411,38 @@ namespace YessGoFront.Views
 
             try
             {
-                await Shell.Current.GoToAsync(nameof(TransactionsPage));
+                await Shell.Current.GoToAsync(TransactionsRoute);
+            }
+            catch
+            {
+                try { await Shell.Current.GoToAsync("//TransactionsPage"); } catch { }
+            }
+            finally
+            {
+                _isNavigating = false;
+            }
+        }
+
+        private async void OnProfileTapped(object? sender, EventArgs e)
+        {
+            if (_isNavigating) return;
+            _isNavigating = true;
+
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(Profile), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Ошибка навигации к Profile: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("Profile", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainPage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
             }
             finally
             {

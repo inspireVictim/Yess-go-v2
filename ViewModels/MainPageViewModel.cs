@@ -520,25 +520,41 @@ namespace YessGoFront.ViewModels
             try
             {
                 System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров из БД");
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Начало загрузки партнёров");
+#endif
 
-                PartnersRow1.Clear();
-                PartnersRow2.Clear();
-                PartnersRow3.Clear();
+                // Очищаем на главном потоке
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    PartnersRow1.Clear();
+                    PartnersRow2.Clear();
+                    PartnersRow3.Clear();
+                });
 
                 if (_partnersApiService == null)
                 {
                     System.Diagnostics.Debug.WriteLine("[MainPageViewModel] PartnersApiService недоступен, не можем загрузить партнёров");
+#if ANDROID
+                    Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] PartnersApiService is null");
+#endif
                     return; // Не используем fallback, просто оставляем пустым
                 }
 
                 var partners = await _partnersApiService.GetAllAsync();
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Получено партнёров из API: {partners?.Count ?? 0}");
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Получено партнёров: {partners?.Count ?? 0}");
+#endif
 
                 if (partners == null || partners.Count == 0)
                 {
                     System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Партнёры не получены из API или список пуст, используем fallback");
-                    LoadPartnersFallback();
+#if ANDROID
+                    Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] Партнёры не получены, используем fallback");
+#endif
+                    await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
                     return;
                 }
 
@@ -547,24 +563,49 @@ namespace YessGoFront.ViewModels
                     .OfType<PartnerDto>()
                     .Select(p => 
                     {
-                        var logoUrl = p.LogoUrl ?? "";
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner из БД: Id={p.Id}, Name={p.Name}, LogoUrl={logoUrl ?? "null"}");
+                        var logoUrl = p.LogoUrl?.Trim() ?? "";
+                        
+                        // Нормализуем URL: если это относительный путь, он будет обработан конвертером
+                        // Но если URL пустой или null, оставляем пустым - будет показан текст
+                        if (!string.IsNullOrWhiteSpace(logoUrl))
+                        {
+                            // Если URL не начинается с http/https, но начинается с /, это относительный путь
+                            // Конвертер сам добавит базовый URL
+                            if (!logoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !logoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                !logoUrl.StartsWith("/"))
+                            {
+                                // Если URL не начинается с /, добавляем его
+                                logoUrl = "/" + logoUrl.TrimStart('/');
+                            }
+                        }
+                        
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner из БД: Id={p.Id}, Name={p.Name}, LogoUrl={(string.IsNullOrWhiteSpace(logoUrl) ? "empty" : logoUrl)}");
+#if ANDROID
+                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Partner: Id={p.Id}, Name={p.Name}, LogoUrl={(string.IsNullOrWhiteSpace(logoUrl) ? "empty" : logoUrl)}");
+#endif
                         
                         return new PartnerLogoModel
                         {
                             Id = p.Id.ToString(),
-                            Name = p.Name ?? "",
+                            Name = p.Name ?? "Партнёр",
                             Logo = logoUrl // Сохраняем даже пустой LogoUrl - конвертер обработает
                         };
                     })
                     .ToList(); // НЕ фильтруем - показываем ВСЕ партнёры из БД
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Всего партнёров из БД: {list.Count}");
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Всего партнёров после обработки: {list.Count}");
+#endif
                 
                 if (list.Count == 0)
                 {
                     System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Список партнёров пуст после обработки, используем fallback");
-                    LoadPartnersFallback();
+#if ANDROID
+                    Android.Util.Log.Warn("MainPageViewModel", "[LoadPartnersAsync] Список пуст, используем fallback");
+#endif
+                    await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
                     return;
                 }
 
@@ -591,18 +632,28 @@ namespace YessGoFront.ViewModels
                 row2 = EnsureEnough(row2);
                 row3 = EnsureEnough(row3);
 
-                // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI ===
-                foreach (var p in row1) PartnersRow1.Add(p);
-                foreach (var p in row2) PartnersRow2.Add(p);
-                foreach (var p in row3) PartnersRow3.Add(p);
+                // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI НА ГЛАВНОМ ПОТОКЕ ===
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    foreach (var p in row1) PartnersRow1.Add(p);
+                    foreach (var p in row2) PartnersRow2.Add(p);
+                    foreach (var p in row3) PartnersRow3.Add(p);
+                });
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] PARTNERS READY: row1={PartnersRow1.Count}, row2={PartnersRow2.Count}, row3={PartnersRow3.Count}");
+#if ANDROID
+                Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] PARTNERS READY: row1={PartnersRow1.Count}, row2={PartnersRow2.Count}, row3={PartnersRow3.Count}");
+#endif
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync ERROR: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] StackTrace: {ex.StackTrace}");
-                LoadPartnersFallback();
+#if ANDROID
+                Android.Util.Log.Error("MainPageViewModel", $"[LoadPartnersAsync] ERROR: {ex.Message}");
+                Android.Util.Log.Error("MainPageViewModel", $"[LoadPartnersAsync] StackTrace: {ex.StackTrace}");
+#endif
+                await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
             }
         }
 

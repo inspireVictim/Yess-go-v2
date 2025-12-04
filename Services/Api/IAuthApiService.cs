@@ -39,6 +39,11 @@ public interface IAuthApiService
     /// Получение профиля текущего пользователя
     /// </summary>
     Task<UserDto> GetMeAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Обновление профиля текущего пользователя
+    /// </summary>
+    Task<UserDto> UpdateProfileAsync(UpdateProfileRequest request, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -83,6 +88,27 @@ public class VerifyCodeRequest
     public string last_name { get; set; } = string.Empty;
     public int? city_id { get; set; }
     public string? referral_code { get; set; }
+}
+
+/// <summary>
+/// Запрос на обновление профиля пользователя
+/// </summary>
+public class UpdateProfileRequest
+{
+    [JsonPropertyName("firstName")]
+    public string? FirstName { get; set; }
+
+    [JsonPropertyName("lastName")]
+    public string? LastName { get; set; }
+
+    [JsonPropertyName("phone")]
+    public string? Phone { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("password")]
+    public string? Password { get; set; }
 }
 
 

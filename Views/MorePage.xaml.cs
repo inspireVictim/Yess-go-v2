@@ -40,10 +40,46 @@ namespace YessGoFront.Views
             }
         }
 
+        // ✅ Обработчик тапа по карточке профиля
+        private async void OnProfileTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(Profile), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к Profile: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("Profile", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
+        }
+
         // ✅ Обработчик тапа по "История операции"
         private async void OnHistoryTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync(nameof(TransactionsPage));
+            try
+            {
+                await Shell.Current.GoToAsync(nameof(OperationHistory), animate: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к OperationHistory: {ex.Message}");
+                try
+                {
+                    await Shell.Current.GoToAsync("OperationHistory", animate: true);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
+                }
+            }
         }
 
         // ✅ Обработчик тапа по "Обратная связь"

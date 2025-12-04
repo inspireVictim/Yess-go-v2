@@ -93,8 +93,41 @@ public class PartnersApiService : ApiClient, IPartnersApiService
         {
             throw new ArgumentException($"Invalid partner ID: {id}", nameof(id));
         }
+        
         var endpoint = ApiEndpoints.PartnersEndpoints.ById(partnerId);
-        return await GetAsync<PartnerDetailDto>(endpoint, ct);
+        
+#if ANDROID
+        Log.Info("PartnersApiService", $"[GetByIdAsync] Запрос партнёра с ID {id} (endpoint: {endpoint})");
+#endif
+        System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Fetching partner by id: {id} from endpoint: {endpoint}");
+        Logger?.LogInformation("[PartnersApiService] Fetching partner by id: {Id} from endpoint: {Endpoint}", id, endpoint);
+        
+        try
+        {
+            var result = await GetAsync<PartnerDetailDto>(endpoint, ct);
+            
+#if ANDROID
+            Log.Info("PartnersApiService", $"[GetByIdAsync] Партнёр загружен: {result?.Name ?? "null"}");
+#endif
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Successfully loaded partner: {result?.Name ?? "null"}");
+            Logger?.LogInformation("[PartnersApiService] Successfully loaded partner: {Name} (Id: {Id})", result?.Name, id);
+            
+            if (result != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Partner details: Address={result.Address}, Phone={result.Phone}, LogoUrl={result.LogoUrl}");
+            }
+            
+            return result ?? throw new InvalidOperationException($"Partner {id} not found");
+        }
+        catch (Exception ex)
+        {
+#if ANDROID
+            Log.Error("PartnersApiService", $"[GetByIdAsync] Ошибка загрузки партнёра {id}: {ex.Message}");
+#endif
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Error loading partner {id}: {ex.Message}");
+            Logger?.LogError(ex, "[PartnersApiService] Error loading partner {Id}", id);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<PartnerDto>> SearchAsync(

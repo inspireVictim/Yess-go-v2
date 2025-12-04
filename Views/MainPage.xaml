@@ -39,6 +39,9 @@
 
                         <!-- Профиль -->
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" VerticalOptions="Center">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnProfileTapped"/>
+                            </Grid.GestureRecognizers>
                             <Frame Grid.Column="0"
                                    WidthRequest="56" HeightRequest="56"
                                    CornerRadius="28" Padding="0"
@@ -47,15 +50,15 @@
                             </Frame>
 
                             <VerticalStackLayout Grid.Column="1"
-                     Spacing="2"
-                     VerticalOptions="Center">
+                                Spacing="2"
+                                VerticalOptions="Center">
                                 <Label FontSize="20"
-           FontAttributes="Bold"
-           TextColor="White"
-           Text="{Binding DisplayName}" />
+                                    FontAttributes="Bold"
+                                    TextColor="White"
+                                    Text="{Binding DisplayName}" />
                                 <Label FontSize="12"
-           TextColor="#FFFFFFCC"
-           Text="{Binding Phone}" />
+                                    TextColor="#FFFFFFCC"
+                                    Text="{Binding Phone}" />
                             </VerticalStackLayout>
 
                         </Grid>

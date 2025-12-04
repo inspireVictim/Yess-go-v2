@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="YessGoFront.Views.OperationHistory"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8"
+    Title="История операции">
+    
+    <Grid RowDefinitions="Auto,*">
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="16,44,16,8" BackgroundColor="#0F6B53">
+            <Grid ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
+                <Border WidthRequest="36" HeightRequest="36"
+                        StrokeThickness="0"
+                        BackgroundColor="#FFFFFF"
+                        StrokeShape="RoundRectangle8">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnBackTapped" />
+                    </Border.GestureRecognizers>
+                    <Image Source="back_arrow_icon.png" 
+                           Aspect="AspectFit" 
+                           Margin="8" />
+                </Border>
+
+                <Label Grid.Column="1"
+                       Text="История операции"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       TextColor="White"
+                       FontAttributes="Bold"
+                       FontSize="18"/>
+            </Grid>
+        </Grid>
+
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <Label Text="ФУНКЦИЯ НА РАЗРАБОТКЕ"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="#6B7280"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"/>
+        </Grid>
+    </Grid>
+</ContentPage>

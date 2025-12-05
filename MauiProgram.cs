@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
@@ -239,6 +240,9 @@ public static class MauiProgram
         services.AddTransient<AuthHandler>();
         services.AddTransient<LoggingHandler>();
 
+        // TODO: remove after Android trusts Let's Encrypt R12 chain properly
+        // Временная мера для обхода SSLHandshakeException на Android
+        // Android не доверяет цепочке сертификатов Let's Encrypt (R12 → ISRG Root X1)
         services.AddHttpClient("ApiClient", (sp, client) =>
         {
             var settings = sp.GetRequiredService<AppSettings>();
@@ -246,16 +250,33 @@ public static class MauiProgram
             client.Timeout = TimeSpan.FromSeconds(settings.Api.RequestTimeoutSeconds);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+            {
+                // TODO: remove after Android trusts Let's Encrypt R12 chain properly
+                return true; // временная мера, пока не заработает нормальная цепочка
+            }
+        })
         .AddHttpMessageHandler<AuthHandler>()
         .AddHttpMessageHandler<LoggingHandler>();
 
         // Отдельный HttpClient для refresh token запросов (без AuthHandler, чтобы избежать бесконечного цикла)
+        // TODO: remove after Android trusts Let's Encrypt R12 chain properly
         services.AddHttpClient("RefreshTokenClient", (sp, client) =>
         {
             var settings = sp.GetRequiredService<AppSettings>();
             client.BaseAddress = new Uri(settings.Api.BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(settings.Api.RequestTimeoutSeconds);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+            {
+                // TODO: remove after Android trusts Let's Encrypt R12 chain properly
+                return true; // временная мера, пока не заработает нормальная цепочка
+            }
         })
         .AddHttpMessageHandler<LoggingHandler>(); // Только LoggingHandler, без AuthHandler
 

@@ -14,7 +14,7 @@ public static class ApiConfiguration
     /// Для изменения адреса сервера отредактируйте эту константу.
     /// Формат: http://IP:PORT или https://IP:PORT
     /// </remarks>
-    public const string BASE_URL = "http://5.59.232.211:8000";
+    public const string BASE_URL = "https://api.yessgo.org";
 
     /// <summary>
     /// Версия API

@@ -188,8 +188,9 @@
 
 
 
-                    <CollectionView x:Name="BannersCollection"
-                            ItemsSource="{Binding Banners}"
+                    <!-- Информационные кнопки -->
+                    <CollectionView x:Name="InfoButtonsCollection"
+                            ItemsSource="{Binding InfoButtons}"
                             ItemsLayout="HorizontalList"
                             SelectionMode="None"
                             HorizontalScrollBarVisibility="Never"
@@ -197,51 +198,41 @@
                             VerticalOptions="Start"
                             HeightRequest="90">
                         <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="models:BannerModel">
-                                <Grid WidthRequest="160"
+                            <DataTemplate x:DataType="models:InfoButtonModel">
+                                <Grid WidthRequest="140"
                                       HeightRequest="90"
                                       Margin="0,0,12,0">
-                                    <Border StrokeThickness="0"
+                                    <Border StrokeThickness="1"
+                                           Stroke="#0F6B53"
                                            StrokeShape="RoundRectangle 16"
-                                           Padding="0"
-                                           BackgroundColor="#E0E0E0">
-                                        <Grid>
-                                            <!-- Placeholder (серый фон с индикатором) -->
-                                            <Grid x:Name="BannerPlaceholder"
-                                                  BackgroundColor="#E0E0E0"
-                                                  HorizontalOptions="Fill"
-                                                  VerticalOptions="Fill">
-                                                <ActivityIndicator IsRunning="True"
-                                                                 Color="#007A51"
-                                                                 VerticalOptions="Center"
-                                                                 HorizontalOptions="Center"/>
-                                            </Grid>
-                                            
-                                            <!-- Изображение (поверх placeholder) -->
-                                            <Image Source="{Binding Image, Converter={StaticResource ImageSourceConverter}}" 
-                                                   Aspect="AspectFill"
-                                                   HorizontalOptions="Fill"
-                                                   VerticalOptions="Fill"
-                                                   BackgroundColor="#F0F0F0">
-                                                <Image.Behaviors>
-                                                    <helpers:ImageLoadingBehavior />
-                                                </Image.Behaviors>
-                                            </Image>
-                                            <!-- Fallback текст, если изображение не загрузилось -->
-                                            <Label Text="📷"
-                                                   FontSize="40"
+                                           Padding="12,8"
+                                           BackgroundColor="White">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnInfoButtonTapped"
+                                                                  CommandParameter="{Binding .}"/>
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="6"
+                                                           HorizontalOptions="Center"
+                                                           VerticalOptions="Center">
+                                            <!-- Иконка -->
+                                            <Label Text="{Binding Icon}"
+                                                   FontSize="32"
                                                    HorizontalOptions="Center"
                                                    VerticalOptions="Center"
-                                                   TextColor="#999"
-                                                   IsVisible="False"
-                                                   x:Name="BannerFallback"/>
-                                        </Grid>
+                                                   HorizontalTextAlignment="Center"/>
+                                            <!-- Текст -->
+                                            <Label Text="{Binding Title}"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#0F6B53"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center"
+                                                   HorizontalTextAlignment="Center"
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
                                     </Border>
-                                    <Grid.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding BindingContext.OpenBannerAsyncCommand, Source={x:Reference MainPageElement}}"
-                                                              CommandParameter="{Binding .}"/>
-                                    </Grid.GestureRecognizers>
-                                </Grid>
+                                </Grid>   
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
                     </CollectionView>
@@ -613,13 +604,14 @@
 
         <!-- ====== OVERLAY: Story (full-screen) ====== -->
         <Grid Grid.RowSpan="2"
+              x:Name="StoryOverlayGrid"
               IsVisible="{Binding IsStoryOpen}"
               BackgroundColor="#000000"
               InputTransparent="False"
               ZIndex="9999">
             <Grid.GestureRecognizers>
-                <SwipeGestureRecognizer Direction="Up" Command="{Binding CloseStoryCommand}"/>
                 <SwipeGestureRecognizer Direction="Down" Command="{Binding CloseStoryCommand}"/>
+                <PanGestureRecognizer PanUpdated="OnStoryPanUpdated"/>
             </Grid.GestureRecognizers>
             
             <!-- Сцена сторис (фон) -->
@@ -679,10 +671,35 @@
                 </HorizontalStackLayout>
             </Grid>
 
-            <!-- Верхняя панель: аватарка, название и кнопка закрытия -->
+            <!-- Навигация сторис (левая/правая части для тапов) - должен быть ПОД верхней панелью -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <!-- Левая часть - предыдущий сторис/страница -->
+                <Grid Grid.Column="0" 
+                      BackgroundColor="Transparent"
+                      InputTransparent="False">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnStoryLeftTapped"/>
+                    </Grid.GestureRecognizers>
+                </Grid>
+                <!-- Правая часть - следующий сторис/страница -->
+                <Grid Grid.Column="1" 
+                      BackgroundColor="Transparent"
+                      InputTransparent="False">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnStoryRightTapped"/>
+                    </Grid.GestureRecognizers>
+                </Grid>
+            </Grid>
+
+            <!-- Верхняя панель: аватарка, название и кнопка закрытия - должна быть ПОВЕРХ навигации -->
             <Grid Padding="16,48,16,0" 
                   RowDefinitions="Auto"
-                  ColumnDefinitions="*,Auto">
+                  ColumnDefinitions="*,Auto"
+                  InputTransparent="False">
                 <!-- Аватарка и название -->
                 <HorizontalStackLayout Grid.Column="0"
                                        Spacing="12"
@@ -715,7 +732,7 @@
                     </Label>
                 </HorizontalStackLayout>
                 
-                <!-- Кнопка закрытия (X) -->
+                <!-- Кнопка закрытия (X) - должна перехватывать клики -->
                 <Button Grid.Column="1"
                         Text="✕"
                         FontSize="24"
@@ -726,6 +743,7 @@
                         Padding="0"
                         HorizontalOptions="End"
                         VerticalOptions="Start"
+                        InputTransparent="False"
                         Command="{Binding CloseStoryCommand}">
                     <Button.Shadow>
                         <Shadow Brush="#000000"
@@ -735,39 +753,8 @@
                     </Button.Shadow>
                 </Button>
             </Grid>
-
-            <!-- Навигация сторис -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid Grid.Column="0">
-                    <Grid.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding PrevPageCommand}"/>
-                    </Grid.GestureRecognizers>
-                </Grid>
-                <Grid Grid.Column="1">
-                    <Grid.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding NextPageCommand}"/>
-                    </Grid.GestureRecognizers>
-                </Grid>
-            </Grid>
         </Grid>
 
-        <!-- ====== OVERLAY: Banner (full-screen) ====== -->
-        <Grid Grid.RowSpan="2"
-              IsVisible="{Binding IsBannerOpen}"
-              BackgroundColor="#000000CC"
-              ZIndex="10000">
-            <Image Source="{Binding CurrentBanner.Image}"
-                   Aspect="AspectFill"
-                   HorizontalOptions="Fill"
-                   VerticalOptions="Fill"/>
-            <Grid.GestureRecognizers>
-                <TapGestureRecognizer Command="{Binding CloseBannerCommand}"/>
-            </Grid.GestureRecognizers>
-        </Grid>
 
     </Grid>
 </ContentPage>

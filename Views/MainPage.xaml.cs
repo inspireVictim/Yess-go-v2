@@ -146,15 +146,15 @@ namespace YessGoFront.Views
 
 
         // ============================
-        // Banner size fix
+        // Info buttons size fix
         // ============================
         protected override void OnSizeAllocated(double width, double height)
         {
             base.OnSizeAllocated(width, height);
 
-            var banners = FindByName("BannersCollection") as CollectionView;
-            if (banners != null)
-                banners.HeightRequest = 90;
+            var infoButtons = FindByName("InfoButtonsCollection") as CollectionView;
+            if (infoButtons != null)
+                infoButtons.HeightRequest = 90;
         }
 
 
@@ -531,6 +531,107 @@ namespace YessGoFront.Views
             finally
             {
                 _isNavigating = false;
+            }
+        }
+
+        // ============================
+        // Story жесты
+        // ============================
+        private DateTime _storyPanStartTime;
+        private bool _storyIsHolding;
+        private Point _storyPanStartPoint;
+        private const double HoldThresholdMs = 150; // Порог для определения удержания (150мс)
+        private const double HoldMaxDistance = 15; // Максимальное расстояние для удержания (пиксели)
+
+        private void OnStoryPanUpdated(object? sender, PanUpdatedEventArgs e)
+        {
+            if (BindingContext is not MainPageViewModel vm || !vm.IsStoryOpen)
+                return;
+
+            switch (e.StatusType)
+            {
+                case GestureStatus.Started:
+                    _storyPanStartTime = DateTime.Now;
+                    _storyPanStartPoint = new Point(e.TotalX, e.TotalY);
+                    _storyIsHolding = false;
+                    // НЕ паузим сразу - ждем, чтобы отличить тап от удержания
+                    break;
+
+                case GestureStatus.Running:
+                    // Вычисляем расстояние от начальной точки
+                    var distance = Math.Sqrt(Math.Pow(e.TotalX - _storyPanStartPoint.X, 2) + 
+                                            Math.Pow(e.TotalY - _storyPanStartPoint.Y, 2));
+                    var elapsed = (DateTime.Now - _storyPanStartTime).TotalMilliseconds;
+                    
+                    // Если прошло достаточно времени и движение минимальное - это удержание
+                    if (elapsed > HoldThresholdMs && distance < HoldMaxDistance && !_storyIsHolding)
+                    {
+                        _storyIsHolding = true;
+                        vm.PauseStory();
+                        System.Diagnostics.Debug.WriteLine("[MainPage] Story holding detected - paused");
+                    }
+                    // Если движение значительное - возобновляем (если была пауза)
+                    else if (distance > HoldMaxDistance * 2 && _storyIsHolding)
+                    {
+                        _storyIsHolding = false;
+                        vm.ResumeStory();
+                        System.Diagnostics.Debug.WriteLine("[MainPage] Story movement detected - resumed");
+                    }
+                    break;
+
+                case GestureStatus.Canceled:
+                case GestureStatus.Completed:
+                    // Возобновляем при отпускании, только если была пауза
+                    if (_storyIsHolding && vm.IsStoryPaused)
+                    {
+                        vm.ResumeStory();
+                        System.Diagnostics.Debug.WriteLine("[MainPage] Story released - resumed");
+                    }
+                    _storyIsHolding = false;
+                    break;
+            }
+        }
+
+        private void OnStoryLeftTapped(object? sender, EventArgs e)
+        {
+            if (BindingContext is MainPageViewModel vm)
+            {
+                vm.PrevPageCommand.Execute(null);
+            }
+        }
+
+        private void OnStoryRightTapped(object? sender, EventArgs e)
+        {
+            if (BindingContext is MainPageViewModel vm)
+            {
+                vm.NextPageCommand.Execute(null);
+            }
+        }
+
+        // ============================
+        // Info Button обработчик
+        // ============================
+        private async void OnInfoButtonTapped(object? sender, TappedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainPage] ===== OnInfoButtonTapped EVENT FIRED =====");
+            
+            if (e.Parameter is InfoButtonModel infoButton)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] InfoButton tapped: Title='{infoButton.Title}', ActionType='{infoButton.ActionType}'");
+                
+                if (BindingContext is MainPageViewModel vm)
+                {
+                    System.Diagnostics.Debug.WriteLine("[MainPage] Calling OpenInfoButtonAsyncCommand from ViewModel");
+                    await vm.OpenInfoButtonAsyncCommand.ExecuteAsync(infoButton);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[MainPage] ERROR: BindingContext is not MainPageViewModel");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] OnInfoButtonTapped: Parameter type={e.Parameter?.GetType()?.Name ?? "NULL"}");
             }
         }
     }

@@ -59,24 +59,44 @@
                     </VerticalStackLayout>
                 </Frame>
 
-                <!-- Заглушка для эквайринга -->
+                <!-- Кнопка оплаты через Finik -->
                 <Frame BackgroundColor="White"
                        CornerRadius="16"
                        HasShadow="True"
                        Padding="20">
                     <VerticalStackLayout Spacing="16">
-                        <Label Text="Выберите способ оплаты"
+                        <Label Text="Оплата через Finik"
                                FontSize="16"
                                FontAttributes="Bold"
                                TextColor="#0B4A3B"
                                HorizontalOptions="Center"/>
                         
-                        <Label Text="Здесь будет интеграция с эквайрингом"
-                               FontSize="14"
-                               TextColor="#666"
+                        <ActivityIndicator x:Name="LoadingIndicator"
+                                          IsRunning="False"
+                                          IsVisible="False"
+                                          Color="#0B4A3B"
+                                          HorizontalOptions="Center"
+                                          HeightRequest="30"
+                                          WidthRequest="30"/>
+                        
+                        <Button x:Name="PayButton"
+                               Text="Оплатить"
+                               BackgroundColor="#0B4A3B"
+                               TextColor="White"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               CornerRadius="12"
+                               Padding="0,14"
+                               Clicked="OnPayButtonClicked"
+                               IsEnabled="False"/>
+                        
+                        <Label Text="Безопасная оплата через платежную систему Finik"
+                               FontSize="12"
+                               TextColor="#999"
                                HorizontalOptions="Center"
                                HorizontalTextAlignment="Center"
-                               LineBreakMode="WordWrap"/>
+                               LineBreakMode="WordWrap"
+                               Margin="0,8,0,0"/>
                     </VerticalStackLayout>
                 </Frame>
             </VerticalStackLayout>

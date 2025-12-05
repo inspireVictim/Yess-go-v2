@@ -19,9 +19,15 @@ using YessGoFront.Services.Domain;
 using ZXing.Net.Maui.Controls;
 using Microsoft.Maui.Handlers;
 using YessGoFront.ViewModels;
+using YessGoFront.Services;
 
 #if ANDROID
 using YessGoFront.Platforms.Android.Handlers;
+using YessGoFront.Platforms.Android;
+#endif
+
+#if IOS
+using YessGoFront.Platforms.iOS;
 #endif
 
 namespace YessGoFront;
@@ -293,6 +299,16 @@ public static class MauiProgram
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPromoCodeService, PromoCodeService>();
         services.AddSingleton<ICartService, CartService>();
+        
+        // Finik Payment Service - платформенно-специфичная регистрация
+#if ANDROID
+        services.AddSingleton<IFinikPaymentService, FinikPaymentService>();
+#elif IOS
+        services.AddSingleton<IFinikPaymentService, FinikPaymentService>();
+#else
+        // Для других платформ можно создать заглушку или оставить пустым
+        // services.AddSingleton<IFinikPaymentService, DummyFinikPaymentService>();
+#endif
     }
 
     private static void ConfigureViewModels(IServiceCollection services)

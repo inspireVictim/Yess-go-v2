@@ -49,7 +49,51 @@
 		<AndroidSigningKeyAlias>yessgo-key</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>YOUR_KEY_PASSWORD</AndroidSigningKeyPass>
 		-->
+		
+		<!-- ⚠️ Отключаем генерацию Java bindings для всех AAR файлов в libs/ -->
+		<!-- Это предотвращает попытки MAUI генерировать bindings для Flutter-based SDK -->
+		<AndroidEnableProguard>false</AndroidEnableProguard>
 	</PropertyGroup>
+	
+	<!-- ✅ Отключаем генерацию bindings для Finik SDK на уровне проекта -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<AndroidLibrary Update="Platforms/Android/libs/android-sdk-2.7.1.aar">
+			<Bind>false</Bind>
+		</AndroidLibrary>
+	</ItemGroup>
+	
+	<!-- ✅ Android библиотеки для Finik SDK -->
+	<!-- 
+	⚠️ ВАЖНО: Finik SDK 2.7.1 - это Flutter модуль, который НЕ МОЖЕТ быть подключен
+	как стандартный Android AAR через AndroidLibrary в MAUI.
+	
+	SDK должен быть подключен через Maven/Gradle как runtime зависимость.
+	Для этого нужно использовать подход через EmbeddedResource или подключение через
+	нативную Gradle конфигурацию.
+	
+	Альтернативный подход: использовать Intent для запуска FinikActivity напрямую,
+	передавая параметры через Intent extras (JSON/примитивы).
+	
+	На данный момент SDK подключен через runtime (через libs/), но генерация bindings отключена.
+	-->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<!-- Finik SDK AAR - подключен как runtime, но без генерации bindings -->
+		<!-- Это позволяет SDK работать на устройстве, но типы недоступны в C# -->
+		<AndroidLibrary Include="Platforms/Android/libs/android-sdk-2.7.1.aar">
+			<Bind>false</Bind>
+		</AndroidLibrary>
+		
+		<!-- Исключаем сгенерированные bindings файлы Finik SDK из компиляции -->
+		<!-- MAUI может пытаться генерировать их даже с Bind=false, но они не работают -->
+		<!-- Используем маски для всех возможных путей генерации -->
+		<Compile Remove="**\obj\**\KG.Finik.**.cs" />
+		<Compile Remove="**\obj\**\kg.finik.**.cs" />
+		<Compile Remove="**\obj\**\*Finik*.cs" />
+		<None Include="**\obj\**\KG.Finik.**.cs" />
+		<None Include="**\obj\**\kg.finik.**.cs" />
+		<None Include="**\obj\**\*Finik*.cs" />
+	</ItemGroup>
+
 
 	<!-- ✅ iOS -->
 	<PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
@@ -105,6 +149,22 @@
 		<EmbeddedResource Remove="Tests\**" />
 		<None Remove="Tests\**" />
 	</ItemGroup>
+	
+	<!-- ✅ Исключаем сгенерированные bindings Finik SDK из компиляции (глобально для всех платформ) -->
+	<!-- Эти файлы генерируются автоматически, но содержат ошибки из-за Flutter-based структуры SDK -->
+	<ItemGroup>
+		<!-- Исключаем из компиляции все сгенерированные файлы Finik SDK -->
+		<Compile Remove="**\obj\**\KG.Finik.**.cs" />
+		<Compile Remove="**\obj\**\kg.finik.**.cs" />
+		<Compile Remove="**\bin\**\KG.Finik.**.cs" />
+		<Compile Remove="**\bin\**\kg.finik.**.cs" />
+		
+		<!-- Помечаем как None, чтобы они не компилировались -->
+		<None Include="**\obj\**\KG.Finik.**.cs" />
+		<None Include="**\obj\**\kg.finik.**.cs" />
+		<None Include="**\bin\**\KG.Finik.**.cs" />
+		<None Include="**\bin\**\kg.finik.**.cs" />
+	</ItemGroup>
 	<ItemGroup>
 	  <Compile Update="Views\ContactsPage.xaml.cs">
 	    <DependentUpon>ContactsPage.xaml</DependentUpon>
@@ -127,4 +187,50 @@
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+	  <PackageReference Include="Xamarin.AndroidX.Activity">
+	    <Version>1.11.0</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.AndroidX.AppCompat">
+	    <Version>1.7.1.1</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx">
+	    <Version>1.17.0</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.AndroidX.Lifecycle.Common">
+	    <Version>2.9.4</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.AndroidX.Lifecycle.Runtime">
+	    <Version>2.9.4</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.Google.Android.Material">
+	    <Version>1.13.0</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.Kotlin.StdLib">
+	    <Version>2.2.21</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.Kotlin.StdLib.Common">
+	    <Version>2.0.21.5</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.Kotlin.StdLib.Jdk7">
+	    <Version>2.2.21</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.Kotlin.StdLib.Jdk8">
+	    <Version>2.2.21</Version>
+	  </PackageReference>
+	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Platforms\Android\libs\" />
+	</ItemGroup>
+	
+	<!-- ✅ Target для удаления сгенерированных bindings Finik SDK после генерации -->
+	<!-- Выполняется после этапа генерации Java bindings, но до компиляции -->
+	<Target Name="RemoveFinikSdkBindings" AfterTargets="_GenerateJavaStubs" BeforeTargets="CoreCompile" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<ItemGroup>
+			<FinikBindingFiles Include="$(IntermediateOutputPath)**\KG.Finik.**.cs" />
+			<FinikBindingFiles Include="$(IntermediateOutputPath)**\kg.finik.**.cs" />
+		</ItemGroup>
+		<Delete Files="@(FinikBindingFiles)" ContinueOnError="true" />
+		<Message Text="Removed @(FinikBindingFiles->Count()) Finik SDK binding files" Importance="normal" />
+	</Target>
 </Project>

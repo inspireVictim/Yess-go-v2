@@ -23,7 +23,7 @@
 		<CFBundleShortVersionString Condition="$(TargetFramework.Contains('-ios'))">1.0.0</CFBundleShortVersionString>
 
 		<!-- Минимальные версии платформ -->
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">21</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">24</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">15.0</SupportedOSPlatformVersion>
 
 		<!-- Подавление предупреждений о версиях пакетов -->
@@ -39,59 +39,58 @@
 	<!-- ✅ Android -->
 	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
 		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
-		
-		<!-- 🔐 Настройки подписи для Google Play -->
-		<!-- Раскомментируйте и укажите путь к вашему keystore файлу -->
-		<!-- 
-		<AndroidKeyStore>true</AndroidKeyStore>
-		<AndroidSigningKeyStore>path\to\your\yessgo-release.keystore</AndroidSigningKeyStore>
-		<AndroidSigningStorePass>YOUR_KEYSTORE_PASSWORD</AndroidSigningStorePass>
-		<AndroidSigningKeyAlias>yessgo-key</AndroidSigningKeyAlias>
-		<AndroidSigningKeyPass>YOUR_KEY_PASSWORD</AndroidSigningKeyPass>
-		-->
-		
-		<!-- ⚠️ Отключаем генерацию Java bindings для всех AAR файлов в libs/ -->
-		<!-- Это предотвращает попытки MAUI генерировать bindings для Flutter-based SDK -->
+
+		<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+		<AndroidMinSdkVersion>24</AndroidMinSdkVersion>
+
 		<AndroidEnableProguard>false</AndroidEnableProguard>
+
+		<!-- 🔥 Эти строки ОЧЕНЬ важны -->
+		<AndroidAarPackagingMode>raw</AndroidAarPackagingMode>
+		<AndroidUseAapt2>true</AndroidUseAapt2>
+		<AndroidDexTool>d8</AndroidDexTool>
+		
+		<!-- 🔥 КРИТИЧЕСКИ ВАЖНО: Отключаем генерацию bindings для всех AAR -->
+		<!-- Это предотвращает попытки MAUI обработать Finik SDK AAR -->
+		<AndroidEnableAssemblyCompression>false</AndroidEnableAssemblyCompression>
 	</PropertyGroup>
-	
-	<!-- ✅ Отключаем генерацию bindings для Finik SDK на уровне проекта -->
-	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
-		<AndroidLibrary Update="Platforms/Android/libs/android-sdk-2.7.1.aar">
-			<Bind>false</Bind>
-		</AndroidLibrary>
-	</ItemGroup>
-	
-	<!-- ✅ Android библиотеки для Finik SDK -->
+
+
+
+	<!-- === FINIK SDK — ОБРАБОТКА AAR === -->
 	<!-- 
 	⚠️ ВАЖНО: Finik SDK 2.7.1 - это Flutter модуль, который НЕ МОЖЕТ быть подключен
-	как стандартный Android AAR через AndroidLibrary в MAUI.
+	как стандартный Android AAR через автоматическую генерацию bindings в MAUI.
 	
-	SDK должен быть подключен через Maven/Gradle как runtime зависимость.
-	Для этого нужно использовать подход через EmbeddedResource или подключение через
-	нативную Gradle конфигурацию.
+	SDK использует Flutter Engine внутри, поэтому стандартные Java bindings не работают.
+	Мы используем подход через reflection для вызова SDK во время выполнения.
 	
-	Альтернативный подход: использовать Intent для запуска FinikActivity напрямую,
-	передавая параметры через Intent extras (JSON/примитивы).
-	
-	На данный момент SDK подключен через runtime (через libs/), но генерация bindings отключена.
+	Настройки для ПОЛНОГО отключения генерации bindings:
+	- Bind=false: Отключает генерацию C# типов из AAR
+	- GenerateJavaStubs=false: Запрещает генерацию Java stubs (критично!)
+	- SkipAndroidManifestProcessing=true: Пропускает обработку AndroidManifest из AAR
+	- AndroidAarPackagingMode=raw: Использует AAR как есть, без анализа
+	- Compile Remove: Удаляет любые сгенерированные файлы из компиляции
+	- Target RemoveFinikSdkBindings: Автоматически удаляет файлы после генерации
 	-->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
-		<!-- Finik SDK AAR - подключен как runtime, но без генерации bindings -->
-		<!-- Это позволяет SDK работать на устройстве, но типы недоступны в C# -->
+		<!-- Подключаем AAR как обычную Android-библиотеку БЕЗ генерации bindings -->
 		<AndroidLibrary Include="Platforms/Android/libs/android-sdk-2.7.1.aar">
-			<Bind>false</Bind>
+			<Bind>false</Bind> <!-- Отключаем генерацию C# binding -->
+			<GenerateJavaStubs>false</GenerateJavaStubs> <!-- Запрещаем генерацию Java stubs -->
+			<SkipAndroidManifestProcessing>true</SkipAndroidManifestProcessing> <!-- Пропускаем обработку AndroidManifest -->
 		</AndroidLibrary>
 		
-		<!-- Исключаем сгенерированные bindings файлы Finik SDK из компиляции -->
-		<!-- MAUI может пытаться генерировать их даже с Bind=false, но они не работают -->
-		<!-- Используем маски для всех возможных путей генерации -->
-		<Compile Remove="**\obj\**\KG.Finik.**.cs" />
-		<Compile Remove="**\obj\**\kg.finik.**.cs" />
-		<Compile Remove="**\obj\**\*Finik*.cs" />
-		<None Include="**\obj\**\KG.Finik.**.cs" />
-		<None Include="**\obj\**\kg.finik.**.cs" />
-		<None Include="**\obj\**\*Finik*.cs" />
+		<!-- УДАЛЯЕМ автоматически сгенерированные binding файлы из компиляции -->
+		<!-- MAUI может пытаться генерировать их даже с Bind=false -->
+		<Compile Remove="**/obj/**/KG.Finik.**.cs" />
+		<Compile Remove="**/obj/**/kg.finik.**.cs" />
+		<Compile Remove="**/obj/**/*Finik*.cs" />
+		
+		<!-- Помечаем как None, чтобы они не вызывали ошибки компиляции -->
+		<None Include="**/obj/**/KG.Finik.**.cs" />
+		<None Include="**/obj/**/kg.finik.**.cs" />
+		<None Include="**/obj/**/*Finik*.cs" />
 	</ItemGroup>
 
 
@@ -145,26 +144,23 @@
 
 	<!-- Исключаем тестовые файлы из компиляции основного проекта -->
 	<ItemGroup>
+		<AndroidResource Remove="%2a%2a\**" />
+		<Compile Remove="%2a%2a\**" />
 		<Compile Remove="Tests\**" />
+		<EmbeddedResource Remove="%2a%2a\**" />
 		<EmbeddedResource Remove="Tests\**" />
+		<MauiCss Remove="%2a%2a\**" />
+		<MauiXaml Remove="%2a%2a\**" />
+		<None Remove="%2a%2a\**" />
 		<None Remove="Tests\**" />
 	</ItemGroup>
-	
-	<!-- ✅ Исключаем сгенерированные bindings Finik SDK из компиляции (глобально для всех платформ) -->
-	<!-- Эти файлы генерируются автоматически, но содержат ошибки из-за Flutter-based структуры SDK -->
 	<ItemGroup>
-		<!-- Исключаем из компиляции все сгенерированные файлы Finik SDK -->
-		<Compile Remove="**\obj\**\KG.Finik.**.cs" />
-		<Compile Remove="**\obj\**\kg.finik.**.cs" />
-		<Compile Remove="**\bin\**\KG.Finik.**.cs" />
-		<Compile Remove="**\bin\**\kg.finik.**.cs" />
-		
-		<!-- Помечаем как None, чтобы они не компилировались -->
-		<None Include="**\obj\**\KG.Finik.**.cs" />
-		<None Include="**\obj\**\kg.finik.**.cs" />
-		<None Include="**\bin\**\KG.Finik.**.cs" />
-		<None Include="**\bin\**\kg.finik.**.cs" />
+	  <None Remove="%2a%2a/obj/%2a%2a/kg.finik.%2a%2a.cs" />
+	  <None Remove="%2a%2a/obj/%2a%2a/KG.Finik.%2a%2a.cs" />
+	  <None Remove="%2a%2a/obj/%2a%2a/kg.finik.%2a%2a.cs" />
+	  <None Remove="%2a%2a/obj/%2a%2a/KG.Finik.%2a%2a.cs" />
 	</ItemGroup>
+	
 	<ItemGroup>
 	  <Compile Update="Views\ContactsPage.xaml.cs">
 	    <DependentUpon>ContactsPage.xaml</DependentUpon>
@@ -218,19 +214,89 @@
 	  <PackageReference Include="Xamarin.Kotlin.StdLib.Jdk8">
 	    <Version>2.2.21</Version>
 	  </PackageReference>
-	</ItemGroup>
-	<ItemGroup>
-	  <Folder Include="Platforms\Android\libs\" />
+	  <PackageReference Include="Xamarin.AndroidX.Tracing.Tracing">
+	    <Version>1.3.0.1</Version>
+	  </PackageReference>
 	</ItemGroup>
 	
-	<!-- ✅ Target для удаления сгенерированных bindings Finik SDK после генерации -->
-	<!-- Выполняется после этапа генерации Java bindings, но до компиляции -->
-	<Target Name="RemoveFinikSdkBindings" AfterTargets="_GenerateJavaStubs" BeforeTargets="CoreCompile" Condition="'$(TargetFramework)' == 'net9.0-android'">
+	<!-- ✅ Target для ИСКЛЮЧЕНИЯ Finik SDK AAR из процесса генерации bindings -->
+	<!-- Выполняется ДО начала генерации bindings, чтобы предотвратить обработку AAR -->
+	<!-- КРИТИЧЕСКИ ВАЖНО: Этот Target должен выполняться ДО _ResolveLibraryProjects -->
+	<Target Name="DisableFinikBinding" BeforeTargets="_ResolveLibraryProjects;_GenerateJavaStubs;_ResolveLibraryProjectImports" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<!-- Явно устанавливаем Bind=false для всех Finik SDK AAR -->
+		<ItemGroup>
+			<AndroidLibrary Condition="'%(Filename)%(Extension)' == 'android-sdk-2.7.1.aar' OR $([System.String]::Copy('%(Identity)').Contains('android-sdk-2.7.1.aar'))">
+				<Bind>false</Bind>
+				<GenerateJavaStubs>false</GenerateJavaStubs>
+				<SkipAndroidManifestProcessing>true</SkipAndroidManifestProcessing>
+			</AndroidLibrary>
+		</ItemGroup>
+		<Message Text="[Finik SDK] Disabled binding generation for android-sdk-2.7.1.aar" Importance="high" />
+	</Target>
+	
+	<!-- ✅ Дополнительный Target для гарантии (на случай, если первый не сработает) -->
+	<Target Name="ExcludeFinikSdkFromBindingGeneration" BeforeTargets="_GenerateJavaStubs;_ResolveLibraryProjectImports" AfterTargets="DisableFinikBinding" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<!-- Явно устанавливаем Bind=false для всех Finik SDK AAR -->
+		<ItemGroup>
+			<AndroidLibrary Condition="'%(Filename)%(Extension)' == 'android-sdk-2.7.1.aar' OR $([System.String]::Copy('%(Identity)').Contains('android-sdk-2.7.1.aar'))">
+				<Bind>false</Bind>
+				<GenerateJavaStubs>false</GenerateJavaStubs>
+				<SkipAndroidManifestProcessing>true</SkipAndroidManifestProcessing>
+			</AndroidLibrary>
+		</ItemGroup>
+	</Target>
+	
+	<!-- ✅ Target для удаления сгенерированных bindings Finik SDK -->
+	<!-- Выполняется на разных этапах сборки для гарантированного удаления -->
+	<Target Name="RemoveFinikSdkBindings" AfterTargets="_GenerateJavaStubs;_ResolveLibraryProjectImports;_ExtractLibraryProjectImports" BeforeTargets="CoreCompile" Condition="'$(TargetFramework)' == 'net9.0-android'">
 		<ItemGroup>
 			<FinikBindingFiles Include="$(IntermediateOutputPath)**\KG.Finik.**.cs" />
 			<FinikBindingFiles Include="$(IntermediateOutputPath)**\kg.finik.**.cs" />
+			<FinikBindingFiles Include="$(IntermediateOutputPath)**\*Finik*.cs" />
+			<FinikBindingFiles Include="$(OutputPath)**\KG.Finik.**.cs" />
+			<FinikBindingFiles Include="$(OutputPath)**\kg.finik.**.cs" />
+			<FinikBindingFiles Include="$(OutputPath)**\*Finik*.cs" />
 		</ItemGroup>
 		<Delete Files="@(FinikBindingFiles)" ContinueOnError="true" />
-		<Message Text="Removed @(FinikBindingFiles->Count()) Finik SDK binding files" Importance="normal" />
+		<Message Text="[Finik SDK] Removed @(FinikBindingFiles-&gt;Count()) binding files" Importance="normal" Condition="'@(FinikBindingFiles)' != ''" />
+	</Target>
+	
+	<!-- ✅ Дополнительный Target для удаления на этапе BeforeBuild -->
+	<Target Name="RemoveFinikSdkBindingsBeforeBuild" BeforeTargets="BeforeBuild;_ResolveLibraryProjects" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<ItemGroup>
+			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\KG.Finik.**.cs" />
+			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\kg.finik.**.cs" />
+			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\*Finik*.cs" />
+			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\KG.Finik.**.cs" />
+			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\kg.finik.**.cs" />
+			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\*Finik*.cs" />
+		</ItemGroup>
+		<Delete Files="@(FinikBindingFilesBeforeBuild)" ContinueOnError="true" />
+		<Message Text="[Finik SDK] Cleaned binding files before build" Importance="normal" Condition="'@(FinikBindingFilesBeforeBuild)' != ''" />
+	</Target>
+	
+	<!-- ✅ Target для исключения дублирующегося AndroidX Tracing-ktx AAR -->
+	<!-- Решает проблему дублирования класса androidx.tracing.TraceKt$traceAsync$1 -->
+	<!-- Исключаем tracing-ktx (lp\174), оставляя только tracing-android (lp\128) -->
+	<Target Name="ExcludeDuplicateTracingLibrary" BeforeTargets="_ResolveLibraryProjectImports;_ExtractLibraryProjectImports" AfterTargets="_ResolveLibraryProjects" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<ItemGroup>
+			<!-- Исключаем tracing-ktx AAR, оставляя только tracing-android -->
+			<_ResolvedLibraryProjectImports Remove="@(_ResolvedLibraryProjectImports)" 
+			                                 Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174'))" />
+			<!-- Также исключаем из списка библиотек для компиляции -->
+			<_LibraryProjectImports Remove="@(_LibraryProjectImports)" 
+			                        Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174'))" />
+		</ItemGroup>
+		<Message Text="[AndroidX Tracing] Excluded duplicate tracing-ktx library" Importance="high" />
+	</Target>
+	
+	<!-- ✅ Дополнительный Target для удаления конфликтующих JAR файлов на этапе компиляции -->
+	<Target Name="RemoveDuplicateTracingJars" BeforeTargets="_CompileJava" AfterTargets="_ResolveLibraryProjectImports" Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<ItemGroup>
+			<TracingKtxJars Include="$(IntermediateOutputPath)lp\174\jl\classes.jar" />
+			<TracingKtxJars Include="$(IntermediateOutputPath)lp\174\**\*.jar" />
+		</ItemGroup>
+		<Delete Files="@(TracingKtxJars)" ContinueOnError="true" />
+		<Message Text="[AndroidX Tracing] Removed @(TracingKtxJars->Count()) duplicate tracing-ktx JAR files" Importance="normal" Condition="'@(TracingKtxJars)' != ''" />
 	</Target>
 </Project>

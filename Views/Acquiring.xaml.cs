@@ -134,7 +134,7 @@ public partial class Acquiring : ContentPage
                 
                 // Можно здесь обновить баланс или вернуться назад
                 // await RefreshBalance();
-                await OnBackButtonClicked(null, EventArgs.Empty);
+                await GoBackAsync();
             }
             else
             {
@@ -156,6 +156,11 @@ public partial class Acquiring : ContentPage
     }
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
+    {
+        await GoBackAsync();
+    }
+
+    private async Task GoBackAsync()
     {
         try
         {

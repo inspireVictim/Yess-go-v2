@@ -22,7 +22,7 @@ namespace YessGoFront.ViewModels
     {
         // ====== Коллекции ======
         public ObservableCollection<StoryModel> Stories { get; } = new();
-        public ObservableCollection<BannerModel> Banners { get; } = new();
+        public ObservableCollection<InfoButtonModel> InfoButtons { get; } = new();
         public ObservableCollection<CategoryModel> TopCategories { get; } = new();
 
         public ObservableCollection<PartnerLogoModel> PartnersRow1 { get; } = new();
@@ -33,8 +33,6 @@ namespace YessGoFront.ViewModels
         [ObservableProperty] private bool isStoryOpen;
         [ObservableProperty] private StoryModel? currentStory;
 
-        [ObservableProperty] private bool isBannerOpen;
-        [ObservableProperty] private BannerModel? currentBanner;
 
         // Индексы текущего сторис и страницы
         [ObservableProperty] private int currentStoryIndex = -1;
@@ -74,14 +72,22 @@ namespace YessGoFront.ViewModels
         private readonly IAuthService? _authService;
         private readonly Infrastructure.Auth.IAuthenticationService? _authenticationService;
 
+        // Флаг паузы для удержания пальца
+        [ObservableProperty] private bool isStoryPaused;
+        
+        // Время начала паузы (для корректного возобновления прогресса)
+        private DateTime _pauseStartTime;
+        private TimeSpan _pausedDuration = TimeSpan.Zero;
+
         // ====== Команды ======
         public IAsyncRelayCommand<StoryModel> OpenStoryAsyncCommand { get; }
         public IRelayCommand CloseStoryCommand { get; }
         public IRelayCommand NextPageCommand { get; }
         public IRelayCommand PrevPageCommand { get; }
+        public IRelayCommand PauseStoryCommand { get; }
+        public IRelayCommand ResumeStoryCommand { get; }
 
-        public IAsyncRelayCommand<BannerModel> OpenBannerAsyncCommand { get; }
-        public IRelayCommand CloseBannerCommand { get; }
+        public IAsyncRelayCommand<InfoButtonModel> OpenInfoButtonAsyncCommand { get; }
         
         public IAsyncRelayCommand<PartnerLogoModel> OpenPartnerAsyncCommand { get; }
 
@@ -106,7 +112,7 @@ namespace YessGoFront.ViewModels
             };
 
             LoadStories();
-            _ = LoadBannersAsync(); // Асинхронная загрузка баннеров с сервера
+            LoadInfoButtons(); // Загрузка информационных кнопок
             LoadTopCategories();
             _ = LoadPartnersAsync(); // Асинхронная загрузка партнёров с сервера
 
@@ -115,10 +121,11 @@ namespace YessGoFront.ViewModels
             CloseStoryCommand = new RelayCommand(CloseStory);
             NextPageCommand = new RelayCommand(() => NextPage());
             PrevPageCommand = new RelayCommand(() => PrevPage());
+            PauseStoryCommand = new RelayCommand(PauseStory);
+            ResumeStoryCommand = new RelayCommand(ResumeStory);
 
-            // Инициализация команд для баннеров
-            OpenBannerAsyncCommand = new AsyncRelayCommand<BannerModel?>(OpenBannerAsync);
-            CloseBannerCommand = new RelayCommand(CloseBanner);
+            // Инициализация команд для информационных кнопок
+            OpenInfoButtonAsyncCommand = new AsyncRelayCommand<InfoButtonModel?>(OpenInfoButtonAsync);
             
             // Команда для открытия партнёра создаётся автоматически через [RelayCommand] на методе OpenPartnerAsync
             // Но нужно явно создать её для правильной работы биндинга
@@ -409,99 +416,58 @@ namespace YessGoFront.ViewModels
         }
 
 
-        private async Task LoadBannersAsync()
+        private void LoadInfoButtons()
         {
             try
             {
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Начало загрузки баннеров");
-#endif
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBannersAsync: Начало загрузки баннеров");
+                InfoButtons.Clear();
                 
-                Banners.Clear();
-                
-                if (_bannerApiService != null)
+                // Информационные кнопки
+                InfoButtons.Add(new InfoButtonModel
                 {
-#if ANDROID
-                    Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Вызов GetActiveBannersAsync()");
-#endif
-                    // Загружаем баннеры с сервера
-                    var bannerDtos = await _bannerApiService.GetActiveBannersAsync();
-                    
-#if ANDROID
-                    Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Получено баннеров: {bannerDtos?.Count ?? 0}");
-#endif
-                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadBannersAsync: Получено баннеров: {bannerDtos?.Count ?? 0}");
-                    
-                    if (bannerDtos != null && bannerDtos.Count > 0)
-                    {
-                        foreach (var dto in bannerDtos.OrderBy(b => b.Order))
-                        {
-                            var imageUrl = dto.ImageUrl ?? "null";
-#if ANDROID
-                            Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Banner: Id={dto.Id}, ImageUrl={imageUrl}");
-#endif
-                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadBannersAsync: Banner: Id={dto.Id}, ImageUrl={imageUrl}");
-                            
-                            var banner = new BannerModel
-                            {
-                                Id = dto.Id.ToString(),
-                                Image = dto.ImageUrl ?? string.Empty,
-                                PartnerName = dto.PartnerName ?? string.Empty,
-                                PartnerId = dto.PartnerId
-                            };
-                            Banners.Add(banner);
-                            
-                            // Предзагрузка изображения для более быстрого отображения
-                            if (!string.IsNullOrWhiteSpace(banner.Image) && banner.IsImageUrl)
-                            {
-                                _ = PrefetchBannerImage(banner.Image);
-                            }
-                        }
-#if ANDROID
-                        Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Загружено {Banners.Count} баннеров с сервера");
-#endif
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded {Banners.Count} banners from server");
-                        return;
-                    }
-                }
-                else
-                {
-#if ANDROID
-                    Android.Util.Log.Warn("MainPageViewModel", "[LoadBannersAsync] _bannerApiService is null");
-#endif
-                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBannersAsync: _bannerApiService is null");
-                }
+                    Title = "Как пользоваться",
+                    Icon = "📱",
+                    ActionType = "help",
+                    Route = "///MorePage"
+                });
                 
-                // Fallback на локальные изображения, если API недоступен или нет данных
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using fallback local banners");
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Adding fallback local banners");
-#endif
-                // В MAUI файлы из Resources/Images загружаются по имени файла (с расширением)
-                Banners.Add(new BannerModel { Image = "banner_1.png", PartnerName = "Партнёр A" });
-                Banners.Add(new BannerModel { Image = "banner_2.png", PartnerName = "Партнёр B" });
-                Banners.Add(new BannerModel { Image = "banner_3.png", PartnerName = "Партнёр C" });
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Added {Banners.Count} fallback banners");
-#endif
+                InfoButtons.Add(new InfoButtonModel
+                {
+                    Title = "Пополнить баланс",
+                    Icon = "💳",
+                    ActionType = "topup",
+                    Route = "///wallet"
+                });
+                
+                InfoButtons.Add(new InfoButtonModel
+                {
+                    Title = "Перевести средства",
+                    Icon = "💸",
+                    ActionType = "transfer",
+                    Route = "///wallet"
+                });
+                
+                InfoButtons.Add(new InfoButtonModel
+                {
+                    Title = "О нас",
+                    Icon = "ℹ️",
+                    ActionType = "about",
+                    Route = "///MorePage"
+                });
+                
+                InfoButtons.Add(new InfoButtonModel
+                {
+                    Title = "Помощь",
+                    Icon = "❓",
+                    ActionType = "support",
+                    Route = "///FeedbackPage"
+                });
+                
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded {InfoButtons.Count} info buttons");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading banners: {ex.Message}");
-#if ANDROID
-                Android.Util.Log.Error("MainPageViewModel", $"[LoadBannersAsync] Error: {ex.Message}");
-                Android.Util.Log.Info("MainPageViewModel", "[LoadBannersAsync] Adding fallback local banners after error");
-#endif
-                // Fallback на локальные изображения при ошибке
-                // В MAUI файлы из Resources/Images загружаются по имени файла (с расширением)
-                Banners.Clear();
-                Banners.Add(new BannerModel { Image = "banner_1.png", PartnerName = "Партнёр A" });
-                Banners.Add(new BannerModel { Image = "banner_2.png", PartnerName = "Партнёр B" });
-                Banners.Add(new BannerModel { Image = "banner_3.png", PartnerName = "Партнёр C" });
-#if ANDROID
-                Android.Util.Log.Info("MainPageViewModel", $"[LoadBannersAsync] Added {Banners.Count} fallback banners after error");
-#endif
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading info buttons: {ex.Message}");
             }
         }
 
@@ -736,10 +702,26 @@ namespace YessGoFront.ViewModels
 
         public async Task OpenStoryAsync(StoryModel? story)
         {
-            if (story == null) return;
+            // Валидация: если сторис пустой или нет страниц - не открываем
+            if (story == null || story.Pages == null || story.Pages.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] OpenStoryAsync: Story is null or has no pages");
+                return;
+            }
+
+            // Валидация: если массив сторисов пуст - не открываем
+            if (Stories == null || Stories.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] OpenStoryAsync: Stories collection is empty");
+                return;
+            }
             
             _overlayCts?.Cancel();
             _overlayCts = new CancellationTokenSource();
+            
+            // Сбрасываем состояние паузы
+            IsStoryPaused = false;
+            _pausedDuration = TimeSpan.Zero;
 
             CurrentStoryIndex = Math.Max(0, Stories.IndexOf(story));
             await PlayFromStoryIndexAsync(CurrentStoryIndex, _overlayCts.Token);
@@ -759,6 +741,10 @@ namespace YessGoFront.ViewModels
                 if (pages.Count == 0) continue;
 
                 PrepareSegments(pages.Count);
+                
+                // Сбрасываем паузу для нового сториса
+                IsStoryPaused = false;
+                _pausedDuration = TimeSpan.Zero;
 
                 IsStoryOpen = true;
 
@@ -766,6 +752,10 @@ namespace YessGoFront.ViewModels
                 {
                     CurrentPageIndex = p;
                     UpdateCurrentPageImage();
+                    
+                    // Сбрасываем паузу для новой страницы
+                    IsStoryPaused = false;
+                    _pausedDuration = TimeSpan.Zero;
 
                     await RunSmoothProgressAsync(p, ct);
                     if (ct.IsCancellationRequested) return;
@@ -795,16 +785,26 @@ namespace YessGoFront.ViewModels
 
         private async Task RunSmoothProgressAsync(int segmentIndex, CancellationToken ct)
         {
-            const int durationMs = 5500;
+            const int durationMs = 5000; // 5 секунд как в Instagram
             var sw = Stopwatch.StartNew();
+            var startTime = sw.ElapsedMilliseconds;
 
             try
             {
                 _ = PrefetchNextImage();
 
-                while (sw.ElapsedMilliseconds < durationMs && !ct.IsCancellationRequested)
+                while (sw.ElapsedMilliseconds - startTime - _pausedDuration.TotalMilliseconds < durationMs && !ct.IsCancellationRequested)
                 {
-                    double prog = Math.Clamp(sw.Elapsed.TotalMilliseconds / durationMs, 0, 1);
+                    // Если сторис на паузе - ждем и не обновляем прогресс
+                    if (IsStoryPaused)
+                    {
+                        await Task.Delay(16, ct);
+                        continue;
+                    }
+
+                    // Вычисляем прогресс с учетом времени паузы
+                    double elapsed = sw.ElapsedMilliseconds - startTime - _pausedDuration.TotalMilliseconds;
+                    double prog = Math.Clamp(elapsed / durationMs, 0, 1);
 
                     await MainThread.InvokeOnMainThreadAsync(() =>
                     {
@@ -920,15 +920,30 @@ namespace YessGoFront.ViewModels
             if (!IsStoryOpen || CurrentStory == null) return;
 
             _overlayCts?.Cancel();
+            
+            // Сбрасываем паузу при переходе
+            IsStoryPaused = false;
+            _pausedDuration = TimeSpan.Zero;
 
             var pages = CurrentStory.Pages ?? new();
             if (CurrentPageIndex + 1 < pages.Count)
             {
+                // Переход к следующей странице в текущем сторисе
                 _ = ResumeFrom(CurrentStoryIndex, CurrentPageIndex + 1);
             }
             else
             {
-                _ = ResumeFrom(CurrentStoryIndex + 1, 0);
+                // Переход к следующему сторису
+                int nextStoryIndex = CurrentStoryIndex + 1;
+                if (nextStoryIndex < Stories.Count)
+                {
+                    _ = ResumeFrom(nextStoryIndex, 0);
+                }
+                else
+                {
+                    // Это был последний сторис - закрываем
+                    CloseStory();
+                }
             }
         }
 
@@ -937,13 +952,19 @@ namespace YessGoFront.ViewModels
             if (!IsStoryOpen) return;
 
             _overlayCts?.Cancel();
+            
+            // Сбрасываем паузу при переходе
+            IsStoryPaused = false;
+            _pausedDuration = TimeSpan.Zero;
 
             if (CurrentStory != null && CurrentPageIndex - 1 >= 0)
             {
+                // Переход к предыдущей странице в текущем сторисе
                 _ = ResumeFrom(CurrentStoryIndex, CurrentPageIndex - 1);
             }
             else
             {
+                // Переход к предыдущему сторису
                 int prevStory = CurrentStoryIndex - 1;
                 if (prevStory >= 0)
                 {
@@ -951,16 +972,17 @@ namespace YessGoFront.ViewModels
                     int lastPage = Math.Max(0, prevPages.Count - 1);
                     _ = ResumeFrom(prevStory, lastPage);
                 }
-                else
-                {
-                    _ = ResumeFrom(0, 0);
-                }
+                // Если это первый сторис - ничего не делаем (как в Instagram)
             }
         }
 
         private async Task ResumeFrom(int storyIndex, int pageIndex)
         {
             _overlayCts = new CancellationTokenSource();
+            
+            // Сбрасываем паузу при переходе
+            IsStoryPaused = false;
+            _pausedDuration = TimeSpan.Zero;
 
             CurrentStoryIndex = Math.Clamp(storyIndex, 0, Stories.Count - 1);
             CurrentStory = Stories[CurrentStoryIndex];
@@ -985,6 +1007,10 @@ namespace YessGoFront.ViewModels
             {
                 CurrentPageIndex = p;
                 UpdateCurrentPageImage();
+                
+                // Сбрасываем паузу для новой страницы
+                IsStoryPaused = false;
+                _pausedDuration = TimeSpan.Zero;
 
                 await RunSmoothProgressAsync(p, _overlayCts.Token);
                 if (_overlayCts.IsCancellationRequested) return;
@@ -1022,43 +1048,164 @@ namespace YessGoFront.ViewModels
         {
             _overlayCts?.Cancel();
             IsStoryOpen = false;
+            IsStoryPaused = false;
             CurrentStory = null;
             CurrentStoryIndex = -1;
             CurrentPageIndex = -1;
             CurrentPageImage = null;
             PageProgress = 0;
             PageProgressList.Clear();
+            _pausedDuration = TimeSpan.Zero;
             OnPropertyChanged(nameof(PageProgressList));
         }
 
-        // ====== Баннеры ======
-        public async Task OpenBannerAsync(BannerModel? banner)
+        // Методы для управления паузой
+        public void PauseStory()
         {
-            if (banner == null) return;
+            if (!IsStoryOpen || IsStoryPaused) return;
             
-            _overlayCts?.Cancel();
-            _overlayCts = new CancellationTokenSource();
+            IsStoryPaused = true;
+            _pauseStartTime = DateTime.Now;
+            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Story paused");
+        }
 
-            CurrentBanner = banner;
-            IsBannerOpen = true;
+        public void ResumeStory()
+        {
+            if (!IsStoryOpen || !IsStoryPaused) return;
+            
+            // Вычисляем время паузы
+            _pausedDuration += DateTime.Now - _pauseStartTime;
+            IsStoryPaused = false;
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Story resumed. Total paused: {_pausedDuration.TotalMilliseconds}ms");
+        }
+
+        // ====== Информационные кнопки ======
+        public async Task OpenInfoButtonAsync(InfoButtonModel? infoButton)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ===== OpenInfoButtonAsync CALLED =====");
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] InfoButton: {(infoButton == null ? "NULL" : $"Title='{infoButton.Title}', ActionType='{infoButton.ActionType}'")}");
+            
+            if (infoButton == null)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] InfoButton is null, returning");
+                return;
+            }
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(25), _overlayCts.Token);
+                string title = infoButton.Title;
+                string message = GetInfoMessage(infoButton.ActionType);
+                
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Title: {title}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Message length: {message.Length}");
+
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    try
+                    {
+                        // Пробуем несколько способов получить текущую страницу
+                        Page? currentPage = null;
+                        
+                        // Способ 1: через Application.Current?.MainPage
+                        if (Application.Current?.MainPage != null)
+                        {
+                            currentPage = Application.Current.MainPage;
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Got page from Application.Current.MainPage");
+                        }
+                        
+                        // Способ 2: через Shell.Current
+                        if (currentPage == null && Shell.Current != null)
+                        {
+                            currentPage = Shell.Current.CurrentPage;
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Got page from Shell.Current.CurrentPage");
+                        }
+                        
+                        // Способ 3: через Navigation
+                        if (currentPage == null && Application.Current?.MainPage is Shell shell)
+                        {
+                            currentPage = shell.CurrentPage;
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Got page from Shell.CurrentPage");
+                        }
+
+                        if (currentPage != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Showing alert: Title='{title}'");
+                            await currentPage.DisplayAlert(title, message, "OK");
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Alert shown successfully");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ERROR: Could not get current page");
+                            // Fallback: пробуем через Shell напрямую
+                            if (Shell.Current != null)
+                            {
+                                await Shell.Current.DisplayAlert(title, message, "OK");
+                                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Alert shown via Shell.Current");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error in MainThread.InvokeOnMainThreadAsync: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Stack trace: {ex.StackTrace}");
+                    }
+                });
             }
-            catch (TaskCanceledException) { }
-            finally
+            catch (Exception ex)
             {
-                if (!_overlayCts.IsCancellationRequested)
-                    IsBannerOpen = false;
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error opening info button: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Stack trace: {ex.StackTrace}");
             }
+            
+            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ===== OpenInfoButtonAsync COMPLETED =====");
         }
 
-        public void CloseBanner()
+        private string GetInfoMessage(string actionType)
         {
-            _overlayCts?.Cancel();
-            IsBannerOpen = false;
-            CurrentBanner = null;
+            return actionType.ToLower() switch
+            {
+                "help" => "Как пользоваться приложением:\n\n" +
+                         "1. Зарегистрируйтесь или войдите в систему\n" +
+                         "2. Просматривайте партнёров и их предложения\n" +
+                         "3. Используйте карту для поиска партнёров рядом\n" +
+                         "4. Получайте кешбэк за покупки\n" +
+                         "5. Пополняйте баланс и используйте Yess!Coin\n\n" +
+                         "Подробная информация доступна в разделе 'Ещё'.",
+                
+                "topup" => "Как пополнить баланс:\n\n" +
+                          "1. Перейдите в раздел 'Кошелёк'\n" +
+                          "2. Нажмите кнопку 'Пополнить'\n" +
+                          "3. Выберите способ пополнения\n" +
+                          "4. Введите сумму пополнения\n" +
+                          "5. Подтвердите операцию\n\n" +
+                          "Средства поступят на ваш баланс в течение нескольких минут.",
+                
+                "transfer" => "Как перевести средства:\n\n" +
+                             "1. Перейдите в раздел 'Кошелёк'\n" +
+                             "2. Нажмите кнопку 'Перевести'\n" +
+                             "3. Введите номер телефона получателя\n" +
+                             "4. Укажите сумму перевода\n" +
+                             "5. Подтвердите операцию\n\n" +
+                             "Перевод выполняется мгновенно при наличии достаточного баланса.",
+                
+                "about" => "О нас:\n\n" +
+                           "YessGo - это приложение для получения кешбэка и скидок от партнёров.\n\n" +
+                           "Мы помогаем вам:\n" +
+                           "• Экономить на покупках\n" +
+                           "• Получать кешбэк за каждую покупку\n" +
+                           "• Находить лучшие предложения рядом\n" +
+                           "• Управлять своими финансами\n\n" +
+                           "Присоединяйтесь к нашей программе лояльности!",
+                
+                "support" => "Помощь и поддержка:\n\n" +
+                            "Если у вас возникли вопросы или проблемы:\n\n" +
+                            "• Обратитесь в раздел 'Обратная связь'\n" +
+                            "• Свяжитесь с нашей службой поддержки\n" +
+                            "• Посетите раздел 'Ещё' для дополнительной информации\n\n" +
+                            "Мы всегда готовы помочь!",
+                
+                _ => "Информация о данной функции будет добавлена позже."
+            };
         }
 
 

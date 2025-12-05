@@ -1,0 +1,22 @@
+# Finik iOS SDK Integration
+# Для установки зависимостей выполните: pod install
+
+platform :ios, '15.0'
+use_frameworks!
+
+target 'YessGoFront' do
+  # Finik iOS SDK
+  pod 'FinikIosSdk', '~> 2.6.0'
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
+  
+  # Flutter post-install (если используется Flutter модуль)
+  flutter_post_install(installer) if defined?(flutter_post_install)
+end
+

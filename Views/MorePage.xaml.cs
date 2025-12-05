@@ -66,14 +66,14 @@ namespace YessGoFront.Views
         {
             try
             {
-                await Shell.Current.GoToAsync(nameof(OperationHistory), animate: true);
+                await Shell.Current.GoToAsync("///TransactionsPage", animate: true);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к OperationHistory: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Ошибка навигации к TransactionsPage: {ex.Message}");
                 try
                 {
-                    await Shell.Current.GoToAsync("OperationHistory", animate: true);
+                    await Shell.Current.GoToAsync("//TransactionsPage", animate: true);
                 }
                 catch (Exception ex2)
                 {

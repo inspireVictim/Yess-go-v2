@@ -31,6 +31,8 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
             Routing.RegisterRoute(nameof(Views.Acquiring), typeof(Views.Acquiring));
             Routing.RegisterRoute(nameof(Views.Profile), typeof(Views.Profile));
+            Routing.RegisterRoute(nameof(Views.PayPage), typeof(Views.PayPage));
+            Routing.RegisterRoute(nameof(Views.SearchPartnersPay), typeof(Views.SearchPartnersPay));
             
             // Другие подстраницы:
             Routing.RegisterRoute(nameof(Views.TransactionDetailsPage), typeof(Views.TransactionDetailsPage));

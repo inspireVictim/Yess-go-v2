@@ -2,6 +2,16 @@
 // Этот файл необходим для загрузки Flutter runtime, который используется внутри Finik SDK
 // В .NET MAUI этот файл может использоваться дополнительно к настройкам в .csproj
 
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven { 
+            url "https://storage.googleapis.com/download.flutter.io" 
+        }
+    }
+}
+
 allprojects {
     repositories {
         google()
@@ -12,7 +22,19 @@ allprojects {
     }
 }
 
-// Flutter Engine зависимости (io.flutter:flutter_embedding_release и flutter_embedding_debug)
-// будут автоматически подключены через Finik SDK как транзитивные зависимости
-// Главное - наличие репозитория https://storage.googleapis.com/download.flutter.io
+// Flutter Engine зависимости для Finik SDK
+// Finik SDK 2.7.1 требует Flutter Engine версии 3.16.5 для работы
+// 
+// ВАЖНО: В MAUI проектах зависимости обычно добавляются через .csproj,
+// но Gradle может автоматически подтянуть зависимости, если они указаны здесь
+//
+// Flutter Engine должен быть включен как транзитивная зависимость Finik SDK AAR,
+// но если это не работает, Gradle попытается скачать их автоматически
+
+dependencies {
+    // Flutter Engine для Finik SDK (версия 3.16.5)
+    // Gradle автоматически скачает эти зависимости при сборке
+    implementation 'io.flutter:flutter_embedding_release:3.16.5'
+    implementation 'io.flutter:flutter_engine_release:3.16.5'
+}
 

@@ -66,6 +66,13 @@ public static class ApiEndpoints
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }
 
+    // Payment endpoints (для работы с Finik SDK через backend)
+    public static class PaymentEndpoints
+    {
+        public const string CreateFinikPayment = $"{ApiVersion}/payment/finik/create";
+        public static string GetPaymentStatus(string paymentId) => $"{ApiVersion}/payments/{Uri.EscapeDataString(paymentId)}/status";
+    }
+
     // QR endpoints
     public static class QREndpoints
     {

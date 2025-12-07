@@ -1,130 +1,133 @@
 #if IOS
-using Foundation;
-using UIKit;
-using System.Diagnostics;
-using YessGoFront.Config;
+using System;
+using System.Threading.Tasks;
 using YessGoFront.Services;
-using Microsoft.Maui.ApplicationModel;
+using YessGoFront.Services.Api;
+using Debug = System.Diagnostics.Debug;
 
-// iOS SDK использует Objective-C, поэтому нам нужны биндинги
-// Для работы с Finik iOS SDK в .NET нужно использовать Objective-C interop
-// В данном случае мы создадим обертку, которая будет вызывать нативный код
 namespace YessGoFront.Platforms.iOS;
 
+/// <summary>
+/// Реализация Finik Payment Service для iOS через Backend Proxy
+/// Все вызовы Finik SDK выполняются на backend, мобильное приложение использует REST API
+/// </summary>
 public class FinikPaymentService : IFinikPaymentService
 {
-    public Task<PaymentResult> ProcessPaymentAsync(PaymentRequest request)
-    {
-        var taskCompletionSource = new TaskCompletionSource<PaymentResult>();
+    private readonly IPaymentApiService _paymentApiService;
 
+    public FinikPaymentService(IPaymentApiService paymentApiService)
+    {
+        _paymentApiService = paymentApiService ?? throw new ArgumentNullException(nameof(paymentApiService));
+    }
+
+    public async Task<PaymentResult> ProcessPaymentAsync(PaymentRequest request)
+    {
         try
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            Debug.WriteLine($"[FinikPaymentService] Starting payment via backend API: Amount={request.Amount}, Description={request.Description}");
+
+            // Создаем запрос для backend API
+            var apiRequest = new CreateFinikPaymentRequest
             {
-                try
-                {
-                    // Получаем текущий UIViewController
-                    var windowScene = UIApplication.SharedApplication.ConnectedScenes
-                        .OfType<UIWindowScene>()
-                        .FirstOrDefault();
-                    
-                    var window = windowScene?.Windows.FirstOrDefault(w => w.IsKeyWindow);
-                    var viewController = window?.RootViewController;
+                Amount = request.Amount,
+                Description = request.Description,
+                NameEn = request.NameEn,
+                RequestId = request.RequestId ?? Guid.NewGuid().ToString(),
+                RequiredFields = request.RequiredFields,
+                MaxAvailableQuantity = request.MaxAvailableQuantity
+            };
 
-                    if (viewController == null)
-                    {
-                        taskCompletionSource.SetResult(new PaymentResult
-                        {
-                            IsSuccess = false,
-                            ErrorMessage = "Не удалось получить текущий ViewController"
-                        });
-                        return;
-                    }
+            // Вызываем backend API для создания платежа
+            var apiResponse = await _paymentApiService.CreateFinikPaymentAsync(apiRequest);
 
-                    // Получаем самый верхний ViewController (может быть модальный)
-                    while (viewController.PresentedViewController != null)
-                    {
-                        viewController = viewController.PresentedViewController;
-                    }
+            Debug.WriteLine($"[FinikPaymentService] Payment created: PaymentId={apiResponse.PaymentId}, Status={apiResponse.Status}");
 
-                    // Создаем параметры для Finik SDK
-                    // Примечание: Для полной интеграции потребуется создать Objective-C биндинги
-                    // или использовать DllImport для вызова нативного кода
-                    
-                    // Временная реализация - показывает что SDK должен быть вызван
-                    // Полная интеграция потребует создания Objective-C биндингов для FinikIosSdk
-                    
-                    Debug.WriteLine($"[FinikPaymentService] Starting payment: Amount={request.Amount}");
-                    Debug.WriteLine($"[FinikPaymentService] NOTE: Full iOS SDK integration requires Objective-C bindings");
+            // Преобразуем ответ API в PaymentResult
+            var result = new PaymentResult
+            {
+                IsSuccess = apiResponse.Status == "completed" || apiResponse.Status == "succeeded",
+                Status = apiResponse.Status,
+                Amount = apiResponse.Amount ?? request.Amount,
+                TransactionId = apiResponse.TransactionId,
+                ErrorMessage = apiResponse.ErrorMessage,
+                IsCancelled = apiResponse.Status == "cancelled"
+            };
 
-                    // Для демонстрации структуры - в реальности здесь будет вызов:
-                    // FinikProvider.Present(
-                    //     from: viewController,
-                    //     apiKey: FinikConfig.ApiKey,
-                    //     isBeta: FinikConfig.IsBeta,
-                    //     locale: GetFinikLocale(),
-                    //     textScenario: GetTextScenario(),
-                    //     paymentMethods: new[] { PaymentMethod.ALL },
-                    //     enableShare: FinikConfig.EnableShare,
-                    //     tapableSupportButtons: FinikConfig.TapableSupportButtons,
-                    //     onBackPressed: () => {
-                    //         taskCompletionSource.SetResult(new PaymentResult { IsCancelled = true });
-                    //     },
-                    //     onPayment: (data) => {
-                    //         // Парсим результат и устанавливаем в taskCompletionSource
-                    //     },
-                    //     widget: CreateItemHandlerWidget(...)
-                    // );
+            // Если платеж в статусе pending, можно опционально проверить статус через polling
+            if (apiResponse.Status == "pending" && !string.IsNullOrEmpty(apiResponse.PaymentId))
+            {
+                Debug.WriteLine($"[FinikPaymentService] Payment is pending, PaymentId={apiResponse.PaymentId}");
+                // Опционально: можно добавить polling для проверки статуса
+                // result = await PollPaymentStatusAsync(apiResponse.PaymentId);
+            }
 
-                    // Временный результат для демонстрации
-                    // В реальной реализации здесь будет обработка результата от SDK
-                    taskCompletionSource.SetResult(new PaymentResult
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = "iOS SDK интеграция требует создания Objective-C биндингов. " +
-                                     "Для полной реализации необходимо создать биндинг проект для FinikIosSdk."
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[FinikPaymentService] Error: {ex.Message}");
-                    taskCompletionSource.SetResult(new PaymentResult
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = ex.Message
-                    });
-                }
-            });
+            return result;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[FinikPaymentService] Outer error: {ex.Message}");
-            taskCompletionSource.SetResult(new PaymentResult
+            Debug.WriteLine($"[FinikPaymentService] Error processing payment: {ex.Message}");
+            Debug.WriteLine($"[FinikPaymentService] StackTrace: {ex.StackTrace}");
+
+            return new PaymentResult
             {
                 IsSuccess = false,
-                ErrorMessage = ex.Message
-            });
+                ErrorMessage = $"Ошибка при создании платежа: {ex.Message}",
+                IsCancelled = false
+            };
+        }
+    }
+
+    /// <summary>
+    /// Опциональный метод для проверки статуса платежа через polling
+    /// </summary>
+    private async Task<PaymentResult> PollPaymentStatusAsync(string paymentId, int maxAttempts = 10, int delayMs = 2000)
+    {
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            await Task.Delay(delayMs);
+
+            try
+            {
+                var statusResponse = await _paymentApiService.GetPaymentStatusAsync(paymentId);
+
+                if (statusResponse.Status == "completed" || statusResponse.Status == "succeeded")
+                {
+                    return new PaymentResult
+                    {
+                        IsSuccess = true,
+                        Status = statusResponse.Status,
+                        Amount = statusResponse.Amount,
+                        TransactionId = statusResponse.TransactionId
+                    };
+                }
+
+                if (statusResponse.Status == "failed" || statusResponse.Status == "cancelled")
+                {
+                    return new PaymentResult
+                    {
+                        IsSuccess = false,
+                        Status = statusResponse.Status,
+                        ErrorMessage = statusResponse.ErrorMessage,
+                        IsCancelled = statusResponse.Status == "cancelled"
+                    };
+                }
+
+                // Если все еще pending, продолжаем polling
+                Debug.WriteLine($"[FinikPaymentService] Payment still pending, attempt {attempt + 1}/{maxAttempts}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FinikPaymentService] Error polling payment status: {ex.Message}");
+            }
         }
 
-        return taskCompletionSource.Task;
-    }
-
-    // Вспомогательные методы для конвертации констант
-    private static string GetFinikLocale()
-    {
-        return FinikConfig.Locale switch
+        // Если после всех попыток статус не изменился
+        return new PaymentResult
         {
-            "KY" => "KY",
-            "EN" => "EN",
-            "RU" => "RU",
-            _ => "KG"
+            IsSuccess = false,
+            Status = "pending",
+            ErrorMessage = "Не удалось получить финальный статус платежа"
         };
-    }
-
-    private static string GetTextScenario()
-    {
-        return FinikConfig.TextScenario == "REPLENISHMENT" ? "REPLENISHMENT" : "PAYMENT";
     }
 }
 #endif
-

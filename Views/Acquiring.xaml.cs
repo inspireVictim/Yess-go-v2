@@ -53,6 +53,7 @@ public partial class Acquiring : ContentPage
         base.OnAppearing();
         // Обновляем Label при появлении страницы, если сумма уже установлена
         UpdateAmountLabel();
+        UpdateYessCoinLabel();
         UpdatePaymentButtonState();
     }
 
@@ -63,6 +64,22 @@ public partial class Acquiring : ContentPage
         if (amountLabel != null)
         {
             amountLabel.Text = $"{_amount:0.##} KGS";
+        }
+        
+        // Обновляем также YessCoin
+        UpdateYessCoinLabel();
+    }
+
+    private void UpdateYessCoinLabel()
+    {
+        // Рассчитываем YessCoin: сумма пополнения * 2
+        decimal yessCoinAmount = _amount * 2;
+        
+        // Используем NameScopeExtensions для поиска элемента
+        var yessCoinLabel = NameScopeExtensions.FindByName<Label>(this, "YessCoinLabel");
+        if (yessCoinLabel != null)
+        {
+            yessCoinLabel.Text = $"{yessCoinAmount:0.##} YessCoin";
         }
     }
 
@@ -127,13 +144,15 @@ public partial class Acquiring : ContentPage
             else if (result.IsSuccess)
             {
                 Debug.WriteLine($"[Acquiring] Payment successful. Transaction ID: {result.TransactionId}");
+                
+                // Обновляем баланс после успешного пополнения
+                await RefreshBalanceAsync();
+                
                 await DisplayAlert(
                     "Успешно",
                     $"Оплата выполнена успешно!\nТранзакция: {result.TransactionId}",
                     "OK");
                 
-                // Можно здесь обновить баланс или вернуться назад
-                // await RefreshBalance();
                 await GoBackAsync();
             }
             else
@@ -158,6 +177,23 @@ public partial class Acquiring : ContentPage
     private async void OnBackButtonClicked(object? sender, EventArgs e)
     {
         await GoBackAsync();
+    }
+
+    private async Task RefreshBalanceAsync()
+    {
+        try
+        {
+            var balanceRefreshService = MauiProgram.Services?.GetService<YessGoFront.Services.BalanceRefreshService>();
+            if (balanceRefreshService != null)
+            {
+                await balanceRefreshService.RefreshBalanceAsync();
+                Debug.WriteLine("[Acquiring] Balance refreshed after successful payment");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Acquiring] Error refreshing balance: {ex.Message}");
+        }
     }
 
     private async Task GoBackAsync()

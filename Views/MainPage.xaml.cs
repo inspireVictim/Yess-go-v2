@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -416,6 +417,26 @@ namespace YessGoFront.Views
             catch
             {
                 try { await Shell.Current.GoToAsync("//TransactionsPage"); } catch { }
+            }
+            finally
+            {
+                _isNavigating = false;
+            }
+        }
+
+        private async void OnPayYessCoinClicked(object? sender, EventArgs e)
+        {
+            if (_isNavigating) return;
+            _isNavigating = true;
+
+            try
+            {
+                Debug.WriteLine("[MainPage] Navigating to PayPage");
+                await Shell.Current.GoToAsync("PayPage", animate: true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error navigating to PayPage: {ex.Message}");
             }
             finally
             {

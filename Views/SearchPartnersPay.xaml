@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:YessGoFront.Converters"
+             xmlns:helpers="clr-namespace:YessGoFront.Helpers"
+             x:Class="YessGoFront.Views.SearchPartnersPay"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringToImageSourceConverter x:Key="ImageSourceConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Заголовок -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Кнопка назад -->
+                <ImageButton Grid.Column="0"
+                             x:Name="BackButton"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <!-- Заголовок -->
+                <Label Grid.Column="1"
+                       Text="Поиск партнера"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+                
+                <!-- Пустое место справа для балансировки -->
+                <BoxView Grid.Column="2" 
+                         WidthRequest="30"
+                         Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <!-- Контент: два состояния -->
+        <Grid Grid.Row="1" x:Name="ContentGrid">
+            <!-- Состояние 1: Поиск партнеров -->
+            <VerticalStackLayout x:Name="SearchState" Spacing="16" Padding="16">
+                <!-- Поле поиска -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="12"
+                       HasShadow="True"
+                       Padding="16,12"
+                       MinimumHeightRequest="56">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowDefinitions="*">
+                        <Image Source="search_icon.png"
+                               WidthRequest="24"
+                               HeightRequest="24"
+                               VerticalOptions="Center"
+                               Grid.Row="0"/>
+                        <Entry x:Name="SearchEntry"
+                               Grid.Column="1"
+                               Grid.Row="0"
+                               Placeholder="Введите название партнера"
+                               PlaceholderColor="#9CA3AF"
+                               TextColor="#000000"
+                               FontSize="18"
+                               FontAttributes="None"
+                               BackgroundColor="Transparent"
+                               VerticalOptions="Center"
+                               MinimumHeightRequest="32"
+                               ClearButtonVisibility="WhileEditing"
+                               TextChanged="OnSearchTextChanged"/>
+                    </Grid>
+                </Frame>
+
+                <!-- Индикатор загрузки -->
+                <ActivityIndicator x:Name="LoadingIndicator"
+                                  IsRunning="False"
+                                  IsVisible="False"
+                                  Color="#0B4A3B"
+                                  HeightRequest="40"/>
+
+                <!-- Список результатов поиска -->
+                <CollectionView x:Name="PartnersCollectionView"
+                                ItemsSource="{Binding Partners}"
+                                SelectionMode="None"
+                                IsVisible="{Binding HasPartners}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="12"/>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White"
+                                   CornerRadius="12"
+                                   HasShadow="True"
+                                   Padding="16"
+                                   Margin="0,0,0,8">
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnPartnerSelected"/>
+                                </Frame.GestureRecognizers>
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                    <!-- Логотип партнера -->
+                                    <Border WidthRequest="60"
+                                            HeightRequest="60"
+                                            BackgroundColor="#EEF2F7"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8">
+                                        <Image Source="{Binding LogoUrl, Converter={StaticResource ImageSourceConverter}}"
+                                               Aspect="AspectFill">
+                                            <Image.Behaviors>
+                                                <helpers:ImageLoadingBehavior />
+                                            </Image.Behaviors>
+                                        </Image>
+                                    </Border>
+                                    
+                                    <!-- Информация о партнере -->
+                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                        <Label Text="{Binding Name}"
+                                               FontSize="16"
+                                               FontAttributes="Bold"
+                                               TextColor="#0B4A3B"
+                                               LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding Category}"
+                                               FontSize="12"
+                                               TextColor="#666"
+                                               LineBreakMode="TailTruncation"/>
+                                    </VerticalStackLayout>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Сообщение "Партнеры не найдены" -->
+                <Label x:Name="NoResultsLabel"
+                       Text="Партнеры не найдены"
+                       FontSize="16"
+                       TextColor="#666"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       IsVisible="False"
+                       Margin="0,40,0,0"/>
+            </VerticalStackLayout>
+
+            <!-- Состояние 2: Форма ввода суммы -->
+            <ScrollView x:Name="PaymentFormState" IsVisible="False">
+                <VerticalStackLayout Spacing="20" Padding="16">
+                    <!-- Информация о выбранном партнере -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="16"
+                           HasShadow="True"
+                           Padding="20">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                            <Border WidthRequest="80"
+                                    HeightRequest="80"
+                                    BackgroundColor="#EEF2F7"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 12">
+                                <Image x:Name="SelectedPartnerLogo"
+                                       Aspect="AspectFill">
+                                    <Image.Behaviors>
+                                        <helpers:ImageLoadingBehavior />
+                                    </Image.Behaviors>
+                                </Image>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label x:Name="SelectedPartnerName"
+                                       FontSize="18"
+                                       FontAttributes="Bold"
+                                       TextColor="#0B4A3B"/>
+                                <Label x:Name="SelectedPartnerCategory"
+                                       FontSize="14"
+                                       TextColor="#666"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Поле ввода суммы -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="16"
+                           HasShadow="True"
+                           Padding="20">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="Сумма Yess!Coin"
+                                   FontSize="14"
+                                   TextColor="#666"/>
+                            <Entry x:Name="AmountEntry"
+                                   Placeholder="Введите сумму"
+                                   Keyboard="Numeric"
+                                   FontSize="24"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"
+                                   TextChanged="OnAmountTextChanged"/>
+                            <Label x:Name="AmountErrorLabel"
+                                   Text="Сумма должна быть больше 0"
+                                   FontSize="12"
+                                   TextColor="Red"
+                                   IsVisible="False"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Информация о платеже -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="16"
+                           Padding="20"
+                           IsVisible="{Binding HasValidAmount}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Вы переведете:"
+                                   FontSize="14"
+                                   TextColor="#666"/>
+                            <Label x:Name="PaymentAmountLabel"
+                                   Text="0 Yess!Coin"
+                                   FontSize="24"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Кнопка оплаты -->
+                    <Button x:Name="PayButton"
+                            Text="Оплатить"
+                            BackgroundColor="#0B4A3B"
+                            TextColor="White"
+                            FontSize="18"
+                            FontAttributes="Bold"
+                            CornerRadius="12"
+                            HeightRequest="56"
+                            Clicked="OnPayButtonClicked"
+                            IsEnabled="False"/>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+    </Grid>
+</ContentPage>

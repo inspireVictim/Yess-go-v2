@@ -24,4 +24,9 @@ Platforms/Android/app/
 *.keystore
 *.jks
 keystore.props
+keystore.properties
 **/keystores/
+Platforms/Android/keystore.properties
+Platforms/Android/keystore.props
+Platforms/Android/*.keystore
+Platforms/Android/*.jks

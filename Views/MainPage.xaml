@@ -188,6 +188,10 @@
 
 
 
+                    
+
+
+
                     <!-- Информационные кнопки -->
                     <CollectionView x:Name="InfoButtonsCollection"
                             ItemsSource="{Binding InfoButtons}"
@@ -237,6 +241,26 @@
                         </CollectionView.ItemTemplate>
                     </CollectionView>
 
+                    <!-- Кнопка оплаты YessCoin -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="16"
+                           HasShadow="True"
+                           Padding="20"
+                           Margin="0,8,0,0">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPayYessCoinClicked"/>
+                        </Frame.GestureRecognizers>
+                        <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                            <Label Text="💳"
+                                   FontSize="24"
+                                   VerticalOptions="Center"/>
+                            <Label Text="Оплатить Yess!Coin-ами"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   TextColor="#0F6B53"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                    </Frame>
 
                     <!-- 🔹 Лента категорий -->
                     <ScrollView Orientation="Horizontal"

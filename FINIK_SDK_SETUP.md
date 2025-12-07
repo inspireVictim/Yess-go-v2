@@ -1,93 +1,28 @@
-# Инструкция по настройке Finik SDK
+# Инструкция по настройке Finik SDK (Backend Proxy подход)
 
-## ⚠️ ВАЖНО: Проблема с Finik SDK 2.7.1
+## ✅ Решение: Backend Proxy
 
-**Finik SDK 2.7.1 - это Flutter модуль**, который **НЕ МОЖЕТ** быть подключен как стандартный Android AAR в .NET MAUI через автоматическую генерацию Java bindings.
+**Finik SDK теперь работает через Backend Proxy** - все вызовы Finik SDK выполняются на backend, а мобильное приложение использует REST API.
 
-### Почему возникает ошибка `BG0000: System.NullReferenceException`?
+### Почему Backend Proxy?
 
-MAUI пытается создать Java bindings для AAR файла, но:
-- Finik SDK содержит Flutter код, а не стандартные Android классы
-- Структура AAR не поддерживает автоматическую генерацию bindings
-- Генератор `JavaTypeResolutionFixups` падает при попытке обработать файл
+**Проблема:** Finik SDK 2.7.1 - это Flutter модуль, который невозможно корректно интегрировать в .NET MAUI Android проект:
+- Finik SDK требует Flutter Engine, который сложно интегрировать в MAUI
+- Стандартные Java bindings не работают с Flutter модулями
+- Возникают конфликты классов и ошибки `ClassNotFoundException`
 
-## ✅ Решение: Использование Reflection + Runtime AAR
+**Решение:** Перенести работу с Finik SDK на backend, а мобильное приложение получает результат через REST API.
 
-Мы используем **reflection подход** - SDK подключается как runtime зависимость (без генерации bindings), а вызов происходит через Java reflection API.
+### Преимущества Backend Proxy подхода:
 
-### Шаги настройки:
+✅ Не требует Flutter Engine в мобильном приложении  
+✅ Централизованная логика платежей на backend  
+✅ Безопасность (API ключи на сервере)  
+✅ Проще обновления и поддержка  
+✅ Кроссплатформенность (один API для Android и iOS)  
+✅ Нет проблем с Java bindings и Flutter Engine  
 
-#### 1️⃣ Скачать AAR файл
-
-**Файл:** `android-sdk-2.7.1.aar`
-
-**URL:** https://repo1.maven.org/maven2/kg/finik/android-sdk/2.7.1/android-sdk-2.7.1.aar
-
-**Сохранить в:** `Platforms/Android/libs/android-sdk-2.7.1.aar`
-
-> ⚠️ **НЕ нужно** скачивать Flutter runtime AAR файлы отдельно - они будут подтянуты автоматически через Gradle во время сборки приложения.
-
-#### 2️⃣ Настройка .csproj
-
-В `YessGoFront.csproj` уже настроено:
-
-```xml
-<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
-    <!-- Finik SDK AAR - подключен как runtime, но БЕЗ генерации bindings -->
-    <AndroidLibrary Include="Platforms/Android/libs/android-sdk-2.7.1.aar">
-        <Bind>false</Bind>
-    </AndroidLibrary>
-</ItemGroup>
-```
-
-**Ключевой параметр:** `<Bind>false</Bind>` - отключает генерацию Java bindings, но включает AAR в APK.
-
-#### 3️⃣ Убедиться, что установлены NuGet пакеты
-
-**Kotlin библиотеки:**
-- `Xamarin.Kotlin.StdLib` (2.2.21)
-- `Xamarin.Kotlin.StdLib.Common` (2.0.21.5)
-- `Xamarin.Kotlin.StdLib.Jdk7` (2.2.21)
-- `Xamarin.Kotlin.StdLib.Jdk8` (2.2.21)
-
-**AndroidX библиотеки:**
-- `Xamarin.AndroidX.Core.Core.Ktx` (1.17.0)
-- `Xamarin.AndroidX.AppCompat` (1.7.1.1)
-- `Xamarin.AndroidX.Activity` (1.11.0)
-- `Xamarin.AndroidX.Lifecycle.Runtime` (2.9.4)
-- `Xamarin.AndroidX.Lifecycle.Common` (2.9.4)
-- `Xamarin.Google.Android.Material` (1.13.0)
-
-Все эти пакеты уже должны быть в `.csproj`.
-
-#### 4️⃣ Настройка build.gradle (для Flutter зависимостей)
-
-Создайте или обновите файл `Platforms/Android/build.gradle`:
-
-```gradle
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven {
-            url "https://storage.googleapis.com/download.flutter.io"
-        }
-    }
-}
-```
-
-Это нужно для того, чтобы Gradle мог скачать Flutter Engine зависимости во время сборки APK.
-
-#### 5️⃣ Пересобрать проект
-
-1. **Очистите решение** (Clean Solution)
-2. **Удалите папки** `bin` и `obj`
-3. **Восстановите NuGet пакеты** (Restore NuGet Packages)
-4. **Пересоберите проект** (Rebuild Solution)
-
-## 🔍 Как это работает?
-
-### Архитектура решения:
+## 🔍 Архитектура решения
 
 ```
 ┌─────────────────────────────────────────┐
@@ -95,92 +30,439 @@ allprojects {
 │  (FinikPaymentService.cs)               │
 │                                         │
 │  ┌───────────────────────────────────┐  │
-│  │ Java Reflection API               │  │
-│  │ - Class.ForName()                 │  │
-│  │ - GetConstructor()                │  │
-│  │ - NewInstance()                   │  │
+│  │ PaymentApiService                  │  │
+│  │ - CreateFinikPaymentAsync()        │  │
+│  │ - GetPaymentStatusAsync()          │  │
 │  └───────────────────────────────────┘  │
 └──────────────┬──────────────────────────┘
-               │ Intent
+               │ HTTP REST API
                ▼
 ┌─────────────────────────────────────────┐
-│  Finik SDK (Runtime в APK)              │
-│  - FinikActivity                        │
-│  - CreateItemHandlerWidget              │
-│  - Flutter Engine                       │
+│  Backend API                             │
+│  POST /api/v1/payment/finik/create     │
+│  GET  /api/v1/payments/{id}/status      │
+│                                         │
+│  ┌───────────────────────────────────┐  │
+│  │ Finik SDK (на backend)            │  │
+│  │ - FinikActivity                   │  │
+│  │ - CreateItemHandlerWidget         │  │
+│  │ - Flutter Engine                  │  │
+│  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
 ```
 
-### Преимущества:
+## 📱 Настройка мобильного приложения
 
-✅ Не требуется генерация Java bindings  
-✅ SDK работает на устройстве через reflection  
-✅ Все классы доступны во время выполнения  
-✅ Поддерживается обновление SDK без перекомпиляции bindings  
+### 1️⃣ API Endpoints
 
-### Ограничения:
+Endpoints уже настроены в `Config/ApiEndpoints.cs`:
 
-⚠️ Нет IntelliSense для классов Finik SDK  
-⚠️ Ошибки reflection видны только во время выполнения  
-⚠️ Требуется тщательное тестирование на реальном устройстве  
+```csharp
+public static class PaymentEndpoints
+{
+    public const string CreateFinikPayment = "/api/v1/payment/finik/create";
+    public static string GetPaymentStatus(string paymentId) => $"/api/v1/payments/{paymentId}/status";
+}
+```
+
+### 2️⃣ API Service
+
+`IPaymentApiService` и `PaymentApiService` уже реализованы в:
+- `Services/Api/IPaymentApiService.cs`
+- `Services/Api/PaymentApiService.cs`
+
+### 3️⃣ FinikPaymentService
+
+`FinikPaymentService` для Android и iOS уже обновлены для использования `IPaymentApiService`:
+- `Platforms/Android/FinikPaymentService.cs`
+- `Platforms/iOS/FinikPaymentService.cs`
+
+### 4️⃣ Dependency Injection
+
+Сервисы уже зарегистрированы в `MauiProgram.cs`:
+
+```csharp
+// Регистрация PaymentApiService
+services.AddHttpClient<IPaymentApiService, PaymentApiService>("ApiClient");
+
+// Регистрация FinikPaymentService с зависимостью от IPaymentApiService
+services.AddSingleton<IFinikPaymentService>(sp =>
+{
+    var paymentApiService = sp.GetRequiredService<IPaymentApiService>();
+    return new Platforms.Android.FinikPaymentService(paymentApiService);
+});
+```
+
+## 🖥️ Настройка Backend
+
+### Требования для Backend
+
+Backend должен реализовать следующие endpoints:
+
+#### 1. POST /api/v1/payment/finik/create
+
+**Запрос:**
+```json
+{
+  "amount": 1000.00,
+  "description": "Пополнение баланса YessGo",
+  "nameEn": "Balance Replenishment",
+  "requestId": "unique-request-id",
+  "requiredFields": {
+    "amount": "1000.00",
+    "requestId": "unique-request-id"
+  },
+  "maxAvailableQuantity": 1
+}
+```
+
+**Ответ:**
+```json
+{
+  "paymentId": "payment-123",
+  "paymentUrl": null,
+  "status": "pending",
+  "transactionId": null,
+  "amount": 1000.00,
+  "errorMessage": null
+}
+```
+
+**Статусы:**
+- `pending` - платеж создан, ожидает обработки
+- `completed` / `succeeded` - платеж успешно выполнен
+- `failed` - платеж не выполнен
+- `cancelled` - платеж отменен пользователем
+
+#### 2. GET /api/v1/payments/{paymentId}/status (опционально)
+
+**Ответ:**
+```json
+{
+  "paymentId": "payment-123",
+  "status": "completed",
+  "transactionId": "finik-transaction-456",
+  "amount": 1000.00,
+  "errorMessage": null
+}
+```
+
+### Реализация на Backend
+
+Backend должен:
+
+1. **Создать endpoint** `POST /api/v1/payment/finik/create`
+2. **Использовать Finik SDK** для создания платежа:
+   - Инициализировать Finik SDK с API ключами
+   - Создать платеж через Finik SDK
+   - Сохранить информацию о платеже в БД
+3. **Вернуть результат** в формате `CreateFinikPaymentResponse`
+4. **Обработать webhook** от Finik:
+   - Создать endpoint для приема webhook от Finik
+   - **ВАЖНО:** Валидировать подпись каждого webhook запроса
+   - Обновить статус платежа в БД
+   - (Опционально) Уведомить мобильное приложение через WebSocket/Push
+5. **Предоставить endpoint** для проверки статуса (опционально):
+   - `GET /api/v1/payments/{paymentId}/status`
+
+## 🔐 Finik Webhook (Callback)
+
+После каждого успешного платежа Finik отправляет POST запрос на callback endpoint, указанный при настройке Finik SDK.
+
+**Webhook endpoints на backend:**
+- `POST /finik/webhook` (основной)
+- `POST /api/v1/payment/finik/webhook` (альтернативный)
+
+Используйте один из этих endpoints для приема webhook от Finik.
+
+### Webhook Payload
+
+Finik отправляет следующий JSON payload:
+
+```json
+{
+  "id": "transaction-id-15423_CREDIT",
+  "accountId": "your account id",
+  "amount": 100,
+  "fields": {
+    "amount": "100",
+    "fieldId1": "value1",
+    "fieldId2": "value2"
+  },
+  "item": {
+    "id": "generated-item-id"
+  },
+  "net": 100,
+  "receiptNumber": "some-number",
+  "requestDate": 1737369012345,
+  "service": {
+    "id": "averspay-items"
+  },
+  "status": "SUCCEEDED",
+  "transactionDate": 1737369012345,
+  "transactionId": "transaction-id-241234",
+  "transactionType": "DEBIT",
+  "data": {
+    "amount": 100,
+    "fieldId1": "value1"
+  }
+}
+```
+
+**Статусы:**
+- `SUCCEEDED` - платеж успешно выполнен
+- `FAILED` - платеж не выполнен
+
+### Валидация подписи Webhook
+
+**КРИТИЧЕСКИ ВАЖНО:** Каждый webhook запрос должен быть валидирован с использованием RSA публичного ключа Finik.
+
+#### Публичные ключи Finik
+
+**Production ключ:**
+```
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuF/PUmhMPPidcMxhZBPb
+BSGJoSphmCI+h6ru8fG8guAlcPMVlhs+ThTjw2LHABvciwtpj51ebJ4EqhlySPyT
+hqSfXI6Jp5dPGJNDguxfocohaz98wvT+WAF86DEglZ8dEsfoumojFUy5sTOBdHEu
+g94B4BbrJvjmBa1YIx9Azse4HFlWhzZoYPgyQpArhokeHOHIN2QFzJqeriANO+wV
+aUMta2AhRVZHbfyJ36XPhGO6A5FYQWgjzkI65cxZs5LaNFmRx6pjnhjIeVKKgF99
+4OoYCzhuR9QmWkPl7tL4Kd68qa/xHLz0Psnuhm0CStWOYUu3J7ZpzRK8GoEXRcr8
+tQIDAQAB
+-----END PUBLIC KEY-----
+```
+
+**Beta ключ:**
+```
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlrlKz/8gLWd1ARWGA/8
+o3a3Qy8G+hPifyqiPosiTY6nCHovANMIJXk6DH4qAqqZeLu8pLGxudkPbv8dSyG7
+F9PZEAryMPzjoB/9P/F6g0W46K/FHDtwTM3YIVvstbEbL19m8yddv/xCT9JPPJTb
+LsSTVZq5zCqvKzpupwlGS3Q3oPyLAYe+ZUn4Bx2J1WQrBu3b08fNaR3E8pAkCK27
+JqFnP0eFfa817VCtyVKcFHb5ij/D0eUP519Qr/pgn+gsoG63W4pPHN/pKwQUUiAy
+uLSHqL5S2yu1dffyMcMVi9E/Q2HCTcez5OvOllgOtkNYHSv9pnrMRuws3u87+hNT
+ZwIDAQAB
+-----END PUBLIC KEY-----
+```
+
+#### Алгоритм валидации подписи
+
+1. **Собрать данные для валидации:**
+   ```
+   data = Lowercase(HTTP method) + "\n"
+   data += URIAbsolutePath + "\n"
+   data += (header["Host"] и headers начинающиеся с x-api-*) + "\n"
+   data += queryStringParams + "\n"
+   data += json(request.body) // JSON отсортированный по ключам
+   ```
+
+2. **Проверить подпись:**
+   - Извлечь подпись из HTTP header `signature`
+   - Использовать RSA публичный ключ для проверки подписи
+   - Алгоритм: `SHA256withRSA`
+
+#### Готовые библиотеки для валидации
+
+- **Node.js:** `@mancho.devs/authorizer` (NPM)
+- **Python:** `mancho-devs/python-authorizer` (PyPI)
+
+#### Пример валидации (Java)
+
+```java
+public void verifyWebhook(String jsonData, String signature, String publicKeyPem) {
+    try {
+        Signature sig = Signature.getInstance("SHA256withRSA");
+        
+        // Загрузить публичный ключ
+        RSAKey rsaKey = (RSAKey) JWK.parseFromPEMEncodedObjects(publicKeyPem);
+        PublicKey publicKey = rsaKey.toPublicKey();
+        
+        sig.initVerify(publicKey);
+        
+        byte[] data = jsonData.getBytes(StandardCharsets.UTF_8);
+        sig.update(data);
+        
+        if (!sig.verify(Base64.decodeBase64(signature))) {
+            throw new SecurityException("Invalid webhook signature");
+        }
+    } catch (Exception e) {
+        throw new RuntimeException("Webhook validation failed", e);
+    }
+}
+```
+
+### Пример реализации на Backend
+
+```java
+// Java/Spring Boot пример
+@PostMapping("/api/v1/payment/finik/create")
+public CreateFinikPaymentResponse createFinikPayment(@RequestBody CreateFinikPaymentRequest request) {
+    // 1. Создать платеж через Finik SDK
+    FinikWidget widget = FinikWidget.create(
+        apiKey: FINIK_API_KEY,
+        accountId: FINIK_ACCOUNT_ID,
+        amount: request.getAmount(),
+        callbackUrl: "https://your-backend.com/finik/webhook",
+        // ... другие параметры
+    );
+    
+    // 2. Сохранить платеж в БД
+    Payment payment = paymentRepository.save(new Payment(
+        amount: request.getAmount(),
+        status: "pending",
+        requestId: request.getRequestId()
+    ));
+    
+    // 3. Вернуть результат
+    return new CreateFinikPaymentResponse(
+        paymentId: payment.getId(),
+        status: "pending",
+        amount: request.getAmount()
+    );
+}
+
+// Обработка webhook от Finik
+// Можно использовать любой из двух endpoints:
+// - @PostMapping("/finik/webhook") - основной
+// - @PostMapping("/api/v1/payment/finik/webhook") - альтернативный
+@PostMapping("/finik/webhook")
+public ResponseEntity<?> handleFinikWebhook(
+    @RequestHeader("signature") String signature,
+    @RequestBody FinikWebhookPayload payload) {
+    
+    // 1. ВАЛИДАЦИЯ ПОДПИСИ (ОБЯЗАТЕЛЬНО!)
+    if (!validateWebhookSignature(payload, signature)) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+    
+    // 2. Найти платеж по transactionId или полям из requiredFields
+    Payment payment = paymentRepository.findByTransactionId(payload.getTransactionId());
+    if (payment == null && payload.getFields() != null) {
+        // Попробовать найти по requestId из fields
+        String requestId = payload.getFields().get("requestId");
+        payment = paymentRepository.findByRequestId(requestId);
+    }
+    
+    if (payment == null) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+    
+    // 3. Обновить статус платежа
+    if ("SUCCEEDED".equals(payload.getStatus())) {
+        payment.setStatus("completed");
+        payment.setTransactionId(payload.getTransactionId());
+        payment.setCompletedAt(new Date(payload.getTransactionDate()));
+    } else if ("FAILED".equals(payload.getStatus())) {
+        payment.setStatus("failed");
+    }
+    
+    paymentRepository.save(payment);
+    
+    // 4. (Опционально) Уведомить мобильное приложение
+    // notificationService.notifyPaymentStatus(payment);
+    
+    return ResponseEntity.ok().build();
+}
+
+private boolean validateWebhookSignature(FinikWebhookPayload payload, String signature) {
+    try {
+        // Собрать данные для валидации согласно алгоритму Finik
+        String data = buildValidationData(payload);
+        
+        // Использовать публичный ключ (prod или beta в зависимости от окружения)
+        String publicKey = isProduction() ? FINIK_PROD_PUBLIC_KEY : FINIK_BETA_PUBLIC_KEY;
+        
+        // Проверить подпись
+        return verifySignature(data, signature, publicKey);
+    } catch (Exception e) {
+        logger.error("Webhook signature validation failed", e);
+        return false;
+    }
+}
+```
 
 ## 🧪 Тестирование
 
-После сборки проекта:
+### Мобильное приложение
 
-1. Запустите приложение на **реальном Android устройстве** (не эмулятор - Flutter может не работать)
+1. Запустите приложение на Android или iOS устройстве
 2. Перейдите на страницу `Acquiring.xaml`
-3. Нажмите кнопку "Оплатить через Finik"
-4. Должно открыться окно Finik SDK
+3. Введите сумму и нажмите "Оплатить через Finik"
+4. Приложение отправит запрос на backend API
+5. Backend создаст платеж через Finik SDK
+6. Результат вернется в мобильное приложение
+
+### Backend
+
+1. Убедитесь, что backend endpoint доступен: `POST /api/v1/payment/finik/create`
+2. Проверьте, что Finik SDK правильно настроен на backend
+3. Проверьте обработку callback от Finik
+4. Убедитесь, что статусы платежей обновляются в БД
 
 ## 📝 Настройка параметров
 
-Параметры SDK настраиваются в `Config/FinikConfig.cs`:
+Параметры Finik SDK настраиваются на **backend**, а не в мобильном приложении.
 
-```csharp
-public const string ApiKey = "YOUR_FINIK_API_KEY";
-public const string AccountId = "YOUR_FINIK_ACCOUNT_ID";
-public const string CallbackUrl = "https://your-backend.com/finik/callback";
-```
+Мобильное приложение передает только:
+- `amount` - сумма платежа
+- `description` - описание
+- `nameEn` - название на английском
+- `requestId` - уникальный ID запроса
+- `requiredFields` - дополнительные поля
 
-**ВАЖНО:** Замените значения на реальные, полученные от Finik.
+API ключи и другие конфигурационные параметры Finik SDK должны быть настроены на backend.
 
 ## ❌ Устранение неполадок
 
-### Ошибка: "ClassNotFoundException: kg.finik.android.sdk.FinikActivity"
+### Ошибка: "Ошибка при создании платежа: Connection refused"
 
-**Причина:** AAR файл не включен в APK.
-
-**Решение:**
-1. Убедитесь, что файл `android-sdk-2.7.1.aar` находится в `Platforms/Android/libs/`
-2. Проверьте, что в `.csproj` есть `<AndroidLibrary Include="...">` (даже с `<Bind>false</Bind>`)
-3. Пересоберите проект
-
-### Ошибка: "NoSuchMethodException" при вызове конструктора
-
-**Причина:** Сигнатура конструктора в SDK изменилась или не совпадает.
+**Причина:** Backend endpoint недоступен или неправильно настроен.
 
 **Решение:**
-1. Проверьте документацию Finik SDK на актуальную версию
-2. Обновите метод `CreateFinikWidget()` в `FinikPaymentService.cs`
-3. Проверьте параметры конструктора через Android Studio или декомпилятор
+1. Проверьте, что backend запущен и доступен
+2. Проверьте URL в `AppSettings.Api.BaseUrl`
+3. Проверьте, что endpoint `POST /api/v1/payment/finik/create` существует
 
-### Ошибка: Flutter Engine не найден
+### Ошибка: "Payment not found" или "404 Not Found"
 
-**Причина:** Flutter зависимости не загружены.
+**Причина:** Endpoint не найден на backend.
 
 **Решение:**
-1. Убедитесь, что `build.gradle` содержит Flutter Maven репозиторий
-2. Очистите кеш Gradle: удалите папку `.gradle` в проекте
-3. Пересоберите проект
+1. Убедитесь, что backend реализует endpoint `/api/v1/payment/finik/create`
+2. Проверьте, что путь соответствует `ApiEndpoints.PaymentEndpoints.CreateFinikPayment`
 
----
+### Ошибка: "Invalid request" или "400 Bad Request"
 
-## Решение для iOS
+**Причина:** Формат запроса не соответствует ожидаемому на backend.
 
-1. Откройте терминал
-2. Перейдите в папку `Platforms/iOS/`
-3. Выполните: `pod install`
-4. Пересоберите проект
+**Решение:**
+1. Проверьте формат запроса в `CreateFinikPaymentRequest`
+2. Убедитесь, что все обязательные поля заполнены
+3. Проверьте логи backend для деталей ошибки
 
-**Примечание**: Для полной интеграции iOS SDK потребуется создание Objective-C биндингов, так как SDK написан на Swift/Objective-C.
+### Платеж создан, но статус остается "pending"
+
+**Причина:** Backend не обрабатывает callback от Finik или не обновляет статус.
+
+**Решение:**
+1. Проверьте, что backend правильно обрабатывает callback от Finik
+2. Убедитесь, что callback URL настроен в Finik SDK на backend
+3. Проверьте логи backend для обработки callback
+
+## 🔄 Миграция с прямого использования SDK
+
+Если вы ранее использовали прямое подключение Finik SDK:
+
+1. ✅ Удалены все зависимости от Flutter Engine из `.csproj`
+2. ✅ Удален `FinikWrapper.java`
+3. ✅ Удален метод `InitializeFlutterEngine()` из `MainActivity.cs`
+4. ✅ Обновлены `FinikPaymentService` для использования API
+5. ✅ Добавлен `IPaymentApiService` и `PaymentApiService`
+
+**Важно:** Теперь необходимо настроить backend для работы с Finik SDK.
+
+## 📚 Дополнительные ресурсы
+
+- [Finik SDK Документация](https://finik.kg/docs) - для настройки SDK на backend
+- [API Endpoints](./Config/ApiEndpoints.cs) - список всех API endpoints
+- [PaymentApiService](./Services/Api/PaymentApiService.cs) - реализация API сервиса

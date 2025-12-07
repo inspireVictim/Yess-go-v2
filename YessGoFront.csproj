@@ -46,54 +46,64 @@
 		<AndroidEnableProguard>false</AndroidEnableProguard>
 
 		<!-- 🔥 Эти строки ОЧЕНЬ важны -->
+		<!-- AndroidAarPackagingMode=raw: AAR включается как есть, но все равно извлекается для доступа к классам -->
 		<AndroidAarPackagingMode>raw</AndroidAarPackagingMode>
 		<AndroidUseAapt2>true</AndroidUseAapt2>
 		<AndroidDexTool>d8</AndroidDexTool>
 		
 		<!-- 🔥 КРИТИЧЕСКИ ВАЖНО: Отключаем генерацию Java stubs полностью -->
 		<!-- Это предотвращает попытки MAUI обработать любые AAR, включая Finik SDK -->
+		<!-- AndroidLibrary все равно извлечет AAR и сделает его классы доступными через reflection -->
 		<AndroidGenerateJavaStubs>false</AndroidGenerateJavaStubs>
 		<AndroidEnableAssemblyCompression>false</AndroidEnableAssemblyCompression>
 	</PropertyGroup>
 
+	<!-- ✅ Подключение keystore.props для подписи Release -->
+	<!-- Импортируем keystore.props ПЕРЕД настройками подписи -->
+	<Import Project="Platforms\Android\keystore.props" Condition="Exists('$(MSBuildProjectDirectory)\Platforms\Android\keystore.props')" />
+
+	<!-- ✅ Android Release Signing Configuration -->
+	<!-- КРИТИЧЕСКИ ВАЖНО: Используем AndroidSigningKeyStore (не AndroidKeyStore) -->
+	<PropertyGroup Condition="$(TargetFramework.Contains('-android')) AND '$(Configuration)' == 'Release'">
+		<!-- Явно отключаем debug подпись -->
+		<AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		
+		<!-- Путь к keystore файлу (из keystore.props или по умолчанию) -->
+		<AndroidSigningKeyStore Condition="'$(KeystoreFile)' != ''">$(MSBuildProjectDirectory)\Platforms\Android\$(KeystoreFile)</AndroidSigningKeyStore>
+		<AndroidSigningKeyStore Condition="'$(AndroidSigningKeyStore)' == ''">$(MSBuildProjectDirectory)\Platforms\Android\yessgo-release.keystore</AndroidSigningKeyStore>
+		
+		<!-- Пароль keystore (из keystore.props или через параметр командной строки) -->
+		<AndroidSigningStorePass Condition="'$(KeystorePassword)' != ''">$(KeystorePassword)</AndroidSigningStorePass>
+		
+		<!-- Alias ключа (из keystore.props или по умолчанию) -->
+		<AndroidSigningKeyAlias Condition="'$(KeyAlias)' != ''">$(KeyAlias)</AndroidSigningKeyAlias>
+		<AndroidSigningKeyAlias Condition="'$(AndroidSigningKeyAlias)' == ''">yessgo-key</AndroidSigningKeyAlias>
+		
+		<!-- Пароль ключа (из keystore.props или через параметр командной строки) -->
+		<AndroidSigningKeyPass Condition="'$(KeyPassword)' != ''">$(KeyPassword)</AndroidSigningKeyPass>
+		<AndroidSigningKeyPass Condition="'$(AndroidSigningKeyPass)' == '' AND '$(KeystorePassword)' != ''">$(KeystorePassword)</AndroidSigningKeyPass>
+		
+		<!-- Дополнительные настройки для гарантии release подписи -->
+		<AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
+		<AndroidEnableProguard>false</AndroidEnableProguard>
+	</PropertyGroup>
 
 
-	<!-- === FINIK SDK — ОБРАБОТКА AAR === -->
+
+	<!-- === FINIK SDK — BACKEND PROXY ПОДХОД === -->
 	<!-- 
-	⚠️ ВАЖНО: Finik SDK 2.7.1 - это Flutter модуль, который НЕ МОЖЕТ быть подключен
-	как стандартный Android AAR через автоматическую генерацию bindings в MAUI.
+	✅ Finik SDK теперь работает через Backend Proxy
+	Все вызовы Finik SDK выполняются на backend, мобильное приложение использует REST API.
+	Это решает проблему с Flutter Engine, который невозможно корректно интегрировать в MAUI.
 	
-	SDK использует Flutter Engine внутри, поэтому стандартные Java bindings не работают.
-	Мы используем подход через reflection для вызова SDK во время выполнения в FinikPaymentService.cs.
-	
-	РЕШЕНИЕ: Используем EmbeddedResource вместо AndroidLibrary
-	- EmbeddedResource: AAR включается в APK как ресурс, MAUI НЕ обрабатывает его
-	- AndroidGenerateJavaStubs=false: Полностью отключает генерацию Java stubs
-	- Compile Remove: Исключает любые сгенерированные файлы из компиляции
-	- Target RemoveFinikSdkBindings: Автоматически удаляет файлы перед/после генерации
+	Преимущества:
+	- Не требует Flutter Engine в мобильном приложении
+	- Централизованная логика платежей на backend
+	- Безопасность (API ключи на сервере)
+	- Проще обновления и поддержка
+	- Кроссплатформенность (один API для Android и iOS)
 	-->
-	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
-		<!-- ✅ Finik SDK подключается как EmbeddedResource, чтобы полностью исключить генерацию bindings -->
-		<!-- AAR будет включен в APK как ресурс и доступен через reflection в FinikPaymentService.cs -->
-		<EmbeddedResource Include="Platforms/Android/libs/android-sdk-2.7.1.aar" />
-		
-		<!-- УДАЛЯЕМ автоматически сгенерированные binding файлы из компиляции -->
-		<!-- Расширенные правила для всех возможных вариантов имен -->
-		<Compile Remove="**/obj/**/kg.finik*.cs" />
-		<Compile Remove="**/obj/**/KG.Finik*.cs" />
-		<Compile Remove="**/obj/**/*Finik*.cs" />
-		<Compile Remove="**/bin/**/kg.finik*.cs" />
-		<Compile Remove="**/bin/**/KG.Finik*.cs" />
-		<Compile Remove="**/bin/**/*Finik*.cs" />
-		
-		<!-- Помечаем как None, чтобы они не вызывали ошибки компиляции -->
-		<None Include="**/obj/**/kg.finik*.cs" />
-		<None Include="**/obj/**/KG.Finik*.cs" />
-		<None Include="**/obj/**/*Finik*.cs" />
-		<None Include="**/bin/**/kg.finik*.cs" />
-		<None Include="**/bin/**/KG.Finik*.cs" />
-		<None Include="**/bin/**/*Finik*.cs" />
-	</ItemGroup>
 
 
 	<!-- ✅ iOS -->
@@ -155,12 +165,6 @@
 		<MauiXaml Remove="%2a%2a\**" />
 		<None Remove="%2a%2a\**" />
 		<None Remove="Tests\**" />
-	</ItemGroup>
-	<ItemGroup>
-	  <None Remove="%2a%2a/obj/%2a%2a/kg.finik.%2a%2a.cs" />
-	  <None Remove="%2a%2a/obj/%2a%2a/KG.Finik.%2a%2a.cs" />
-	  <None Remove="%2a%2a/obj/%2a%2a/kg.finik.%2a%2a.cs" />
-	  <None Remove="%2a%2a/obj/%2a%2a/KG.Finik.%2a%2a.cs" />
 	</ItemGroup>
 	
 	<ItemGroup>
@@ -233,60 +237,18 @@
 	  <PackageReference Update="Xamarin.AndroidX.SavedState" Version="1.4.0" />
 	</ItemGroup>
 	
-	
-	<!-- ✅ Target для удаления сгенерированных bindings Finik SDK -->
-	<!-- Выполняется на разных этапах сборки для гарантированного удаления -->
-	<!-- Расширенные правила для всех возможных вариантов имен -->
-	<Target Name="RemoveFinikSdkBindings" AfterTargets="_GenerateJavaStubs;_ResolveLibraryProjectImports;_ExtractLibraryProjectImports" BeforeTargets="CoreCompile" Condition="'$(TargetFramework)' == 'net9.0-android'">
-		<ItemGroup>
-			<FinikBindingFiles Include="$(IntermediateOutputPath)**\kg.finik*.cs" />
-			<FinikBindingFiles Include="$(IntermediateOutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFiles Include="$(IntermediateOutputPath)**\*Finik*.cs" />
-			<FinikBindingFiles Include="$(OutputPath)**\kg.finik*.cs" />
-			<FinikBindingFiles Include="$(OutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFiles Include="$(OutputPath)**\*Finik*.cs" />
-			<FinikBindingFiles Include="$(BaseIntermediateOutputPath)**\kg.finik*.cs" />
-			<FinikBindingFiles Include="$(BaseIntermediateOutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFiles Include="$(BaseIntermediateOutputPath)**\*Finik*.cs" />
-		</ItemGroup>
-		<Delete Files="@(FinikBindingFiles)" ContinueOnError="true" />
-		<Message Text="[Finik SDK] Removed @(FinikBindingFiles->Count()) binding files" Importance="normal" Condition="'@(FinikBindingFiles)' != ''" />
-	</Target>
-	
-	<!-- ✅ Дополнительный Target для удаления на этапе BeforeBuild -->
-	<!-- Удаляет все возможные варианты сгенерированных binding файлов Finik SDK -->
-	<Target Name="RemoveFinikSdkBindingsBeforeBuild" BeforeTargets="BeforeBuild;_ResolveLibraryProjects" Condition="'$(TargetFramework)' == 'net9.0-android'">
-		<ItemGroup>
-			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\kg.finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(IntermediateOutputPath)**\*Finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\kg.finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(BaseIntermediateOutputPath)**\*Finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(OutputPath)**\kg.finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(OutputPath)**\KG.Finik*.cs" />
-			<FinikBindingFilesBeforeBuild Include="$(OutputPath)**\*Finik*.cs" />
-		</ItemGroup>
-		<Delete Files="@(FinikBindingFilesBeforeBuild)" ContinueOnError="true" />
-		<Message Text="[Finik SDK] Cleaned @(FinikBindingFilesBeforeBuild->Count()) binding files before build" Importance="normal" Condition="'@(FinikBindingFilesBeforeBuild)' != ''" />
-	</Target>
-	
 	<!-- ✅ УНИВЕРСАЛЬНЫЙ Target для исключения ВСЕХ дублирующихся -ktx AAR библиотек -->
 	<!-- Решает проблему дублирования классов из android/ktx версий (Tracing, SavedState и др.) -->
 	<!-- Исключаем все -ktx версии, оставляя только -android -->
 	<Target Name="ExcludeDuplicateKtxLibraries" BeforeTargets="_ResolveLibraryProjectImports;_ExtractLibraryProjectImports" AfterTargets="_ResolveLibraryProjects" Condition="'$(TargetFramework)' == 'net9.0-android'">
 		<ItemGroup>
 			<!-- Исключаем все -ktx AAR, оставляя только -android версии -->
-			<_ResolvedLibraryProjectImports Remove="@(_ResolvedLibraryProjectImports)" 
-			                                 Condition="$([System.String]::Copy('%(Identity)').Contains('-ktx'))" />
+			<_ResolvedLibraryProjectImports Remove="@(_ResolvedLibraryProjectImports)" Condition="$([System.String]::Copy('%(Identity)').Contains('-ktx'))" />
 			<!-- Также исключаем из списка библиотек для компиляции -->
-			<_LibraryProjectImports Remove="@(_LibraryProjectImports)" 
-			                        Condition="$([System.String]::Copy('%(Identity)').Contains('-ktx'))" />
+			<_LibraryProjectImports Remove="@(_LibraryProjectImports)" Condition="$([System.String]::Copy('%(Identity)').Contains('-ktx'))" />
 			<!-- Специфичные исключения для известных проблемных библиотек -->
-			<_ResolvedLibraryProjectImports Remove="@(_ResolvedLibraryProjectImports)" 
-			                                 Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174')) OR $([System.String]::Copy('%(Identity)').Contains('savedstate-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\178'))" />
-			<_LibraryProjectImports Remove="@(_LibraryProjectImports)" 
-			                        Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174')) OR $([System.String]::Copy('%(Identity)').Contains('savedstate-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\178'))" />
+			<_ResolvedLibraryProjectImports Remove="@(_ResolvedLibraryProjectImports)" Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174')) OR $([System.String]::Copy('%(Identity)').Contains('savedstate-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\178'))" />
+			<_LibraryProjectImports Remove="@(_LibraryProjectImports)" Condition="$([System.String]::Copy('%(Identity)').Contains('tracing-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\174')) OR $([System.String]::Copy('%(Identity)').Contains('savedstate-ktx')) OR $([System.String]::Copy('%(Identity)').Contains('lp\178'))" />
 		</ItemGroup>
 		<Message Text="[AndroidX] Excluded duplicate -ktx libraries (tracing, savedstate, etc.)" Importance="high" />
 	</Target>
@@ -301,10 +263,10 @@
 			<KtxJarFiles Include="$(IntermediateOutputPath)lp\174\**\*.jar" />
 			<KtxJarFiles Include="$(IntermediateOutputPath)lp\178\**\*.jar" />
 			<!-- Удаляем все JAR из папок, содержащих -ktx в пути -->
-			<KtxJarFiles Include="$(IntermediateOutputPath)lp\**\jl\classes.jar" 
-			             Condition="$([System.String]::Copy('%(RootDir)%(Directory)').Contains('ktx'))" />
+			<KtxJarFiles Include="$(IntermediateOutputPath)lp\**\jl\classes.jar" Condition="$([System.String]::Copy('%(RootDir)%(Directory)').Contains('ktx'))" />
 		</ItemGroup>
 		<Delete Files="@(KtxJarFiles)" ContinueOnError="true" />
-		<Message Text="[AndroidX] Removed @(KtxJarFiles->Count()) duplicate -ktx JAR files" Importance="normal" Condition="'@(KtxJarFiles)' != ''" />
+		<Message Text="[AndroidX] Removed @(KtxJarFiles-&gt;Count()) duplicate -ktx JAR files" Importance="normal" Condition="'@(KtxJarFiles)' != ''" />
 	</Target>
+
 </Project>

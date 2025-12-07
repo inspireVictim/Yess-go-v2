@@ -74,11 +74,11 @@
                 <Border WidthRequest="36" HeightRequest="36"
         StrokeThickness="0"
         BackgroundColor="#FFFFFF"
-        StrokeShape="RoundRectangle8">
+        StrokeShape="RoundRectangle 18">
                     <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnBackTapped" />
                     </Border.GestureRecognizers>
-                    <Image Source="back_arrow_icon.png" 
+                    <Image Source="back_partner.svg" 
            Aspect="AspectFit" 
            Margin="8" />
                 </Border>

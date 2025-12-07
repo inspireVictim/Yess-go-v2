@@ -26,12 +26,12 @@
                     HeightRequest="36"
                     StrokeThickness="0"
                     BackgroundColor="White"
-                    StrokeShape="RoundRectangle 8,8,8,8"
+                    StrokeShape="RoundRectangle 18"
                     VerticalOptions="Center">
                 <Border.GestureRecognizers>
                     <TapGestureRecognizer Tapped="OnBackTapped" />
                 </Border.GestureRecognizers>
-                <Image Source="back_arrow_icon.png"
+                <Image Source="back_partner.svg"
                        Aspect="AspectFit"
                        Margin="8" />
             </Border>

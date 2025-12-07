@@ -59,13 +59,32 @@
                     </VerticalStackLayout>
                 </Frame>
 
+                <!-- Информация о YessCoin -->
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="20">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Вы получите"
+                               FontSize="14"
+                               TextColor="#666"
+                               HorizontalOptions="Center"/>
+                        <Label x:Name="YessCoinLabel"
+                               Text="0 YessCoin"
+                               FontSize="24"
+                               FontAttributes="Bold"
+                               TextColor="#0B4A3B"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+
                 <!-- Кнопка оплаты через Finik -->
                 <Frame BackgroundColor="White"
                        CornerRadius="16"
                        HasShadow="True"
                        Padding="20">
                     <VerticalStackLayout Spacing="16">
-                        <Label Text="Оплата через Finik"
+                        <Label Text="Пополнение через Finik"
                                FontSize="16"
                                FontAttributes="Bold"
                                TextColor="#0B4A3B"
@@ -80,7 +99,7 @@
                                           WidthRequest="30"/>
                         
                         <Button x:Name="PayButton"
-                               Text="Оплатить"
+                               Text="Пополнить"
                                BackgroundColor="#0B4A3B"
                                TextColor="White"
                                FontSize="16"

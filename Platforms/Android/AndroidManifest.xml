@@ -6,6 +6,7 @@
 		android:icon="@mipmap/appicon"
 		android:roundIcon="@mipmap/appicon_round"
 		android:networkSecurityConfig="@xml/network_security_config">
+		<!-- FinikActivity объявлена в AAR (android-sdk-2.7.1.aar), не нужно дублировать здесь -->
 	</application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />

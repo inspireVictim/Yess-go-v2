@@ -130,6 +130,82 @@ public class WalletApiService : ApiClient, IWalletApiService
         return await GetAsync<PurchaseDto>(endpoint, ct);
     }
 
+    public async Task<PurchaseDto> TransferToPartnerAsync(
+        int partnerId,
+        decimal amount,
+        string? description = null,
+        CancellationToken ct = default)
+    {
+        var endpoint = ApiEndpoints.WalletEndpoints.Transfer;
+        
+        var request = new TransferRequest
+        {
+            PartnerId = partnerId,
+            Amount = amount,
+            Description = description ?? $"Перевод партнеру"
+        };
+
+        Logger?.LogInformation("Перевод средств партнеру: PartnerId={PartnerId}, Amount={Amount}", partnerId, amount);
+        
+        var response = await PostAsync<TransferRequest, TransferResponse>(endpoint, request, ct);
+        
+        // Преобразуем ответ в PurchaseDto
+        var result = new PurchaseDto
+        {
+            Id = response.TransactionId ?? response.Id.ToString(),
+            PartnerId = partnerId.ToString(),
+            PartnerName = response.PartnerName,
+            Amount = amount,
+            Type = "payment",
+            Status = response.Status ?? "completed",
+            CreatedAt = response.CreatedAt ?? DateTime.UtcNow,
+            DateUtc = response.CreatedAt ?? DateTime.UtcNow,
+            Description = description ?? $"Перевод партнеру {response.PartnerName}"
+        };
+
+        Logger?.LogInformation("Перевод выполнен успешно: TransactionId={TransactionId}", result.Id);
+        return result;
+    }
+
+    private class TransferRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("partner_id")]
+        public int PartnerId { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("amount")]
+        public decimal Amount { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("description")]
+        public string? Description { get; set; }
+    }
+
+    private class TransferResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public int Id { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("transaction_id")]
+        public string? TransactionId { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("partner_id")]
+        public int? PartnerId { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("partner_name")]
+        public string? PartnerName { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("amount")]
+        public decimal Amount { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("created_at")]
+        public DateTime? CreatedAt { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("balance_after")]
+        public decimal? BalanceAfter { get; set; }
+    }
+
     private class BalanceResponse
     {
         [System.Text.Json.Serialization.JsonPropertyName("balance")]

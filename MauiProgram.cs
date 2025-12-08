@@ -76,72 +76,13 @@ public static class MauiProgram
         var app = builder.Build();
         Services = app.Services;
 
+        // Инициализация БД полностью отложена - будет выполнена в фоне после показа UI
+        // См. AppShell.xaml.cs для запуска инициализации и seeding
 
+        // Balance refresh service будет запущен после загрузки главного экрана
+        // См. MainPage.xaml.cs или AppShell.xaml.cs для запуска
 
-
-        // Инициализируем базу данных при запуске приложения
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = Services.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var logger = scope.ServiceProvider.GetService<ILogger<DatabaseInitializer>>();
-                var initializer = new DatabaseInitializer(dbContext, logger);
-                
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing database...");
-                await initializer.InitializeAsync();
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database initialized successfully");
-                
-                // Заполняем базу данных начальными данными
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Seeding database...");
-                await initializer.SeedAsync();
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database seeded successfully");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] ❌ Failed to initialize database: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] StackTrace: {ex.StackTrace}");
-            }
-        });
-
-        // Запускаем сервис периодического обновления баланса
-        try
-        {
-            var balanceRefreshService = Services.GetService<YessGoFront.Services.BalanceRefreshService>();
-            if (balanceRefreshService != null)
-            {
-                // Обновляем баланс каждые 30 секунд
-                balanceRefreshService.Start(TimeSpan.FromSeconds(30));
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Balance refresh service started");
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Failed to start balance refresh service: {ex.Message}");
-        }
-
-        // Тест API
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var settings = Services.GetRequiredService<AppSettings>();
-                System.Diagnostics.Debug.WriteLine($"[AppSettings] BaseUrl = {settings.Api.BaseUrl}");
-
-                var clientFactory = Services.GetRequiredService<IHttpClientFactory>();
-                var client = clientFactory.CreateClient("ApiClient");
-
-                var response = await client.GetAsync("api/v1/health");
-                var text = await response.Content.ReadAsStringAsync();
-
-                System.Diagnostics.Debug.WriteLine($"[HEALTH TEST] ✅ {response.StatusCode}: {text}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[HEALTH TEST] ❌ ERROR: {ex.Message}");
-            }
-        });
+        // API health check отложен - будет выполнен в фоне после показа UI
 
         return app;
     }

@@ -18,12 +18,12 @@ public static class ApiEndpoints
     public const string Promotions = $"{ApiVersion}/promotions";
     public const string Banners = $"{ApiVersion}/banners";
 
-    // Authentication endpoints (✅ FIXED)
     // Authentication endpoints
     public static class AuthEndpoints
     {
         public const string Register = $"{Auth}/register";   // /api/v1/auth/register
         public const string Login = $"{Auth}/login";         // /api/v1/auth/login
+        public const string LoginJson = $"{Auth}/login/json"; // /api/v1/auth/login/json (для JSON запросов)
         public const string Refresh = $"{Auth}/refresh";     // /api/v1/auth/refresh
         public const string Me = $"{Auth}/me";               // /api/v1/auth/me
         public const string ReferralStats = $"{Auth}/referral-stats"; // /api/v1/auth/referral-stats
@@ -33,8 +33,9 @@ public static class ApiEndpoints
         public const string Verify = $"{Auth}/verify";
         
         // SMS верификация
-        public const string SendVerificationCode = $"{Auth}/send-verification-code";
-        public const string VerifyCode = $"{Auth}/verify-code";
+        public const string SendVerificationCode = $"{Auth}/send-verification-code"; // /api/v1/auth/send-verification-code
+        public const string SendCode = $"{Auth}/send-code"; // /api/v1/auth/send-code (альтернативный)
+        public const string VerifyCode = $"{Auth}/verify-code"; // /api/v1/auth/verify-code
         
         // Базовый путь для Auth
         public const string Base = Auth;
@@ -63,6 +64,7 @@ public static class ApiEndpoints
         public const string Balance = $"{ApiVersion}/payments/balance";
         public const string Transactions = $"{ApiVersion}/payments/transactions";
         public const string TopUp = $"{Wallet}/topup";
+        public const string Transfer = $"{ApiVersion}/payments/transfer";
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }
 

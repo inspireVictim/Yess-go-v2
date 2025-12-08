@@ -30,23 +30,55 @@ namespace YessGoFront.Services.Api
         {
             try
             {
+                // Валидация входных данных
+                if (request == null)
+                {
+                    throw new ArgumentNullException(nameof(request), "Login request cannot be null");
+                }
+                
+                if (string.IsNullOrWhiteSpace(request.Username))
+                {
+                    throw new ArgumentException("Phone number is required", nameof(request));
+                }
+                
+                if (string.IsNullOrWhiteSpace(request.Password))
+                {
+                    throw new ArgumentException("Password is required", nameof(request));
+                }
+
                 // Используем JSON для логина (backend принимает JSON на /api/v1/auth/login)
                 var loginDto = new UserLoginDto
                 {
-                    Phone = request.Username,  // Backend ожидает поле "phone" в JSON
+                    Phone = request.Username.Trim(),  // Backend ожидает поле "phone" в JSON
                     Password = request.Password
                 };
 
-                Logger?.LogInformation("[AuthApiService] Attempting login for phone: {Phone}", request.Username);
+                Logger?.LogInformation("[AuthApiService] Attempting login for phone: {Phone}", loginDto.Phone);
                 Logger?.LogDebug("[AuthApiService] BaseAddress: {BaseAddress}", HttpClient.BaseAddress);
 
-                // Используем базовый метод PostAsync, который отправляет JSON
-                // Endpoint: /api/v1/auth/login (без /json суффикса)
+                // Используем /api/v1/auth/login/json для JSON запросов
+                // Согласно документации API, есть два варианта: /login и /login/json
+                // Используем /login/json так как отправляем JSON
+                Logger?.LogInformation("[AuthApiService] Using endpoint: {Endpoint}", ApiEndpoints.AuthEndpoints.LoginJson);
                 var tokenResponse = await PostAsync<UserLoginDto, TokenResponseDto>(
-                    ApiEndpoints.AuthEndpoints.Login,
+                    ApiEndpoints.AuthEndpoints.LoginJson,
                     loginDto,
                     ct
                 );
+
+                // Проверка на null ответ
+                if (tokenResponse == null)
+                {
+                    Logger?.LogError("[AuthApiService] Login response is null");
+                    throw new ApiException("Получен пустой ответ от сервера при входе");
+                }
+
+                // Проверка на пустой токен
+                if (string.IsNullOrWhiteSpace(tokenResponse.AccessToken))
+                {
+                    Logger?.LogError("[AuthApiService] AccessToken is null or empty in login response");
+                    throw new ApiException("Не получен токен доступа от сервера");
+                }
 
                 // Конвертируем TokenResponseDto в AuthResponse
                 var authResponse = new AuthResponse
@@ -56,15 +88,39 @@ namespace YessGoFront.Services.Api
                     TokenType = tokenResponse.TokenType ?? "bearer"
                 };
                 
-                Logger?.LogInformation("Login successful. AccessToken: {HasAccess}, RefreshToken: {HasRefresh}", 
+                Logger?.LogInformation("[AuthApiService] Login successful. AccessToken: {HasAccess}, RefreshToken: {HasRefresh}", 
                     !string.IsNullOrEmpty(authResponse.AccessToken), 
                     !string.IsNullOrEmpty(authResponse.RefreshToken));
                 return authResponse;
+            }
+            catch (NotFoundException ex)
+            {
+                // Специальная обработка 404 для login endpoint
+                Logger?.LogError(ex, "[AuthApiService] Login endpoint not found (404). Endpoint: {Endpoint}, BaseAddress: {BaseAddress}", 
+                    ApiEndpoints.AuthEndpoints.Login, HttpClient.BaseAddress);
+                throw new NotFoundException(
+                    $"Endpoint входа не найден на сервере. Проверьте конфигурацию API или обратитесь к администратору. " +
+                    $"Попытка доступа к: {HttpClient.BaseAddress}{ApiEndpoints.AuthEndpoints.Login}", ex);
+            }
+            catch (UnauthorizedException)
+            {
+                // Пробрасываем UnauthorizedException без изменений
+                throw;
+            }
+            catch (BadRequestException)
+            {
+                // Пробрасываем BadRequestException без изменений
+                throw;
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {
                 Logger?.LogError(ex, "[AuthApiService] Network error during login: {Message}", ex.Message);
                 throw new NetworkException($"Ошибка сети при входе: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "[AuthApiService] Unexpected error during login: {Message}", ex.Message);
+                throw new ApiException($"Ошибка при входе: {ex.Message}", ex);
             }
         }
 
@@ -122,15 +178,51 @@ namespace YessGoFront.Services.Api
 
         public async Task<Dictionary<string, object>> SendVerificationCodeAsync(string phoneNumber, CancellationToken ct = default)
         {
+            var request = new VerificationCodeRequest { phone_number = phoneNumber };
+            
+            // Пробуем сначала основной endpoint /send-verification-code
             try
             {
-                var request = new VerificationCodeRequest { phone_number = phoneNumber };
+                Logger?.LogInformation("[AuthApiService] Sending verification code to: {Phone}, trying endpoint: {Endpoint}", 
+                    phoneNumber, ApiEndpoints.AuthEndpoints.SendVerificationCode);
+                
                 var response = await PostAsync<VerificationCodeRequest, Dictionary<string, object>>(
-                    $"{ApiEndpoints.AuthEndpoints.Base}/send-verification-code",
+                    ApiEndpoints.AuthEndpoints.SendVerificationCode,
                     request,
                     ct
                 );
+                
+                Logger?.LogInformation("[AuthApiService] Successfully sent verification code using endpoint: {Endpoint}", 
+                    ApiEndpoints.AuthEndpoints.SendVerificationCode);
                 return response;
+            }
+            catch (NotFoundException)
+            {
+                // Если основной endpoint не найден, пробуем альтернативный /send-code
+                Logger?.LogWarning("[AuthApiService] Primary endpoint {PrimaryEndpoint} returned 404, trying fallback: {FallbackEndpoint}", 
+                    ApiEndpoints.AuthEndpoints.SendVerificationCode, ApiEndpoints.AuthEndpoints.SendCode);
+                
+                try
+                {
+                    var response = await PostAsync<VerificationCodeRequest, Dictionary<string, object>>(
+                        ApiEndpoints.AuthEndpoints.SendCode,
+                        request,
+                        ct
+                    );
+                    
+                    Logger?.LogInformation("[AuthApiService] Successfully sent verification code using fallback endpoint: {Endpoint}", 
+                        ApiEndpoints.AuthEndpoints.SendCode);
+                    return response;
+                }
+                catch (Exception fallbackEx)
+                {
+                    Logger?.LogError(fallbackEx, "[AuthApiService] Both endpoints failed. Primary: {Primary}, Fallback: {Fallback}", 
+                        ApiEndpoints.AuthEndpoints.SendVerificationCode, ApiEndpoints.AuthEndpoints.SendCode);
+                    throw new NotFoundException(
+                        $"Endpoint отправки кода верификации не найден на сервере. " +
+                        $"Попробованы: {ApiEndpoints.AuthEndpoints.SendVerificationCode} и {ApiEndpoints.AuthEndpoints.SendCode}. " +
+                        $"Проверьте конфигурацию API или обратитесь к администратору.", fallbackEx);
+                }
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {
@@ -142,15 +234,81 @@ namespace YessGoFront.Services.Api
         {
             try
             {
-                return await PostAsync<VerifyCodeRequest, UserDto>(
-                    $"{ApiEndpoints.AuthEndpoints.Base}/verify-code",
+                // Валидация входных данных
+                if (request == null)
+                {
+                    throw new ArgumentNullException(nameof(request), "VerifyCodeRequest cannot be null");
+                }
+                
+                if (string.IsNullOrWhiteSpace(request.phone_number))
+                {
+                    throw new ArgumentException("Phone number is required", nameof(request));
+                }
+                
+                if (string.IsNullOrWhiteSpace(request.code))
+                {
+                    throw new ArgumentException("Verification code is required", nameof(request));
+                }
+                
+                if (string.IsNullOrWhiteSpace(request.password))
+                {
+                    throw new ArgumentException("Password is required", nameof(request));
+                }
+
+                Logger?.LogInformation("[AuthApiService] Attempting registration for phone: {Phone}, Endpoint: {Endpoint}", 
+                    request.phone_number, ApiEndpoints.AuthEndpoints.VerifyCode);
+                
+                // Используем константу из ApiEndpoints вместо конкатенации строк
+                var response = await PostAsync<VerifyCodeRequest, UserDto>(
+                    ApiEndpoints.AuthEndpoints.VerifyCode,
                     request,
                     ct
                 );
+                
+                // Проверка на null ответ
+                if (response == null)
+                {
+                    Logger?.LogError("[AuthApiService] Registration response is null");
+                    throw new ApiException("Получен пустой ответ от сервера при регистрации");
+                }
+                
+                // Проверка на валидный ID пользователя
+                if (response.Id <= 0)
+                {
+                    Logger?.LogWarning("[AuthApiService] Registration response has invalid user ID: {Id}", response.Id);
+                }
+                
+                Logger?.LogInformation("[AuthApiService] Registration successful. UserId: {Id}, Phone: {Phone}", 
+                    response.Id, response.Phone);
+                
+                return response;
+            }
+            catch (NotFoundException ex)
+            {
+                // Специальная обработка 404 для registration endpoints
+                Logger?.LogError(ex, "[AuthApiService] Registration endpoint not found (404). Endpoint: {Endpoint}, BaseAddress: {BaseAddress}", 
+                    ApiEndpoints.AuthEndpoints.VerifyCode, HttpClient.BaseAddress);
+                throw new NotFoundException(
+                    $"Endpoint регистрации не найден на сервере. Проверьте конфигурацию API или обратитесь к администратору. " +
+                    $"Попытка доступа к: {HttpClient.BaseAddress}{ApiEndpoints.AuthEndpoints.VerifyCode}", ex);
+            }
+            catch (UnauthorizedException)
+            {
+                throw;
+            }
+            catch (BadRequestException)
+            {
+                throw;
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {
+                Logger?.LogError(ex, "[AuthApiService] Network error during registration: {Message}", ex.Message);
                 throw new NetworkException("Ошибка сети. Проверьте подключение к интернету.", ex);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "[AuthApiService] Unexpected error during registration: {Message}", ex.Message);
+                throw new ApiException($"Ошибка при регистрации: {ex.Message}", ex);
             }
         }
 
@@ -158,8 +316,12 @@ namespace YessGoFront.Services.Api
         {
             try
             {
+                // Используем константу из ApiEndpoints
+                Logger?.LogInformation("[AuthApiService] Getting user profile, Endpoint: {Endpoint}", 
+                    ApiEndpoints.AuthEndpoints.Me);
+                
                 // Получаем JSON ответ напрямую для отладки
-                var uri = BuildUri($"{ApiEndpoints.AuthEndpoints.Base}/me");
+                var uri = BuildUri(ApiEndpoints.AuthEndpoints.Me);
                 Logger?.LogDebug("GET {Url}", uri);
                 
                 var response = await HttpClient.GetAsync(uri, ct);
@@ -227,6 +389,15 @@ namespace YessGoFront.Services.Api
                 }
                 
                 return userDto;
+            }
+            catch (NotFoundException ex)
+            {
+                // Специальная обработка 404 для send-verification-code endpoint
+                Logger?.LogError(ex, "[AuthApiService] SendVerificationCode endpoint not found (404). Endpoint: {Endpoint}, BaseAddress: {BaseAddress}", 
+                    ApiEndpoints.AuthEndpoints.SendVerificationCode, HttpClient.BaseAddress);
+                throw new NotFoundException(
+                    $"Endpoint отправки кода верификации не найден на сервере. Проверьте конфигурацию API или обратитесь к администратору. " +
+                    $"Попытка доступа к: {HttpClient.BaseAddress}{ApiEndpoints.AuthEndpoints.SendVerificationCode}", ex);
             }
             catch (Exception ex) when (IsNetworkError(ex))
             {

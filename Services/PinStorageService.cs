@@ -28,9 +28,10 @@ public class PinStorageService
         return storedPin == enteredPin;
     }
 
-    public async Task ClearPinAsync()
+    public Task ClearPinAsync()
     {
         SecureStorage.Remove(PinKey);
+        return Task.CompletedTask;
     }
 
     /// <summary>

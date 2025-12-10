@@ -344,23 +344,40 @@ namespace YessGoFront.Views
                 {
                     var authService = MauiProgram.Services?.GetService<IAuthService>();
                     if (authService == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MorePage] IAuthService not found");
                         return;
+                    }
 
                     var localUser = await authService.GetLocalUserAsync();
                     if (localUser != null)
                     {
-                        // DisplayName всегда показывает ФИО из БД (или "Пользователь" если пусто)
+                        // DisplayName всегда показывает ФИО из БД
                         var displayName = localUser.Name;
+                        System.Diagnostics.Debug.WriteLine($"[MorePage] LoadUserAsync: Initial displayName from DB = '{displayName}'");
                         
-                        // Если ФИО пустое в БД, пытаемся загрузить профиль из API
-                        if (string.IsNullOrWhiteSpace(displayName))
+                        // Проверяем, нужно ли загружать профиль из API:
+                        // 1. Если Name пустое
+                        // 2. Если Name равно "Пользователь" (дефолтное значение)
+                        // 3. Если Name не содержит пробел (вероятно, это не полное имя)
+                        var shouldLoadFromApi = string.IsNullOrWhiteSpace(displayName) ||
+                                               displayName.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase) ||
+                                               !displayName.Contains(' ');
+                        
+                        if (shouldLoadFromApi)
                         {
+                            System.Diagnostics.Debug.WriteLine("[MorePage] Name is empty/invalid in DB, loading profile from API...");
                             try
                             {
-                                var userProfile = await authService.GetUserProfileAsync();
+                                // Используем таймаут для загрузки профиля (10 секунд)
+                                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                var userProfile = await authService.GetUserProfileAsync(cts.Token);
+                                
                                 if (userProfile != null)
                                 {
-                                    // Формируем ФИО из FirstName и LastName напрямую (не используем DisplayName)
+                                    System.Diagnostics.Debug.WriteLine($"[MorePage] Got profile from API: FirstName='{userProfile.FirstName}', LastName='{userProfile.LastName}'");
+                                    
+                                    // Формируем ФИО из FirstName и LastName напрямую (не используем DisplayName, так как он может вернуть телефон)
                                     var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
                                     var lastName = userProfile.LastName?.Trim() ?? string.Empty;
                                     var fullName = $"{firstName} {lastName}".Trim();
@@ -368,13 +385,58 @@ namespace YessGoFront.Views
                                     if (!string.IsNullOrWhiteSpace(fullName))
                                     {
                                         displayName = fullName;
-                                        System.Diagnostics.Debug.WriteLine($"[MorePage] Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                        System.Diagnostics.Debug.WriteLine($"[MorePage] ✅ Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                        
+                                        // Перезагружаем пользователя из БД, чтобы получить обновленное имя
+                                        var updatedUser = await authService.GetLocalUserAsync();
+                                        if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name) && 
+                                            !updatedUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            displayName = updatedUser.Name;
+                                            System.Diagnostics.Debug.WriteLine($"[MorePage] ✅ Updated displayName from DB after profile load: {displayName}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Если API не вернул имя, но в БД есть что-то валидное - используем его
+                                        if (!string.IsNullOrWhiteSpace(localUser.Name) && 
+                                            !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            displayName = localUser.Name;
+                                            System.Diagnostics.Debug.WriteLine($"[MorePage] Using Name from DB as fallback: {displayName}");
+                                        }
+                                        else
+                                        {
+                                            displayName = "Пользователь";
+                                            System.Diagnostics.Debug.WriteLine("[MorePage] ❌ FirstName and LastName are empty in API response");
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    // Если API вернул null, но в БД есть валидное имя - используем его
+                                    if (!string.IsNullOrWhiteSpace(localUser.Name) && 
+                                        !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        displayName = localUser.Name;
+                                        System.Diagnostics.Debug.WriteLine($"[MorePage] Using Name from DB as fallback (API returned null): {displayName}");
                                     }
                                     else
                                     {
                                         displayName = "Пользователь";
-                                        System.Diagnostics.Debug.WriteLine("[MorePage] FirstName and LastName are empty in API response");
+                                        System.Diagnostics.Debug.WriteLine("[MorePage] ❌ API returned null profile");
                                     }
+                                }
+                            }
+                            catch (System.OperationCanceledException)
+                            {
+                                System.Diagnostics.Debug.WriteLine("[MorePage] GetUserProfileAsync timed out");
+                                // Если таймаут, но в БД есть валидное имя - используем его
+                                if (!string.IsNullOrWhiteSpace(localUser.Name) && 
+                                    !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    displayName = localUser.Name;
+                                    System.Diagnostics.Debug.WriteLine($"[MorePage] Using Name from DB as fallback (timeout): {displayName}");
                                 }
                                 else
                                 {
@@ -383,9 +445,25 @@ namespace YessGoFront.Views
                             }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"[MorePage] Failed to load profile from API: {ex.Message}");
-                                displayName = "Пользователь";
+                                System.Diagnostics.Debug.WriteLine($"[MorePage] ❌ Failed to load profile from API: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"[MorePage] Stack trace: {ex.StackTrace}");
+                                
+                                // Если API не загрузился, но в БД есть валидное имя - используем его
+                                if (!string.IsNullOrWhiteSpace(localUser.Name) && 
+                                    !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    displayName = localUser.Name;
+                                    System.Diagnostics.Debug.WriteLine($"[MorePage] Using Name from DB as fallback (API error): {displayName}");
+                                }
+                                else
+                                {
+                                    displayName = "Пользователь";
+                                }
                             }
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MorePage] ✅ Using Name from DB: {displayName}");
                         }
                         
                         DisplayName = displayName;
@@ -393,13 +471,55 @@ namespace YessGoFront.Views
                     }
                     else
                     {
-                        DisplayName = "Пользователь";
-                        System.Diagnostics.Debug.WriteLine("[MorePage] No local user found");
+                        // Если нет локального пользователя, пытаемся получить данные из API
+                        string displayName = "Пользователь";
+                        
+                        try
+                        {
+                            // Используем таймаут для загрузки профиля (10 секунд)
+                            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                            var userProfile = await authService.GetUserProfileAsync(cts.Token);
+                            
+                            if (userProfile != null)
+                            {
+                                // Формируем ФИО из FirstName и LastName напрямую
+                                var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
+                                var lastName = userProfile.LastName?.Trim() ?? string.Empty;
+                                var fullName = $"{firstName} {lastName}".Trim();
+                                
+                                if (!string.IsNullOrWhiteSpace(fullName))
+                                {
+                                    displayName = fullName;
+                                    System.Diagnostics.Debug.WriteLine($"[MorePage] ✅ Loaded Name from API (no local user): FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[MorePage] ❌ FirstName and LastName are empty in API response (no local user)");
+                                }
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("[MorePage] ❌ API returned null profile (no local user)");
+                            }
+                        }
+                        catch (System.OperationCanceledException)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[MorePage] GetUserProfileAsync timed out (no local user)");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MorePage] ❌ Failed to load profile from API (no local user): {ex.Message}");
+                            // Оставляем "Пользователь"
+                        }
+                        
+                        DisplayName = displayName;
+                        System.Diagnostics.Debug.WriteLine($"[MorePage] No local user found: DisplayName={DisplayName}");
                     }
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[MorePage] Error loading user: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[MorePage] Stack trace: {ex.StackTrace}");
                     DisplayName = "Пользователь";
                 }
             }

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -88,7 +90,17 @@ public partial class RegisterViewModel : ObservableObject
 
             _logger?.LogInformation("Sending verification code to: {Phone}", normalizedPhone);
 
-            var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
+            // Используем таймаут для отправки кода (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var result = await _authService.SendVerificationCodeAsync(normalizedPhone, cts.Token);
+
+            // Проверка на null результат
+            if (result == null)
+            {
+                _logger?.LogError("[RegisterViewModel] SendVerificationCodeAsync returned null");
+                ShowError("Получен пустой ответ от сервера");
+                return;
+            }
 
             if (result.TryGetValue("code", out var codeObj) && codeObj != null)
                 DisplayedVerificationCode = codeObj.ToString();
@@ -98,6 +110,11 @@ public partial class RegisterViewModel : ObservableObject
             IsCodeSent = true;
             IsVerificationStep = true;
             SuccessMessage = "Код сгенерирован. Используйте его для верификации.";
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[RegisterViewModel] Send verification code operation timed out after 15 seconds");
+            ShowError("Операция отправки кода заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {
@@ -216,7 +233,27 @@ public partial class RegisterViewModel : ObservableObject
 
             _logger?.LogInformation("Attempting registration for phone: {Phone}", normalizedPhone);
 
-            var response = await _authService.VerifyCodeAndRegisterAsync(request);
+            // Используем таймаут для регистрации (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await _authService.VerifyCodeAndRegisterAsync(request, cts.Token);
+            
+            var userId = response?.UserId ?? response?.User?.Id ?? 0;
+            _logger?.LogInformation("[RegisterViewModel] Registration successful. UserId: {UserId}", userId);
+            
+            // Проверка на null response
+            if (response == null)
+            {
+                _logger?.LogError("[RegisterViewModel] Registration response is null");
+                ShowError("Получен пустой ответ от сервера при регистрации");
+                return;
+            }
+            
+            // Проверка на валидный ID пользователя
+            if (userId <= 0)
+            {
+                _logger?.LogWarning("[RegisterViewModel] Registration response has invalid user ID: UserId={UserId}, User.Id={UserId}", 
+                    response.UserId, response.User?.Id ?? 0);
+            }
 
             // Устанавливаем флаг успешной регистрации ПЕРЕД вызовом OnRegisterSuccess
             // чтобы предотвратить повторный вызов, если пользователь быстро нажмет кнопку
@@ -225,6 +262,11 @@ public partial class RegisterViewModel : ObservableObject
 
             if (OnRegisterSuccess is not null)
                 await OnRegisterSuccess.Invoke(response);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds");
+            ShowError("Операция регистрации заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {

@@ -40,6 +40,10 @@ public class AppDbContext : DbContext
     {
         optionsBuilder.UseSqlite(_connectionString);
 
+        // Установить NoTracking по умолчанию для read-only операций
+        // Явно включать tracking только для операций записи через .AsTracking()
+        optionsBuilder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+
         // Включить логирование SQL запросов
         if (_enableSqlLogging || 
 #if DEBUG
@@ -52,6 +56,35 @@ public class AppDbContext : DbContext
             optionsBuilder.LogTo(
                 message => _logger?.LogDebug(message),
                 LogLevel.Information);
+        }
+    }
+
+    /// <summary>
+    /// Настройка SQLite PRAGMA команд для оптимизации производительности
+    /// Должен вызываться один раз при инициализации БД
+    /// </summary>
+    public async Task ConfigureSqlitePragmasAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Используем ExecuteSqlRaw для настройки PRAGMA команд
+            // Эти команды применяются один раз при первом использовании БД
+            await Database.ExecuteSqlRawAsync(
+                """
+                PRAGMA synchronous = NORMAL;
+                PRAGMA journal_mode = WAL;
+                PRAGMA cache_size = -64000;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA mmap_size = 268435456;
+                PRAGMA foreign_keys = ON;
+                """,
+                cancellationToken);
+            
+            _logger?.LogDebug("SQLite PRAGMA commands configured for optimal performance");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to configure SQLite PRAGMA commands, using defaults");
         }
     }
 
@@ -72,6 +105,36 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<PartnerLocation>()
             .Ignore(pl => pl.WorkingHours);
+
+        // ============================================
+        // ИНДЕКСЫ ДЛЯ ОПТИМИЗАЦИИ ПРОИЗВОДИТЕЛЬНОСТИ
+        // ============================================
+
+        // Индекс на User.Phone для быстрого поиска по телефону
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Phone)
+            .HasDatabaseName("IX_Users_Phone");
+
+        // Составной индекс на User.IsActive, IsBlocked, LastLoginAt для GetLocalUserAsync
+        // Это ускорит запрос активных пользователей, отсортированных по LastLoginAt
+        modelBuilder.Entity<User>()
+            .HasIndex(u => new { u.IsActive, u.IsBlocked, u.LastLoginAt })
+            .HasDatabaseName("IX_Users_IsActive_IsBlocked_LastLoginAt");
+
+        // Индекс на Wallet.UserId для быстрого поиска кошелька пользователя
+        modelBuilder.Entity<Wallet>()
+            .HasIndex(w => w.UserId)
+            .HasDatabaseName("IX_Wallets_UserId");
+
+        // Составной индекс на Notification.UserId и CreatedAt для сортировки уведомлений
+        modelBuilder.Entity<Notification>()
+            .HasIndex(n => new { n.UserId, n.CreatedAt })
+            .HasDatabaseName("IX_Notifications_UserId_CreatedAt");
+
+        // Составной индекс на Transaction.UserId и CreatedAt для истории транзакций
+        modelBuilder.Entity<Transaction>()
+            .HasIndex(t => new { t.UserId, t.CreatedAt })
+            .HasDatabaseName("IX_Transactions_UserId_CreatedAt");
     }
 
     /// <summary>

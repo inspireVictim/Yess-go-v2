@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -72,11 +73,35 @@ public partial class LoginViewModel : ObservableObject
 
             _logger?.LogInformation("Attempting login for phone: {Phone}", normalizedPhone);
 
-            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, Password);
-            _logger?.LogInformation("Login successful. UserId: {UserId}", response.UserId);
+            // Используем таймаут для операции входа (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, Password, cts.Token);
+            
+            _logger?.LogInformation("[LoginViewModel] Login successful. UserId: {UserId}", response.UserId);
+            
+            // Проверка на null response
+            if (response == null)
+            {
+                _logger?.LogError("[LoginViewModel] Login response is null");
+                ShowError("Получен пустой ответ от сервера");
+                return;
+            }
+            
+            // Проверка на валидный токен
+            if (string.IsNullOrWhiteSpace(response.AccessToken))
+            {
+                _logger?.LogError("[LoginViewModel] AccessToken is null or empty in response");
+                ShowError("Не получен токен доступа от сервера");
+                return;
+            }
 
             if (OnLoginSuccess is not null)
                 await OnLoginSuccess.Invoke(response);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
+            ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Dispatching;
 using YessGoFront.Data;
 using YessGoFront.Infrastructure.Ui;
@@ -54,7 +55,7 @@ public partial class App : Application
     {
         base.OnResume();
 
-        // Обновляем баланс при возврате приложения в фокус
+        // Обновляем токены и баланс при возврате приложения в фокус
         Task.Run(async () =>
         {
             try
@@ -63,18 +64,64 @@ public partial class App : Application
                 if (scopeFactory != null)
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var walletService = scope.ServiceProvider.GetService<IWalletService>();
-                    if (walletService != null)
+                    
+                    // 1. Сначала обновляем токены, чтобы сессия не терялась
+                    try
                     {
-                        var balance = await walletService.GetBalanceAsync();
-                        BalanceStore.Instance.Balance = balance;
-                        System.Diagnostics.Debug.WriteLine($"[App] Balance refreshed on resume: {balance}");
+                        var globalAuthService = scope.ServiceProvider.GetService<GlobalAuthService>();
+                        if (globalAuthService != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[App] OnResume: Checking and refreshing tokens...");
+                            
+                            // Используем таймаут для обновления токенов (10 секунд)
+                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                            var tokensValid = await globalAuthService.EnsureValidTokensAsync(cts.Token);
+                            
+                            if (tokensValid)
+                            {
+                                System.Diagnostics.Debug.WriteLine("[App] OnResume: Tokens are valid or refreshed successfully");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("[App] OnResume: Failed to refresh tokens, user may need to login");
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[App] OnResume: Token refresh timed out");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[App] OnResume: Error refreshing tokens: {ex.Message}");
+                    }
+                    
+                    // 2. Затем обновляем баланс
+                    try
+                    {
+                        var walletService = scope.ServiceProvider.GetService<IWalletService>();
+                        if (walletService != null)
+                        {
+                            // Используем таймаут для запроса баланса (10 секунд)
+                            using var balanceCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                            var balance = await walletService.GetBalanceAsync(balanceCts.Token);
+                            BalanceStore.Instance.Balance = balance;
+                            System.Diagnostics.Debug.WriteLine($"[App] OnResume: Balance refreshed: {balance}");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[App] OnResume: Balance refresh timed out");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[App] OnResume: Error refreshing balance: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[App] Error refreshing balance on resume: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] OnResume: Unexpected error: {ex.Message}");
             }
         });
     }

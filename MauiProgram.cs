@@ -321,25 +321,6 @@ public static class MauiProgram
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPromoCodeService, PromoCodeService>();
         services.AddSingleton<ICartService, CartService>();
-        
-        // Finik Payment Service - платформенно-специфичная регистрация
-        // Использует Backend Proxy подход: все вызовы Finik SDK выполняются на backend
-#if ANDROID
-        services.AddSingleton<IFinikPaymentService>(sp =>
-        {
-            var paymentApiService = sp.GetRequiredService<IPaymentApiService>();
-            return new Platforms.Android.FinikPaymentService(paymentApiService);
-        });
-#elif IOS
-        services.AddSingleton<IFinikPaymentService>(sp =>
-        {
-            var paymentApiService = sp.GetRequiredService<IPaymentApiService>();
-            return new Platforms.iOS.FinikPaymentService(paymentApiService);
-        });
-#else
-        // Для других платформ можно создать заглушку или оставить пустым
-        // services.AddSingleton<IFinikPaymentService, DummyFinikPaymentService>();
-#endif
     }
 
     private static void ConfigureViewModels(IServiceCollection services)

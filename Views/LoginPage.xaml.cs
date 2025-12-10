@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
@@ -13,6 +14,7 @@ namespace YessGoFront.Views
     public partial class LoginPage : ContentPage
     {
         private readonly LoginViewModel _viewModel;
+        private bool _isNavigating = false; // Защита от повторных вызовов навигации
 
         public LoginPage()
         {
@@ -63,6 +65,13 @@ namespace YessGoFront.Views
 
         private async Task OnLoginSuccess(Services.Api.AuthResponse response)
         {
+            // Защита от повторных вызовов навигации
+            if (_isNavigating)
+            {
+                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigation already in progress, ignoring duplicate call");
+                return;
+            }
+
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response.UserId}");
@@ -98,14 +107,38 @@ namespace YessGoFront.Views
                     System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: IsSignedIn is false after SignIn! This should not happen.");
                 }
 
-                // Проверяем, есть ли валидный PIN (с очисткой старого/повреждённого)
+                // Проверяем, есть ли валидный PIN с таймаутом
                 var domainAuthService = MauiProgram.Services.GetRequiredService<IAuthService>();
-                var hasPin = await domainAuthService.HasPinAsync();
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] OnLoginSuccess: hasValidPin={hasPin}");
+                bool hasPin = false;
+                try
+                {
+                    // Используем таймаут для проверки PIN (10 секунд)
+                    // HasPinAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                    using var pinCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    hasPin = await Task.Run(async () => await domainAuthService.HasPinAsync(), pinCts.Token);
+                    System.Diagnostics.Debug.WriteLine($"[LoginPage] OnLoginSuccess: hasValidPin={hasPin}");
+                }
+                catch (OperationCanceledException)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] HasPinAsync timed out, assuming no PIN");
+                    hasPin = false; // При таймауте предполагаем, что PIN нет
+                }
+                catch (Exception pinEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LoginPage] Error checking PIN: {pinEx.Message}");
+                    hasPin = false; // При ошибке предполагаем, что PIN нет
+                }
 
                 // Навигацию делаем на главном потоке
                 await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
+                    if (_isNavigating)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[LoginPage] Navigation already in progress, skipping");
+                        return;
+                    }
+
+                    _isNavigating = true;
                     try
                     {
                         var shell = Shell.Current;
@@ -129,6 +162,10 @@ namespace YessGoFront.Views
                     {
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation error: {navEx.Message}");
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {navEx.StackTrace}");
+                    }
+                    finally
+                    {
+                        _isNavigating = false;
                     }
                 });
             }

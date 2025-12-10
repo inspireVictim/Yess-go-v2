@@ -180,6 +180,18 @@
                         </Grid>
                     </Frame>
 
+                    <!-- Отображение баланса пользователя -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="16"
+                           Padding="20">
+                        <Label x:Name="UserBalanceLabel"
+                               Text="У вас в наличии: 0 Yess!Coin"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#0B4A3B"
+                               HorizontalOptions="Center"/>
+                    </Frame>
+
                     <!-- Поле ввода суммы -->
                     <Frame BackgroundColor="White"
                            CornerRadius="16"
@@ -219,6 +231,20 @@
                                    FontAttributes="Bold"
                                    TextColor="#0B4A3B"/>
                         </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Сообщение о недостатке средств -->
+                    <Frame BackgroundColor="#FFEBEE"
+                           CornerRadius="16"
+                           Padding="20"
+                           BorderColor="#F44336"
+                           HasShadow="False">
+                        <Label x:Name="InsufficientFundsLabel"
+                               Text="Не хватает средств для перевода"
+                               FontSize="14"
+                               TextColor="#D32F2F"
+                               HorizontalOptions="Center"
+                               IsVisible="False"/>
                     </Frame>
 
                     <!-- Кнопка оплаты -->

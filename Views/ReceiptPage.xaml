@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage 
+    x:Class="YessGoFront.Views.ReceiptPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="#F4F6F8">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="16,12" BackgroundColor="#0B4A3B">
+            <Label Text="Чек об оплате" 
+                   TextColor="White" 
+                   FontSize="20" 
+                   FontAttributes="Bold"
+                   VerticalTextAlignment="Center"
+                   HorizontalOptions="Center"/>
+        </Grid>
+
+        <!-- Receipt Content with Border -->
+        <ScrollView Grid.Row="1">
+            <Grid Padding="20">
+                <Border
+                    StrokeThickness="2"
+                    Stroke="#0B4A3B"
+                    BackgroundColor="White"
+                    Padding="24"
+                    StrokeShape="RoundRectangle 12">
+                <VerticalStackLayout Spacing="20">
+                    <!-- Receipt Header -->
+                    <Label Text="ЧЕК ОБ ОПЛАТЕ"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="#0B4A3B"
+                           HorizontalOptions="Center"/>
+
+                    <!-- Date and Time -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="8"
+                           Padding="12"
+                           HasShadow="False">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Label Text="Дата и время:"
+                                   FontSize="14"
+                                   TextColor="#666"
+                                   Grid.Column="0"/>
+                            <Label x:Name="DateLabel"
+                                   Text=""
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"
+                                   HorizontalOptions="End"
+                                   Grid.Column="1"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- From (User) -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="8"
+                           Padding="12"
+                           HasShadow="False">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Label Text="От:"
+                                   FontSize="14"
+                                   TextColor="#666"
+                                   Grid.Column="0"/>
+                            <Label x:Name="FromLabel"
+                                   Text=""
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"
+                                   HorizontalOptions="End"
+                                   Grid.Column="1"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- To (Partner) -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="8"
+                           Padding="12"
+                           HasShadow="False">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Label Text="Кому:"
+                                   FontSize="14"
+                                   TextColor="#666"
+                                   Grid.Column="0"/>
+                            <Label x:Name="ToLabel"
+                                   Text=""
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"
+                                   HorizontalOptions="End"
+                                   Grid.Column="1"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Amount -->
+                    <Frame BackgroundColor="#0B4A3B"
+                           CornerRadius="8"
+                           Padding="16"
+                           HasShadow="False">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Label Text="Сумма:"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   Grid.Column="0"/>
+                            <Label x:Name="AmountLabel"
+                                   Text=""
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   HorizontalOptions="End"
+                                   Grid.Column="1"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Transaction ID -->
+                    <Frame BackgroundColor="#EEF2F7"
+                           CornerRadius="8"
+                           Padding="12"
+                           HasShadow="False">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Label Text="ID транзакции:"
+                                   FontSize="12"
+                                   TextColor="#666"
+                                   Grid.Column="0"/>
+                            <Label x:Name="TransactionIdLabel"
+                                   Text=""
+                                   FontSize="12"
+                                   FontAttributes="Bold"
+                                   TextColor="#0B4A3B"
+                                   HorizontalOptions="End"
+                                   Grid.Column="1"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Divider -->
+                    <BoxView HeightRequest="1"
+                             Color="#E5E7EB"
+                             Margin="0,10"/>
+
+                    <!-- Footer -->
+                    <Label Text="Спасибо за использование YESS!GO"
+                           FontSize="12"
+                           TextColor="#9CA3AF"
+                           HorizontalOptions="Center"
+                           Margin="0,10,0,0"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+        </ScrollView>
+
+        <!-- Close Button -->
+        <Button Grid.Row="2"
+                x:Name="CloseButton"
+                Text="Закрыть"
+                BackgroundColor="#0B4A3B"
+                TextColor="White"
+                FontSize="16"
+                FontAttributes="Bold"
+                CornerRadius="12"
+                HeightRequest="50"
+                Margin="20,10,20,20"
+                Clicked="OnCloseButtonClicked"/>
+    </Grid>
+</ContentPage>
+

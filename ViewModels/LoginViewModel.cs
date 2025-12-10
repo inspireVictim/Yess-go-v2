@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -33,9 +34,24 @@ public partial class LoginViewModel : ObservableObject
     private async Task LoginAsync()
     {
         if (IsBusy)
+        {
+            _logger?.LogWarning("[LoginViewModel] Login attempt while busy, ignoring");
             return;
+        }
 
+        // Очищаем предыдущие ошибки
+        HasError = false;
+        ErrorMessage = null;
+
+        // Валидация телефона
         if (string.IsNullOrWhiteSpace(Phone))
+        {
+            ShowError("Введите номер телефона");
+            return;
+        }
+
+        var phoneTrimmed = Phone.Trim();
+        if (string.IsNullOrWhiteSpace(phoneTrimmed))
         {
             ShowError("Введите номер телефона");
             return;
@@ -43,7 +59,7 @@ public partial class LoginViewModel : ObservableObject
 
         // Phone уже содержит полный номер с +996 от PhoneEntry (FullPhoneNumber)
         // Проверяем валидность: должно быть 9 цифр после +996
-        var phoneDigits = new string(Phone.Where(char.IsDigit).ToArray());
+        var phoneDigits = new string(phoneTrimmed.Where(char.IsDigit).ToArray());
         // Убираем префикс 996 если есть (PhoneEntry уже добавил +996)
         if (phoneDigits.StartsWith("996") && phoneDigits.Length > 3)
         {
@@ -56,11 +72,25 @@ public partial class LoginViewModel : ObservableObject
         }
 
         // Phone уже содержит +996 от PhoneEntry, используем как есть
-        var normalizedPhone = Phone.StartsWith("+996") ? Phone : "+996" + phoneDigits;
+        var normalizedPhone = phoneTrimmed.StartsWith("+996") ? phoneTrimmed : "+996" + phoneDigits;
 
+        // Валидация пароля
         if (string.IsNullOrWhiteSpace(Password))
         {
             ShowError("Введите пароль");
+            return;
+        }
+
+        var passwordTrimmed = Password.Trim();
+        if (string.IsNullOrWhiteSpace(passwordTrimmed))
+        {
+            ShowError("Введите пароль");
+            return;
+        }
+        
+        if (passwordTrimmed.Length < 6)
+        {
+            ShowError("Пароль должен содержать минимум 6 символов");
             return;
         }
 
@@ -70,10 +100,30 @@ public partial class LoginViewModel : ObservableObject
             HasError = false;
             ErrorMessage = null;
 
-            _logger?.LogInformation("Attempting login for phone: {Phone}", normalizedPhone);
+            _logger?.LogInformation("[LoginViewModel] Attempting login for phone: {Phone}", normalizedPhone);
+            var startTime = DateTime.UtcNow;
 
-            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, Password);
-            _logger?.LogInformation("Login successful. UserId: {UserId}", response.UserId);
+            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, passwordTrimmed);
+            
+            var duration = DateTime.UtcNow - startTime;
+            _logger?.LogInformation("[LoginViewModel] Login successful in {Duration}ms. UserId: {UserId}", 
+                duration.TotalMilliseconds, response.UserId);
+            
+            // Проверка на null response
+            if (response == null)
+            {
+                _logger?.LogError("[LoginViewModel] Login response is null");
+                ShowError("Получен пустой ответ от сервера");
+                return;
+            }
+            
+            // Проверка на валидный токен
+            if (string.IsNullOrWhiteSpace(response.AccessToken))
+            {
+                _logger?.LogError("[LoginViewModel] AccessToken is null or empty in response");
+                ShowError("Не получен токен доступа от сервера");
+                return;
+            }
 
             if (OnLoginSuccess is not null)
                 await OnLoginSuccess.Invoke(response);

@@ -453,12 +453,14 @@ namespace YessGoFront.Views
         [RelayCommand]
         private void Number(string number)
         {
+            // Проверяем длину ДО добавления цифры, чтобы не допустить ввод больше 4 цифр
             if (_currentPin.Length >= 4)
                 return;
 
+            // Добавляем цифру
             PinCode = _currentPin + number;
             
-            // Автоматическая обработка при вводе 4 цифр
+            // Автоматическая обработка при вводе 4 цифр (проверяем ПОСЛЕ добавления)
             if (_currentPin.Length == 4)
             {
                 _ = ProcessPinAsync();
@@ -488,36 +490,48 @@ namespace YessGoFront.Views
 
             System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: START - _isCreatingPin={_isCreatingPin}, _confirmPin={_confirmPin}, _currentPin={_currentPin}");
             
-            // ВСЕГДА проверяем наличие PIN-кода в хранилище ПЕРЕД обработкой
-            bool hasPinInStorage = false;
-            if (_authService != null)
+            // ЧЕТКАЯ ЛОГИКА определения режима:
+            // 1. Если _confirmPin != null - мы в процессе создания (второй ввод) - ВСЕГДА создание
+            // 2. Иначе проверяем наличие PIN в хранилище
+            bool isActuallyCreating;
+            
+            if (_confirmPin != null)
             {
-                try
+                // Второй ввод при создании - всегда режим создания
+                isActuallyCreating = true;
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: _confirmPin is set → creation mode (second input)");
+            }
+            else
+            {
+                // Первый ввод - проверяем наличие PIN в хранилище
+                bool hasPinInStorage = false;
+                if (_authService != null)
                 {
-                    hasPinInStorage = await _authService.HasPinAsync();
-                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: hasPinInStorage={hasPinInStorage}");
+                    try
+                    {
+                        hasPinInStorage = await _authService.HasPinAsync();
+                        System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: hasPinInStorage={hasPinInStorage}");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: Error checking PIN: {ex.Message}");
+                        hasPinInStorage = false; // В случае ошибки считаем, что PIN-кода нет
+                    }
                 }
-                catch (Exception ex)
+                
+                // Если PIN нет в хранилище - режим создания, иначе - проверки
+                isActuallyCreating = !hasPinInStorage;
+                
+                // Обновляем _isCreatingPin для будущих вызовов
+                if (!hasPinInStorage)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: Error checking PIN: {ex.Message}");
-                    hasPinInStorage = false; // В случае ошибки считаем, что PIN-кода нет
+                    _isCreatingPin = true;
                 }
+                
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: hasPinInStorage={hasPinInStorage} → isActuallyCreating={isActuallyCreating}");
             }
             
-            // Определяем режим работы:
-            // 1. Если _confirmPin не null - мы в процессе создания (второй ввод) - ВСЕГДА создание
-            // 2. Если PIN-кода нет в хранилище - ВСЕГДА создание
-            // 3. Если _isCreatingPin = true - режим создания
-            // 4. Иначе - режим проверки
-            var isActuallyCreating = _confirmPin != null || !hasPinInStorage || _isCreatingPin;
-            
-            // Обновляем _isCreatingPin для будущих вызовов
-            if (!hasPinInStorage)
-            {
-                _isCreatingPin = true;
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: FINAL - isActuallyCreating={isActuallyCreating}, hasPinInStorage={hasPinInStorage}");
+            System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: FINAL - isActuallyCreating={isActuallyCreating}");
 
             IsBusy = true;
             OnPropertyChanged(nameof(IsBusy));
@@ -610,6 +624,11 @@ namespace YessGoFront.Views
                     _confirmPin = null;
                     PinCode = string.Empty;
                     
+                    // Обновляем режим создания и UI
+                    _isCreatingPin = true;
+                    OnPropertyChanged(nameof(TitleText));
+                    OnPropertyChanged(nameof(IsVerificationMode));
+                    
                     // Обновляем текст подзаголовка
                     SubtitleText = "Придумайте 4-значный PIN-код для быстрого входа";
                 }
@@ -620,15 +639,25 @@ namespace YessGoFront.Views
         {
             bool isValid = false;
 
-            if (_authService != null)
+            try
             {
-                isValid = await _authService.ValidatePinAsync(_currentPin);
+                if (_authService != null)
+                {
+                    isValid = await _authService.ValidatePinAsync(_currentPin);
+                }
+                else
+                {
+                    // Fallback: проверяем напрямую через SecureStorage
+                    var storedPin = await Microsoft.Maui.Storage.SecureStorage.GetAsync("user_pin");
+                    isValid = storedPin == _currentPin;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // Fallback: проверяем напрямую через SecureStorage
-                var storedPin = await Microsoft.Maui.Storage.SecureStorage.GetAsync("user_pin");
-                isValid = storedPin == _currentPin;
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error validating PIN: {ex.Message}");
+                ShowError("Ошибка при проверке PIN-кода. Попробуйте снова.");
+                PinCode = string.Empty;
+                return;
             }
 
             if (isValid)

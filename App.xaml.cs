@@ -14,32 +14,7 @@ public partial class App : Application
     {
         InitializeComponent();
 
-#if DEBUG
-        // Тест здоровья API — можно оставить, не влияет на навигацию
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(2000);
-                var clientFactory = MauiProgram.Services.GetRequiredService<IHttpClientFactory>();
-                var client = clientFactory.CreateClient("ApiClient");
-
-                var baseUrl = client.BaseAddress?.ToString() ?? "unknown";
-                System.Diagnostics.Debug.WriteLine($"[App] 🔍 Testing API connection to: {baseUrl}");
-
-                var response = await client.GetAsync("");
-                var text = await response.Content.ReadAsStringAsync();
-
-                System.Diagnostics.Debug.WriteLine(
-                    $"[App] ✅ API Health Check: {response.StatusCode} - {text.Substring(0, Math.Min(100, text.Length))}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[App] ❌ API Health Check FAILED!");
-                System.Diagnostics.Debug.WriteLine($"[App] Error: {ex.Message}");
-            }
-        });
-#endif
+        // API health check отложен для оптимизации запуска
     }
 
     /// <summary>

@@ -24,6 +24,11 @@ public class AppDbContext : DbContext
         _logger = logger;
     }
 
+    /// <summary>
+    /// Строка подключения к базе данных
+    /// </summary>
+    public string ConnectionString => _connectionString;
+
     // DbSets для сущностей
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<Wallet> Wallets { get; set; } = null!;

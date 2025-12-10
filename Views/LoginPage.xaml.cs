@@ -74,7 +74,29 @@ namespace YessGoFront.Views
 
             try
             {
+                // Проверка на null response
+                if (response == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: Login response is null");
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        await DisplayAlert("Ошибка", "Получен пустой ответ от сервера. Попробуйте войти снова.", "OK");
+                    });
+                    return;
+                }
+
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response.UserId}");
+
+                // Проверка на валидный токен
+                if (string.IsNullOrWhiteSpace(response.AccessToken))
+                {
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: AccessToken is null or empty");
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        await DisplayAlert("Ошибка", "Не получен токен доступа. Попробуйте войти снова.", "OK");
+                    });
+                    return;
+                }
 
                 // Проверяем, что токен реально сохранён
                 var authService = MauiProgram.Services
@@ -82,6 +104,11 @@ namespace YessGoFront.Views
 
                 var savedToken = await authService.GetAccessTokenAsync();
                 System.Diagnostics.Debug.WriteLine($"[LoginPage] Token saved: {!string.IsNullOrEmpty(savedToken)}");
+                
+                if (string.IsNullOrEmpty(savedToken))
+                {
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: Token was not saved properly");
+                }
 
                 // Обновляем AccountStore (учитываем rememberMe!)
                 var user = response.User;
@@ -142,26 +169,41 @@ namespace YessGoFront.Views
                     try
                     {
                         var shell = Shell.Current;
-                        if (shell != null)
+                        if (shell == null)
                         {
-                            if (!hasPin)
-                            {
-                                // Если валидного PIN-кода нет - перейти на создание PIN
-                                System.Diagnostics.Debug.WriteLine("[LoginPage] No valid PIN found, navigating to PIN creation page");
-                                await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
-                            }
-                            else
-                            {
-                                // Если есть валидный PIN - сразу на экран ввода PIN
-                                System.Diagnostics.Debug.WriteLine("[LoginPage] Valid PIN exists, navigating to PIN login page");
-                                await shell.GoToAsync("///pinlogin", animate: true);
-                            }
+                            System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: Shell.Current is null");
+                            await DisplayAlert("Ошибка", "Не удалось выполнить навигацию. Перезапустите приложение.", "OK");
+                            return;
+                        }
+
+                        if (!hasPin)
+                        {
+                            // Если валидного PIN-кода нет - перейти на создание PIN
+                            System.Diagnostics.Debug.WriteLine("[LoginPage] No valid PIN found, navigating to PIN creation page");
+                            await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
+                        }
+                        else
+                        {
+                            // Если есть валидный PIN - сразу на экран ввода PIN
+                            System.Diagnostics.Debug.WriteLine("[LoginPage] Valid PIN exists, navigating to PIN login page");
+                            await shell.GoToAsync("///pinlogin", animate: true);
                         }
                     }
                     catch (Exception navEx)
                     {
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation error: {navEx.Message}");
                         System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {navEx.StackTrace}");
+                        
+                        // Показываем ошибку пользователю
+                        try
+                        {
+                            await DisplayAlert("Ошибка навигации", 
+                                $"Не удалось перейти на следующий экран: {navEx.Message}", "OK");
+                        }
+                        catch
+                        {
+                            // Игнорируем ошибки при показе алерта
+                        }
                     }
                     finally
                     {

@@ -24,5 +24,10 @@ public interface IWalletApiService
     /// Получить транзакцию по ID
     /// </summary>
     Task<PurchaseDto> GetTransactionByIdAsync(string id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Перевести средства партнеру
+    /// </summary>
+    Task<PurchaseDto> TransferToPartnerAsync(int partnerId, decimal amount, string? description = null, CancellationToken ct = default);
 }
 

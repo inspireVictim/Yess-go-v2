@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
 using YessGoFront.Views;
 using YessGoFront.Services;
+using YessGoFront.Data.Entities;
 
 namespace YessGoFront
 {
@@ -88,7 +89,7 @@ namespace YessGoFront
 
             _initialized = true;
 
-            Debug.WriteLine("[AppShell] OnAppearing: starting startup auth/PIN check");
+            Debug.WriteLine("[AppShell] OnAppearing: starting fast startup routing");
 
             try
             {
@@ -101,121 +102,58 @@ namespace YessGoFront
                     return;
                 }
 
-                // Получаем сервис аутентификации один раз для использования во всех блоках
-                var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
-
-                // 1. Проверяем, есть ли пользователь в локальной SQLite БД
-                var localUser = await authService.GetLocalUserAsync();
-                Debug.WriteLine($"[AppShell] OnAppearing: LocalUser exists={localUser != null} (UserId={localUser?.Id ?? 0})");
-
-                if (localUser != null)
+                // БЫСТРАЯ ПРОВЕРКА: используем кэш или Preferences для мгновенного показа UI
+                var userId = await authService.GetCurrentUserIdAsync();
+                var hasCachedUser = userId.HasValue && userId.Value > 0;
+                
+                // Проверяем кэш PIN (быстро, без БД)
+                var hasCachedPin = _cachedHasPin ?? false;
+                if (!_cachedHasPin.HasValue || DateTime.UtcNow - _cacheTimestamp > CacheExpiry)
                 {
-                    // Проверяем состояние токенов для оптимизации UX
-                    bool tokensAreFresh = false;
-                    if (authenticationService != null)
+                    // Быстрая проверка через SecureStorage (синхронно, без БД)
+                    try
                     {
-                        var accessToken = await authenticationService.GetAccessTokenAsync();
-                        if (!string.IsNullOrWhiteSpace(accessToken))
-                        {
-                            var isTokenValid = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
-                            var remainingMinutes = Infrastructure.Auth.JwtHelper.GetTokenRemainingMinutes(accessToken);
-
-                            if (isTokenValid && remainingMinutes > 15)
-                            {
-                                // Токены свежие (более 15 минут) - можем оптимизировать UX
-                                tokensAreFresh = true;
-                                Debug.WriteLine($"[AppShell] Tokens are fresh: {remainingMinutes} minutes remaining");
-                            }
-                            else if (!isTokenValid)
-                            {
-                                // Токены истекли - пытаемся обновить в фоне
-                                var refreshToken = await authenticationService.GetRefreshTokenAsync();
-                                if (!string.IsNullOrWhiteSpace(refreshToken))
-                                {
-                                    Debug.WriteLine("[AppShell] Access token expired, attempting to refresh in background");
-                                    // Обновляем в фоне, не ждем результата
-                                    _ = Task.Run(async () =>
-                                    {
-                                        try
-                                        {
-                                            await authenticationService.RefreshTokenAsync();
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Debug.WriteLine($"[AppShell] Background token refresh failed: {ex.Message}");
-                                        }
-                                    });
-                                }
-                            }
-                        }
+                        var pinService = new PinStorageService();
+                        var storedPin = await pinService.GetPinAsync();
+                        hasCachedPin = !string.IsNullOrWhiteSpace(storedPin) && storedPin.Length >= 4 && storedPin.Length <= 10;
+                        _cachedHasPin = hasCachedPin;
+                        _cacheTimestamp = DateTime.UtcNow;
                     }
-
-                    // Проверяем наличие PIN
-                    var hasValidPin = await authService.HasPinAsync();
-                    Debug.WriteLine($"[AppShell] OnAppearing: hasValidPin={hasValidPin}, tokensAreFresh={tokensAreFresh}");
-
-                    if (!hasValidPin)
+                    catch
                     {
-                        Debug.WriteLine("[AppShell] Decision: local user but NO valid PIN → navigating to PIN creation");
-                        await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
+                        hasCachedPin = false;
                     }
-                    else
-                    {
-                        // Отправляем на PIN экран с информацией о состоянии токенов
-                        var route = tokensAreFresh ? "///pinlogin?tokenStatus=fresh" : "///pinlogin";
-                        Debug.WriteLine($"[AppShell] Decision: local user WITH valid PIN → navigating to PIN login (tokenStatus: {(tokensAreFresh ? "fresh" : "normal")})");
-                        await Shell.Current.GoToAsync(route, animate: false);
-                    }
-                    return;
                 }
 
-                // 2. Пользователя нет в локальной БД - проверяем, есть ли токены (пользователь есть на сервере)
-                var hasRefreshToken = false;
-                if (authenticationService != null)
+                // ПОКАЗЫВАЕМ UI СРАЗУ на основе кэша
+                if (hasCachedUser && hasCachedPin)
                 {
-                    var refreshToken = await authenticationService.GetRefreshTokenAsync();
-                    hasRefreshToken = !string.IsNullOrWhiteSpace(refreshToken);
-                    Debug.WriteLine($"[AppShell] OnAppearing: HasRefreshToken={hasRefreshToken}");
+                    Debug.WriteLine("[AppShell] Fast path: cached user and PIN → navigating to PIN login");
+                    await Shell.Current.GoToAsync("///pinlogin", animate: false);
+                }
+                else if (hasCachedUser && !hasCachedPin)
+                {
+                    Debug.WriteLine("[AppShell] Fast path: cached user but NO PIN → navigating to PIN creation");
+                    await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
+                }
+                else
+                {
+                    Debug.WriteLine("[AppShell] Fast path: no cached user → navigating to login");
+                    await Shell.Current.GoToAsync("///login", animate: false);
                 }
 
-                if (hasRefreshToken)
+                // ЗАПУСКАЕМ ТЯЖЕЛЫЕ ОПЕРАЦИИ В ФОНЕ после показа UI
+                _ = Task.Run(async () =>
                 {
-                    // Есть токены на сервере, но нет локального пользователя - выполняем автоматический вход
-                    Debug.WriteLine("[AppShell] Decision: no local user but has refresh token → attempting auto-login");
-                    var autoLoginSuccess = await authService.AutoLoginIfNoLocalUserAsync();
-                    
-                    if (autoLoginSuccess)
+                    try
                     {
-                        Debug.WriteLine("[AppShell] Auto-login successful, checking PIN");
-                        var hasValidPin = await authService.HasPinAsync();
-                        
-                        if (!hasValidPin)
-                        {
-                            Debug.WriteLine("[AppShell] Decision: auto-login successful but NO valid PIN → navigating to PIN creation");
-                            await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
-                        }
-                        else
-                        {
-                            Debug.WriteLine("[AppShell] Decision: auto-login successful WITH valid PIN → navigating to PIN login");
-                            await Shell.Current.GoToAsync("///pinlogin", animate: false);
-                        }
+                        await PerformBackgroundInitializationAsync(authService);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Debug.WriteLine("[AppShell] Auto-login failed → navigating to login");
-                        // Очищаем токены, если автоматический вход не удался
-                        if (authenticationService != null)
-                        {
-                            await authenticationService.ClearTokensAsync();
-                        }
-                        await Shell.Current.GoToAsync("///login", animate: false);
+                        Debug.WriteLine($"[AppShell] Background initialization error: {ex.Message}");
                     }
-                    return;
-                }
-
-                // 3. Нет ни локального пользователя, ни токенов - показываем экран логина
-                Debug.WriteLine("[AppShell] Decision: no local user and no tokens → navigating to login");
-                await Shell.Current.GoToAsync("///login", animate: false);
+                });
             }
             catch (Exception ex)
             {

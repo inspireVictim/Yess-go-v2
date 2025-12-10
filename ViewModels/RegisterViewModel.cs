@@ -1,6 +1,5 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -73,7 +72,28 @@ public partial class RegisterViewModel : ObservableObject
 
     private async Task SendVerificationCodeAsync()
     {
-        var normalizedPhone = NormalizePhone(Phone);
+        // Очищаем предыдущие ошибки
+        HasPhoneError = false;
+        PhoneError = null;
+        ClearMessages();
+
+        // Валидация телефона
+        if (string.IsNullOrWhiteSpace(Phone))
+        {
+            PhoneError = "Введите номер телефона";
+            HasPhoneError = true;
+            return;
+        }
+
+        var phoneTrimmed = Phone.Trim();
+        if (string.IsNullOrWhiteSpace(phoneTrimmed))
+        {
+            PhoneError = "Введите номер телефона";
+            HasPhoneError = true;
+            return;
+        }
+
+        var normalizedPhone = NormalizePhone(phoneTrimmed);
 
         if (!IsPhoneValid(normalizedPhone))
         {
@@ -88,19 +108,10 @@ public partial class RegisterViewModel : ObservableObject
             IsBusy = true;
             ClearMessages();
 
-            _logger?.LogInformation("Sending verification code to: {Phone}", normalizedPhone);
+            _logger?.LogInformation("[RegisterViewModel] Sending verification code to: {Phone}", normalizedPhone);
+            var startTime = DateTime.UtcNow;
 
-            // Используем таймаут для отправки кода (15 секунд)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var result = await _authService.SendVerificationCodeAsync(normalizedPhone, cts.Token);
-
-            // Проверка на null результат
-            if (result == null)
-            {
-                _logger?.LogError("[RegisterViewModel] SendVerificationCodeAsync returned null");
-                ShowError("Получен пустой ответ от сервера");
-                return;
-            }
+            var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
 
             if (result.TryGetValue("code", out var codeObj) && codeObj != null)
                 DisplayedVerificationCode = codeObj.ToString();
@@ -163,10 +174,22 @@ public partial class RegisterViewModel : ObservableObject
             return;
         }
 
+        // Очищаем предыдущие ошибки
+        HasPhoneError = false;
+        PhoneError = null;
+        ClearMessages();
+
         // Validate code
-        if (string.IsNullOrWhiteSpace(VerificationCode) || VerificationCode.Length < 4)
+        if (string.IsNullOrWhiteSpace(VerificationCode))
         {
             ShowError("Введите код подтверждения");
+            return;
+        }
+        
+        var codeTrimmed = VerificationCode.Trim();
+        if (string.IsNullOrWhiteSpace(codeTrimmed) || codeTrimmed.Length < 4)
+        {
+            ShowError("Введите код подтверждения (минимум 4 символа)");
             return;
         }
 
@@ -176,14 +199,37 @@ public partial class RegisterViewModel : ObservableObject
             ShowError("Введите имя");
             return;
         }
+        
+        var firstNameTrimmed = FirstName.Trim();
+        if (string.IsNullOrWhiteSpace(firstNameTrimmed))
+        {
+            ShowError("Введите имя");
+            return;
+        }
+        
         if (string.IsNullOrWhiteSpace(LastName))
+        {
+            ShowError("Введите фамилию");
+            return;
+        }
+        
+        var lastNameTrimmed = LastName.Trim();
+        if (string.IsNullOrWhiteSpace(lastNameTrimmed))
         {
             ShowError("Введите фамилию");
             return;
         }
 
         // Validate phone
-        var normalizedPhone = NormalizePhone(Phone);
+        if (string.IsNullOrWhiteSpace(Phone))
+        {
+            PhoneError = "Введите номер телефона";
+            HasPhoneError = true;
+            return;
+        }
+        
+        var phoneTrimmed = Phone.Trim();
+        var normalizedPhone = NormalizePhone(phoneTrimmed);
         if (!IsPhoneValid(normalizedPhone))
         {
             PhoneError = "Введите корректный номер телефона";
@@ -198,12 +244,28 @@ public partial class RegisterViewModel : ObservableObject
             ShowError("Введите пароль");
             return;
         }
-        if (Password.Length < 6)
+        
+        var passwordTrimmed = Password.Trim();
+        if (string.IsNullOrWhiteSpace(passwordTrimmed))
+        {
+            ShowError("Введите пароль");
+            return;
+        }
+        
+        if (passwordTrimmed.Length < 6)
         {
             ShowError("Пароль должен содержать минимум 6 символов");
             return;
         }
-        if (Password != ConfirmPassword)
+        
+        if (string.IsNullOrWhiteSpace(ConfirmPassword))
+        {
+            ShowError("Подтвердите пароль");
+            return;
+        }
+        
+        var confirmPasswordTrimmed = ConfirmPassword.Trim();
+        if (passwordTrimmed != confirmPasswordTrimmed)
         {
             ShowError("Пароли не совпадают");
             return;
@@ -224,36 +286,17 @@ public partial class RegisterViewModel : ObservableObject
             var request = new VerifyCodeRequest
             {
                 phone_number = normalizedPhone,
-                code = VerificationCode,
-                password = Password,
-                first_name = FirstName.Trim(),
-                last_name = LastName.Trim(),
+                code = codeTrimmed,
+                password = passwordTrimmed,
+                first_name = firstNameTrimmed,
+                last_name = lastNameTrimmed,
                 referral_code = !string.IsNullOrWhiteSpace(ReferralCode) ? ReferralCode.Trim() : null
             };
 
-            _logger?.LogInformation("Attempting registration for phone: {Phone}", normalizedPhone);
+            _logger?.LogInformation("[RegisterViewModel] Attempting registration for phone: {Phone}", normalizedPhone);
+            var startTime = DateTime.UtcNow;
 
-            // Используем таймаут для регистрации (15 секунд)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var response = await _authService.VerifyCodeAndRegisterAsync(request, cts.Token);
-            
-            var userId = response?.UserId ?? response?.User?.Id ?? 0;
-            _logger?.LogInformation("[RegisterViewModel] Registration successful. UserId: {UserId}", userId);
-            
-            // Проверка на null response
-            if (response == null)
-            {
-                _logger?.LogError("[RegisterViewModel] Registration response is null");
-                ShowError("Получен пустой ответ от сервера при регистрации");
-                return;
-            }
-            
-            // Проверка на валидный ID пользователя
-            if (userId <= 0)
-            {
-                _logger?.LogWarning("[RegisterViewModel] Registration response has invalid user ID: UserId={UserId}, User.Id={UserId}", 
-                    response.UserId, response.User?.Id ?? 0);
-            }
+            var response = await _authService.VerifyCodeAndRegisterAsync(request);
 
             // Устанавливаем флаг успешной регистрации ПЕРЕД вызовом OnRegisterSuccess
             // чтобы предотвратить повторный вызов, если пользователь быстро нажмет кнопку

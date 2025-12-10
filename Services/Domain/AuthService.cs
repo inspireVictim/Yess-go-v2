@@ -167,41 +167,42 @@ public class AuthService : IAuthService
 
             if (response.UserId > 0)
             {
+                _logger?.LogInformation("[AuthService] Saving user data. UserId: {UserId}", response.UserId);
+                var startTime = DateTime.UtcNow;
+                
                 // Сначала сохраняем данные из response.User (если есть)
                 await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
                 
-                // Затем пытаемся получить полный профиль пользователя через API /me в фоне
-                // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
-                // Выполняем неблокирующе, чтобы не замедлять процесс входа
-                _ = Task.Run(async () =>
-                {
+                    // Затем пытаемся получить полный профиль пользователя через API /me
+                    // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
                     try
                     {
-                        // Используем короткий таймаут (5 секунд) для запроса профиля
-                        using var profileCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                        _logger?.LogDebug("Fetching full user profile from /me endpoint in background...");
-                        var userProfile = await _apiService.GetMeAsync(profileCts.Token);
+                        _logger?.LogDebug("Fetching full user profile from /me endpoint...");
+                        var userProfile = await _apiService.GetMeAsync(ct);
                         if (userProfile != null)
                         {
-                            _logger?.LogDebug("[AuthService] Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
+                            _logger?.LogDebug("Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
                                 userProfile.Id, userProfile.FirstName, userProfile.LastName, userProfile.Phone);
-                            await SaveOrUpdateUserAsync(response.UserId, userProfile, profileCts.Token);
+                            await SaveOrUpdateUserAsync(response.UserId, userProfile, ct);
+                            
+                            // Проверяем, что данные сохранились
+                            var savedUser = await _dbContext.Users.FindAsync(new object[] { response.UserId }, ct);
+                            if (savedUser != null)
+                            {
+                                _logger?.LogInformation("User profile saved: Id={Id}, Name={Name}, Phone={Phone}", 
+                                    savedUser.Id, savedUser.Name, savedUser.Phone);
+                            }
                         }
                         else
                         {
                             _logger?.LogWarning("GetMeAsync returned null profile");
                         }
                     }
-                    catch (OperationCanceledException)
-                    {
-                        _logger?.LogDebug("GetMeAsync timed out, using data from login response");
-                    }
                     catch (Exception ex)
                     {
                         // Не критично - используем данные из response.User
                         _logger?.LogWarning(ex, "Failed to fetch full user profile, using data from login response");
                     }
-                });
             }
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);

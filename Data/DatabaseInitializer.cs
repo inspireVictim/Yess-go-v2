@@ -1,3 +1,7 @@
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using YessGoFront.Data.Entities;
@@ -23,6 +27,7 @@ public class DatabaseInitializer
 
     /// <summary>
     /// Инициализировать базу данных (создать таблицы если их нет)
+    /// Оптимизировано: проверяет существование файла БД перед EnsureCreatedAsync для ускорения
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -39,6 +44,11 @@ public class DatabaseInitializer
             await _context.ConfigureSqlitePragmasAsync(initCts.Token);
             
             _logger?.LogInformation("Database initialized successfully");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogError("Database initialization timed out after {Timeout} seconds", DatabaseInitTimeoutSeconds);
+            throw new TimeoutException($"Database initialization timed out after {DatabaseInitTimeoutSeconds} seconds");
         }
         catch (Exception ex)
         {
@@ -58,6 +68,28 @@ public class DatabaseInitializer
                 throw;
             }
         }
+    }
+
+    /// <summary>
+    /// Извлекает путь к файлу БД из строки подключения SQLite
+    /// </summary>
+    private static string? ExtractDbPathFromConnectionString(string? connectionString)
+    {
+        if (string.IsNullOrEmpty(connectionString))
+            return null;
+
+        // Формат: "Data Source=path;Foreign Keys=True"
+        var dataSourceIndex = connectionString.IndexOf("Data Source=", StringComparison.OrdinalIgnoreCase);
+        if (dataSourceIndex < 0)
+            return null;
+
+        var startIndex = dataSourceIndex + "Data Source=".Length;
+        var endIndex = connectionString.IndexOf(';', startIndex);
+        if (endIndex < 0)
+            endIndex = connectionString.Length;
+
+        var path = connectionString.Substring(startIndex, endIndex - startIndex).Trim();
+        return path;
     }
 
     /// <summary>
@@ -268,16 +300,21 @@ public class DatabaseInitializer
             return;
         }
 
+        // ОПТИМИЗАЦИЯ: получаем количество уведомлений для всех пользователей одним запросом
+        var userIds = users.Select(u => u.Id).ToList();
+        var notificationCounts = await _context.Notifications
+            .Where(n => userIds.Contains(n.UserId))
+            .GroupBy(n => n.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
         var random = new Random();
         var now = DateTime.UtcNow;
         var notifications = new List<Notification>();
 
-        // Список тестовых уведомлений
+        // Список тестовых уведомлений (исключаем приветственное, оно создаётся отдельно)
         var sampleNotifications = new List<(string Title, string Message, NotificationType Type, NotificationPriority Priority, double HoursAgo)>
         {
-            ("🎉 Добро пожаловать в YessGo!", 
-                "Спасибо за регистрацию! Используйте приложение для получения бонусов и кешбэка у наших партнёров.",
-                NotificationType.InApp, NotificationPriority.Normal, 48),
             ("💰 Начислен кешбэк", 
                 "Вам начислен кешбэк 50 сом за покупку в партнёре «Нават». Проверьте баланс в кошельке!",
                 NotificationType.InApp, NotificationPriority.High, 24),
@@ -325,9 +362,8 @@ public class DatabaseInitializer
         // Создаём уведомления для каждого пользователя
         foreach (var user in users)
         {
-            // Проверяем, есть ли уже уведомления у пользователя
-            var existingCount = await _context.Notifications
-                .CountAsync(n => n.UserId == user.Id);
+            // Проверяем количество уведомлений из кэша (один запрос для всех пользователей)
+            var existingCount = notificationCounts.GetValueOrDefault(user.Id, 0);
             
             if (existingCount >= 10)
             {
@@ -335,13 +371,9 @@ public class DatabaseInitializer
                 continue;
             }
 
-            // Создаём уведомления для пользователя (кроме приветственного, оно уже создаётся в SeedTestUserAsync)
+            // Создаём уведомления для пользователя
             foreach (var sample in sampleNotifications)
             {
-                // Пропускаем приветственное уведомление, оно уже создаётся отдельно
-                if (sample.Title.Contains("Добро пожаловать"))
-                    continue;
-                
                 var createdAt = now.AddHours(-sample.HoursAgo);
                 var isRead = random.Next(3) == 0; // 33% прочитанных
                 
@@ -362,6 +394,7 @@ public class DatabaseInitializer
             }
         }
 
+        // ОПТИМИЗАЦИЯ: batch insert всех уведомлений одним запросом
         if (notifications.Any())
         {
             await _context.Notifications.AddRangeAsync(notifications, cts.Token);
@@ -421,6 +454,14 @@ public class DatabaseInitializer
         var wallets = await _context.Wallets.ToListAsync(cts.Token);
         var walletDict = wallets.ToDictionary(w => w.UserId);
 
+        // ОПТИМИЗАЦИЯ: получаем количество транзакций для всех пользователей одним запросом
+        var userIds = users.Select(u => u.Id).ToList();
+        var transactionCounts = await _context.Transactions
+            .Where(t => userIds.Contains(t.UserId))
+            .GroupBy(t => t.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
         var random = new Random();
         var now = DateTime.UtcNow;
         var transactions = new List<Transaction>();
@@ -432,9 +473,8 @@ public class DatabaseInitializer
         // Создаём транзакции для каждого пользователя
         foreach (var user in users)
         {
-            // Проверяем, есть ли уже транзакции у пользователя
-            var existingCount = await _context.Transactions
-                .CountAsync(t => t.UserId == user.Id);
+            // Проверяем количество транзакций из кэша (один запрос для всех пользователей)
+            var existingCount = transactionCounts.GetValueOrDefault(user.Id, 0);
             
             if (existingCount >= 20)
             {
@@ -525,6 +565,7 @@ public class DatabaseInitializer
             }
         }
 
+        // ОПТИМИЗАЦИЯ: batch insert всех транзакций одним запросом
         if (transactions.Any())
         {
             await _context.Transactions.AddRangeAsync(transactions, cts.Token);

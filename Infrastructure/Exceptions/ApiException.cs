@@ -62,6 +62,11 @@ namespace YessGoFront.Infrastructure.Exceptions
             : base(message, HttpStatusCode.NotFound)
         {
         }
+
+        public NotFoundException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
     }
 
     /// <summary>

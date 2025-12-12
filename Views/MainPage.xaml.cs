@@ -112,9 +112,15 @@ namespace YessGoFront.Views
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
 
+            // Обновляем баланс напрямую из Wallet.Balance через API (из базы данных)
+            // RefreshBalanceAsync загружает баланс без кэширования, обеспечивая актуальность данных
+            // Это гарантирует, что изменения в БД (включая ручное редактирование) сразу отображаются
             // Story timeline grid width
             if (BindingContext is MainPageViewModel viewModel)
             {
+                // Загружаем баланс напрямую из БД без кэширования
+                _ = viewModel.RefreshBalanceAsync();
+
                 var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
                 if (progressContainer != null)
                 {
@@ -136,6 +142,13 @@ namespace YessGoFront.Views
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
+
+            // Отменяем незавершенные задачи при навигации для оптимизации памяти
+            if (BindingContext is MainPageViewModel viewModel)
+            {
+                // Отменяем загрузку партнеров, если она выполняется
+                viewModel.CancelPartnersLoading();
+            }
 
             UnhookPartnerRows();
             StopSmoothAutoScroll();

@@ -23,6 +23,7 @@ namespace YessGoFront.Views
         private string _categoryName = string.Empty;
         private string _searchQuery = string.Empty;
         private List<PartnerDto> _allPartners = new();
+        private System.Threading.Timer? _searchDebounceTimer; // Для дебаунсинга поиска
 
         public string CategorySlug { get; set; } = string.Empty;
         public string CategoryName { get; set; } = string.Empty;
@@ -368,8 +369,18 @@ namespace YessGoFront.Views
 
         private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
         {
-            _searchQuery = e.NewTextValue ?? string.Empty;
-            ApplyFilters();
+            var searchText = e.NewTextValue ?? string.Empty;
+            
+            // Дебаунсинг поиска (500ms) для оптимизации производительности
+            _searchDebounceTimer?.Dispose();
+            _searchDebounceTimer = new System.Threading.Timer(async _ =>
+            {
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    _searchQuery = searchText;
+                    ApplyFilters();
+                });
+            }, null, 500, System.Threading.Timeout.Infinite);
         }
 
         private async void OnPartnerTapped(object? sender, TappedEventArgs e)

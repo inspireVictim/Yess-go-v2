@@ -89,7 +89,8 @@
                 <CollectionView x:Name="PartnersCollectionView"
                                 ItemsSource="{Binding Partners}"
                                 SelectionMode="None"
-                                IsVisible="{Binding HasPartners}">
+                                IsVisible="{Binding HasPartners}"
+                                ItemSizingStrategy="MeasureFirstItem">
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Vertical" ItemSpacing="12"/>
                     </CollectionView.ItemsLayout>

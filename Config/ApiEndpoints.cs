@@ -60,10 +60,12 @@ public static class ApiEndpoints
     // Wallet endpoints
     public static class WalletEndpoints
     {
-        // Используем endpoint из payments, который работает с текущим пользователем из токена
-        public const string Balance = $"{ApiVersion}/payments/balance";
-        public const string Transactions = $"{ApiVersion}/payments/transactions";
-        public const string TopUp = $"{Wallet}/topup";
+        // Получение баланса из Wallet.Balance через API
+        public const string Balance = $"{Wallet}/balance"; // /api/v1/wallet/balance
+        public const string Transactions = $"{Wallet}/transactions"; // /api/v1/wallet/transactions
+        public const string History = $"{Wallet}/history"; // /api/v1/wallet/history
+        public const string TopUp = $"{Wallet}/topup"; // /api/v1/wallet/topup
+        public const string Sync = $"{Wallet}/sync"; // /api/v1/wallet/sync
         public const string Transfer = $"{ApiVersion}/payments/transfer";
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }

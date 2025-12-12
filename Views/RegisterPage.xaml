@@ -77,6 +77,20 @@
                            FontSize="12"
                            Margin="0,-8,0,0"/>
 
+                    <!-- Поле Реферальный код -->
+                    <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
+                        <Grid Padding="12,0">
+                            <Entry x:Name="ReferralCodeEntry" 
+                                   Placeholder="Реферальный код (необязательно)" 
+                                   PlaceholderColor="#6B7280"
+                                   Keyboard="Default" 
+                                   BackgroundColor="Transparent"
+                                   VerticalOptions="Center"
+                                   TextColor="#6B7280"
+                                   Text="{Binding ReferralCode, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+
                     <!-- Поле Телефон -->
                     <components:PhoneEntry x:Name="PhoneEntryControl"
                                            FullPhoneNumber="{Binding Phone, Mode=TwoWay}" />

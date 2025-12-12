@@ -80,7 +80,7 @@ public class CartService : ICartService
                     Price = product.Price,
                     OriginalPrice = product.OriginalPrice,
                     DiscountPercent = product.DiscountPercent,
-                    YessCoins = product.YessCoins,
+                    YessCoins = product.EffectiveYessCoins > 0 ? product.EffectiveYessCoins : null,
                     Quantity = 1
                 };
                 

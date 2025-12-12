@@ -311,7 +311,16 @@ public partial class BasketViewModel : ObservableObject
         int itemNumber = 1;
         foreach (var item in partnerGroup.Items)
         {
-            message.AppendLine($"{itemNumber}. {item.ProductName} (x{item.Quantity}) - {item.TotalPrice:F0} сом");
+            var itemLine = $"{itemNumber}. {item.ProductName} (x{item.Quantity}) - {item.TotalPrice:F0} сом";
+            
+            // Добавляем Yess!Coins для товара, если есть
+            var itemYessCoins = item.EffectiveYessCoins * item.Quantity;
+            if (itemYessCoins > 0)
+            {
+                itemLine += $" + {itemYessCoins:F0} Yess!Coins";
+            }
+            
+            message.AppendLine(itemLine);
             
             if (!string.IsNullOrWhiteSpace(item.ProductDescription))
             {

@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using YessGoFront.Config;
 using YessGoFront.Infrastructure.Http;
@@ -16,6 +17,7 @@ namespace YessGoFront.Views
         private readonly IHttpClientFactory _httpClientFactory;
         public ObservableCollection<CategoryItem> Categories { get; set; }
         private string _searchQuery = string.Empty;
+        private bool _categoriesLoaded = false;
 
         public PartnerPage()
         {
@@ -30,18 +32,25 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
-            // Загружаем категории из API
-            await LoadCategoriesAsync();
+            // Показываем дефолтные категории сразу
+            if (!_categoriesLoaded)
+            {
+                LoadDefaultCategories();
+            }
+
+            // Загружаем категории из API в фоне
+            _ = LoadCategoriesAsync();
         }
 
         private async Task LoadCategoriesAsync()
         {
             try
             {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                 var httpClient = _httpClientFactory.CreateClient("ApiClient");
                 var endpoint = ApiEndpoints.PartnersEndpoints.Categories;
                 
-                var response = await httpClient.GetAsync(endpoint);
+                var response = await httpClient.GetAsync(endpoint, cts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger?.LogWarning($"Failed to load categories: {response.StatusCode}");
@@ -65,16 +74,22 @@ namespace YessGoFront.Views
                 Categories.Add(new CategoryItem("Все компании", "cat_all.png", null));
 
                 // Добавляем категории из API
-                foreach (var category in categories.OrderBy(c => c.Name))
+                await MainThread.InvokeOnMainThreadAsync(() =>
                 {
-                    var icon = GetCategoryIcon(category.Slug ?? category.Name.ToLower());
-                    Categories.Add(new CategoryItem(category.Name, icon, category.Slug));
-                }
+                    Categories.Clear();
+                    Categories.Add(new CategoryItem("Все компании", "cat_all.png", null));
+                    foreach (var category in categories.OrderBy(c => c.Name))
+                    {
+                        var icon = GetCategoryIcon(category.Slug ?? category.Name.ToLower());
+                        Categories.Add(new CategoryItem(category.Name, icon, category.Slug));
+                    }
+                    _categoriesLoaded = true;
+                });
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error loading categories");
-                LoadDefaultCategories();
+                // Оставляем дефолтные категории
             }
         }
 

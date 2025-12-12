@@ -103,14 +103,13 @@ namespace YessGoFront.Views
                     System.Diagnostics.Debug.WriteLine("[MapPage] MapView инициализирован");
                 }
                 
-                // Загружаем категории из API
-                await InitializeCategoriesAsync();
+                // Выполняем загрузку данных параллельно для оптимизации
+                var categoriesTask = InitializeCategoriesAsync();
+                var partnersTask = LoadPartnersOnMap();
+                var locationTask = RequestLocationAndCenterMap();
                 
-                // Загружаем партнёров на карту
-                await LoadPartnersOnMap();
-                
-                // Запрашиваем разрешение на геолокацию и центрируем карту
-                await RequestLocationAndCenterMap();
+                // Ждем завершения хотя бы одной задачи, остальные продолжают в фоне
+                await Task.WhenAny(categoriesTask, partnersTask, locationTask);
                 
                 System.Diagnostics.Debug.WriteLine("[MapPage] === OnAppearing ЗАВЕРШЕНО ===");
             }

@@ -13,35 +13,39 @@ using YessGoFront.Services.Domain;
 
 namespace YessGoFront.ViewModels;
 
-public partial class NotificationsViewModel : BaseViewModel
-{
-    private readonly INotificationService _notificationService;
-    private readonly IAuthService _authService;
-    private readonly AppDbContext _dbContext;
-    private readonly ILogger<NotificationsViewModel>? _logger;
+    public partial class NotificationsViewModel : BaseViewModel
+    {
+        private readonly INotificationService _notificationService;
+        private readonly IAuthService _authService;
+        private readonly AppDbContext _dbContext;
+        private readonly ILogger<NotificationsViewModel>? _logger;
 
-    [ObservableProperty]
-    private bool isBusy;
+        [ObservableProperty]
+        private bool isBusy;
 
-    [ObservableProperty]
-    private bool isRefreshing;
+        [ObservableProperty]
+        private bool isRefreshing;
 
-    [ObservableProperty]
-    private string? errorMessage;
+        [ObservableProperty]
+        private string? errorMessage;
 
-    [ObservableProperty]
-    private bool hasError;
+        [ObservableProperty]
+        private bool hasError;
 
-    [ObservableProperty]
-    private bool hasMoreItems = true;
+        [ObservableProperty]
+        private bool hasMoreItems = true;
 
-    [ObservableProperty]
-    private int unreadCount;
+        [ObservableProperty]
+        private int unreadCount;
 
-    public ObservableCollection<Notification> Notifications { get; } = new();
+        public ObservableCollection<Notification> Notifications { get; } = new();
 
-    private int _currentPage = 1;
-    private const int PageSize = 20;
+        private int _currentPage = 1;
+        private const int PageSize = 20;
+
+        // Оптимизация: защита от повторных вызовов и кэширование
+        private readonly SemaphoreSlim _loadNotificationsLock = new(1, 1);
+        private int? _cachedUserId;
 
     public IAsyncRelayCommand LoadNotificationsCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
@@ -82,8 +86,8 @@ public partial class NotificationsViewModel : BaseViewModel
             HasError = false;
             ErrorMessage = null;
 
-            // Get current user ID
-            var userId = await _authService.GetCurrentUserIdAsync();
+            // Get current user ID (используем кэш)
+            var userId = await GetCachedUserIdAsync();
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot load notifications: user is not authenticated");
@@ -163,9 +167,13 @@ public partial class NotificationsViewModel : BaseViewModel
 
     private async Task LoadPageAsync(int page)
     {
+        if (!await _loadNotificationsLock.WaitAsync(0))
+            return; // Уже выполняется
+
         try
         {
-            var userId = await _authService.GetCurrentUserIdAsync();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var userId = await GetCachedUserIdAsync();
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot load notifications page: user is not authenticated");
@@ -198,13 +206,27 @@ public partial class NotificationsViewModel : BaseViewModel
             System.Diagnostics.Debug.WriteLine($"[NotificationsViewModel] Error loading notifications page {page}: {ex}");
             throw new Exception("Не удалось загрузить уведомления. Пожалуйста, проверьте подключение к интернету.", ex);
         }
+        finally
+        {
+            _loadNotificationsLock.Release();
+        }
+    }
+
+    private async Task<int?> GetCachedUserIdAsync()
+    {
+        if (_cachedUserId.HasValue)
+            return _cachedUserId;
+
+        _cachedUserId = await _authService.GetCurrentUserIdAsync();
+        return _cachedUserId;
     }
 
     private async Task LoadUnreadCountAsync()
     {
         try
         {
-            var userId = await _authService.GetCurrentUserIdAsync();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var userId = await GetCachedUserIdAsync();
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot load unread count: user is not authenticated");
@@ -228,7 +250,7 @@ public partial class NotificationsViewModel : BaseViewModel
 
         try
         {
-            var userId = await _authService.GetCurrentUserIdAsync();
+            var userId = await GetCachedUserIdAsync();
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot mark notification as read: user is not authenticated");
@@ -258,7 +280,7 @@ public partial class NotificationsViewModel : BaseViewModel
     {
         try
         {
-            var userId = await _authService.GetCurrentUserIdAsync();
+            var userId = await GetCachedUserIdAsync();
             if (!userId.HasValue)
             {
                 _logger?.LogWarning("Cannot mark all notifications as read: user is not authenticated");

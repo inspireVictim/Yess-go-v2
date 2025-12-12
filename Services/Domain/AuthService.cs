@@ -147,62 +147,65 @@ public class AuthService : IAuthService
             var savedRefreshToken = await _authService.GetRefreshTokenAsync();
             _logger?.LogInformation("Refresh token saved: {Saved}", !string.IsNullOrEmpty(savedRefreshToken));
 
+            // Сохраняем UserId в Preferences сразу (быстрая операция)
             if (response.UserId > 0)
             {
-                _logger?.LogInformation("[AuthService] Saving user data. UserId: {UserId}", response.UserId);
-                var startTime = DateTime.UtcNow;
+                Preferences.Set("UserId", response.UserId);
+            }
+
+            // Сохранение пользователя в БД и получение профиля выполняем в фоне (fire-and-forget)
+            // чтобы не блокировать процесс входа
+            if (response.UserId > 0)
+            {
+                var userId = response.UserId;
+                var userDto = response.User;
                 
-                // Сначала сохраняем данные из response.User (если есть)
-                await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
-                
-                // Затем пытаемся получить полный профиль пользователя через API /me
-                // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
-                // Используем таймаут для GetMeAsync, чтобы не блокировать процесс входа
-                try
+                _ = Task.Run(async () =>
                 {
-                    _logger?.LogDebug("[AuthService] Fetching full user profile from /me endpoint...");
-                    
-                    // Создаем CancellationToken с таймаутом для GetMeAsync (5 секунд)
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    cts.CancelAfter(TimeSpan.FromSeconds(5));
-                    
-                    var userProfile = await _apiService.GetMeAsync(cts.Token);
-                    if (userProfile != null)
+                    try
                     {
-                        _logger?.LogDebug("[AuthService] Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
-                            userProfile.Id, userProfile.FirstName, userProfile.LastName, userProfile.Phone);
-                        await SaveOrUpdateUserAsync(response.UserId, userProfile, ct);
+                        _logger?.LogInformation("[AuthService] Saving user data in background. UserId: {UserId}", userId);
+                        var startTime = DateTime.UtcNow;
                         
-                        // Проверяем, что данные сохранились
-                        var savedUser = await _dbContext.Users.FindAsync(new object[] { response.UserId }, ct);
-                        if (savedUser != null)
+                        // Сохраняем данные из response.User (если есть)
+                        if (userDto != null)
                         {
-                            _logger?.LogInformation("[AuthService] User profile saved: Id={Id}, Name={Name}, Phone={Phone}", 
-                                savedUser.Id, savedUser.Name, savedUser.Phone);
+                            await SaveOrUpdateUserAsync(userId, userDto, CancellationToken.None);
+                            var duration = DateTime.UtcNow - startTime;
+                            _logger?.LogInformation("[AuthService] User data saved in background in {Duration}ms", duration.TotalMilliseconds);
+                        }
+                        
+                        // Затем пытаемся получить полный профиль пользователя через API /me
+                        // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
+                        _logger?.LogDebug("[AuthService] Fetching full user profile from /me endpoint in background...");
+                        
+                        // Используем короткий таймаут (3 секунды) для запроса профиля в фоне
+                        using var profileCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var userProfile = await _apiService.GetMeAsync(profileCts.Token);
+                        if (userProfile != null)
+                        {
+                            _logger?.LogDebug("[AuthService] Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
+                                userProfile.Id, userProfile.FirstName, userProfile.LastName, userProfile.Phone);
+                            await SaveOrUpdateUserAsync(userId, userProfile, CancellationToken.None);
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("[AuthService] GetMeAsync returned null profile");
                         }
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        _logger?.LogWarning("[AuthService] GetMeAsync returned null profile");
+                        _logger?.LogDebug("[AuthService] Background save/get profile operation timed out, using data from login response");
                     }
-                }
-                catch (TaskCanceledException)
-                {
-                    // Таймаут GetMeAsync - не критично, используем данные из response.User
-                    _logger?.LogWarning("[AuthService] GetMeAsync timed out, using data from login response");
-                }
-                catch (Exception ex)
-                {
-                    // Не критично - используем данные из response.User
-                    _logger?.LogWarning(ex, "[AuthService] Failed to fetch full user profile, using data from login response");
-                }
-                
-                var duration = DateTime.UtcNow - startTime;
-                _logger?.LogInformation("[AuthService] User data saved in {Duration}ms", duration.TotalMilliseconds);
+                    catch (Exception ex)
+                    {
+                        // Не критично - используем данные из response.User
+                        _logger?.LogWarning(ex, "[AuthService] Failed to save user or fetch profile in background: {Message}", ex.Message);
+                    }
+                });
             }
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
-            Preferences.Set("UserId", response.UserId);
             return response;
         }
         catch (ApiException) { throw; }
@@ -295,30 +298,48 @@ public class AuthService : IAuthService
             await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
 
             var userId = response.UserId > 0 ? response.UserId : registeredUser.Id;
-            if (userId > 0)
-                await SaveOrUpdateUserAsync(userId, registeredUser, ct);
-
             response.User = registeredUser;
 
-            // Create welcome notification for the new user
+            // Сохранение пользователя в БД и создание welcome notification выполняем в фоне (fire-and-forget)
+            // чтобы не блокировать процесс регистрации
             if (userId > 0)
             {
-                var welcomeNotification = new Notification
-                {
-                    UserId = userId, // Уведомление для нового пользователя
-                    Title = "Добро пожаловать в YESS!GO",
-                    Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
-                    NotificationType = NotificationType.InApp,
-                    Priority = NotificationPriority.Normal,
-                    Status = NotificationStatus.Delivered,
-                    CreatedAt = DateTime.UtcNow,
-                    DeliveredAt = DateTime.UtcNow
-                };
-
-                await _dbContext.Notifications.AddAsync(welcomeNotification, ct);
-                await _dbContext.SaveChangesAsync(ct);
+                var userIdCopy = userId;
+                var registeredUserCopy = registeredUser;
                 
-                _logger?.LogInformation("Welcome notification created for user {UserId}", userId);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Сохраняем данные пользователя в БД
+                        _logger?.LogInformation("[AuthService] Saving user data to local DB in background. UserId: {UserId}", userIdCopy);
+                        await SaveOrUpdateUserAsync(userIdCopy, registeredUserCopy, CancellationToken.None);
+                        _logger?.LogInformation("[AuthService] User data saved to local DB successfully in background. UserId: {UserId}", userIdCopy);
+                        
+                        // Create welcome notification for the new user
+                        var welcomeNotification = new Notification
+                        {
+                            UserId = userIdCopy,
+                            Title = "Добро пожаловать в YESS!GO",
+                            Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
+                            NotificationType = NotificationType.InApp,
+                            Priority = NotificationPriority.Normal,
+                            Status = NotificationStatus.Delivered,
+                            CreatedAt = DateTime.UtcNow,
+                            DeliveredAt = DateTime.UtcNow
+                        };
+
+                        await _dbContext.Notifications.AddAsync(welcomeNotification, CancellationToken.None);
+                        await _dbContext.SaveChangesAsync(CancellationToken.None);
+                        
+                        _logger?.LogInformation("Welcome notification created for user {UserId} in background", userIdCopy);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Не критично - пользователь зарегистрирован, данные обновятся позже
+                        _logger?.LogWarning(ex, "[AuthService] Error saving user or creating notification in background: {Message}", ex.Message);
+                    }
+                });
             }
 
             _logger?.LogInformation("User registered with verification: {Phone}, UserId: {UserId}", request.phone_number, userId);
@@ -499,37 +520,8 @@ public class AuthService : IAuthService
             var savedChanges = await _dbContext.SaveChangesAsync(ct);
             _logger?.LogInformation("SaveOrUpdateUserAsync: Saved {Count} changes to database", savedChanges);
             
-            // Отслеживаем изменения для отладки
-            var changedEntries = _dbContext.ChangeTracker.Entries()
-                .Where(e => e.State != Microsoft.EntityFrameworkCore.EntityState.Unchanged)
-                .ToList();
-            
-            if (changedEntries.Any())
-            {
-                _logger?.LogWarning("SaveOrUpdateUserAsync: After SaveChangesAsync, {Count} entities still have pending changes!", changedEntries.Count);
-            }
-            
-            // Перезагружаем сущность из БД, чтобы убедиться, что изменения сохранены
-            // Сначала отключаем отслеживание, если сущность была найдена
-            if (existingUser != null)
-            {
-                // Если сущность отслеживается, отключаем отслеживание
-                var entry = _dbContext.Entry(existingUser);
-                if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
-                {
-                    entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
-                }
-            }
-            var verifyUser = await _dbContext.Users.FindAsync(new object[] { userId }, ct);
-            if (verifyUser != null)
-            {
-                _logger?.LogInformation("SaveOrUpdateUserAsync: ✅ Verified saved user - Id={Id}, Name='{Name}', Phone='{Phone}'", 
-                    verifyUser.Id, verifyUser.Name ?? "empty", verifyUser.Phone ?? "empty");
-            }
-            else
-            {
-                _logger?.LogError("SaveOrUpdateUserAsync: ❌ User not found after save! UserId={UserId}", userId);
-            }
+            // Упрощаем: не проверяем изменения после сохранения, чтобы не замедлять процесс
+            // Если SaveChangesAsync завершился без исключения, данные сохранены
         }
         catch (Exception ex)
         {

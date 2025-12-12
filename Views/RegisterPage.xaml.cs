@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using YessGoFront.Services.Domain;
@@ -11,6 +12,7 @@ namespace YessGoFront.Views
     public partial class RegisterPage : ContentPage
     {
         private readonly RegisterViewModel _viewModel;
+        private readonly AuthNavigationHandler _authNavigationHandler;
         private bool _acknowledged;
         private string? _pendingReferralCode; // Временное хранение реферального кода до инициализации ViewModel
         
@@ -54,6 +56,7 @@ namespace YessGoFront.Views
             // Получаем сервисы через DI
             var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
             var logger = MauiProgram.Services.GetService<Microsoft.Extensions.Logging.ILogger<RegisterViewModel>>();
+            _authNavigationHandler = MauiProgram.Services.GetRequiredService<AuthNavigationHandler>();
 
             _viewModel = new RegisterViewModel(authService, logger);
             BindingContext = _viewModel;
@@ -72,116 +75,10 @@ namespace YessGoFront.Views
 
         private async Task OnRegisterSuccess(Services.Api.AuthResponse response)
         {
-            try
-            {
-                // Проверка на null response
-                if (response == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[RegisterPage] ERROR: Registration response is null");
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
-                    {
-                        await DisplayAlert("Ошибка", "Получен пустой ответ от сервера. Попробуйте зарегистрироваться снова.", "OK");
-                    });
-                    return;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Registration success! UserId: {response.UserId}");
-
-                // Сохраняем данные пользователя в AccountStore
-                if (response.User != null)
-                {
-                    var accountStore = AccountStore.Instance;
-                    accountStore.SignIn(
-                        email: response.User.Email ?? string.Empty,
-                        firstName: response.User.FirstName ?? string.Empty,
-                        lastName: response.User.LastName ?? string.Empty,
-                        remember: true,
-                        phone: response.User.Phone ?? string.Empty
-                    );
-                    System.Diagnostics.Debug.WriteLine($"[RegisterPage] AccountStore updated. UserId: {response.UserId}");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("[RegisterPage] WARNING: response.User is null");
-                }
-
-                // Проверяем, есть ли PIN-код
-                var domainAuthService = MauiProgram.Services.GetRequiredService<Services.Domain.IAuthService>();
-                if (domainAuthService == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[RegisterPage] ERROR: IAuthService is null");
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
-                    {
-                        await DisplayAlert("Ошибка", "Сервис авторизации недоступен. Перезапустите приложение.", "OK");
-                    });
-                    return;
-                }
-
-                var hasPin = await domainAuthService.HasPinAsync();
-                System.Diagnostics.Debug.WriteLine($"[RegisterPage] HasPin: {hasPin}");
-
-                // Навигацию делаем на главном потоке
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try
-                    {
-                        var shell = Shell.Current;
-                        if (shell == null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[RegisterPage] ERROR: Shell.Current is null");
-                            await DisplayAlert("Ошибка", "Не удалось выполнить навигацию. Перезапустите приложение.", "OK");
-                            return;
-                        }
-
-                        // Если PIN-кода нет - переходим на страницу создания PIN
-                        if (!hasPin)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[RegisterPage] No PIN found, navigating to PIN creation page");
-                            await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
-                        }
-                        else
-                        {
-                            // Если PIN-код есть - переходим на главную страницу
-                            System.Diagnostics.Debug.WriteLine("[RegisterPage] PIN exists, navigating to main/home");
-                            await shell.GoToAsync("///main/home", animate: true);
-                        }
-                    }
-                    catch (Exception navEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[RegisterPage] Navigation error: {navEx.Message}");
-                        System.Diagnostics.Debug.WriteLine($"[RegisterPage] Stack trace: {navEx.StackTrace}");
-                        
-                        // Показываем ошибку пользователю
-                        try
-                        {
-                            await DisplayAlert("Ошибка навигации", 
-                                $"Не удалось перейти на следующий экран: {navEx.Message}", "OK");
-                        }
-                        catch
-                        {
-                            // Игнорируем ошибки при показе алерта
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Error in OnRegisterSuccess: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Stack trace: {ex.StackTrace}");
-                
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try
-                    {
-                        await DisplayAlert("Ошибка", 
-                            $"Произошла ошибка после регистрации: {ex.Message}", "OK");
-                    }
-                    catch
-                    {
-                        // Игнорируем ошибки при показе алерта
-                    }
-                });
-            }
+            System.Diagnostics.Debug.WriteLine($"[RegisterPage] Registration success! UserId: {response?.UserId}");
+            
+            // Передаем обработку в AuthNavigationHandler
+            await _authNavigationHandler.HandleSuccessfulAuthAsync(response, rememberMe: true);
         }
 
         private async void OpenLogin_Tapped(object? sender, EventArgs e)
@@ -191,19 +88,19 @@ namespace YessGoFront.Views
 
         private void TogglePassword_Tapped(object? sender, EventArgs e)
         {
-            var passwordEntry = this.FindByName<Entry>("PasswordEntry");
-            if (passwordEntry != null)
+            // Оптимизировано: используем прямое обращение к элементу через x:Name
+            if (PasswordEntry != null)
             {
-                passwordEntry.IsPassword = !passwordEntry.IsPassword;
+                PasswordEntry.IsPassword = !PasswordEntry.IsPassword;
             }
         }
 
         private void ToggleConfirmPassword_Tapped(object? sender, EventArgs e)
         {
-            var confirmPasswordEntry = this.FindByName<Entry>("ConfirmPasswordEntry");
-            if (confirmPasswordEntry != null)
+            // Оптимизировано: используем прямое обращение к элементу через x:Name
+            if (ConfirmPasswordEntry != null)
             {
-                confirmPasswordEntry.IsPassword = !confirmPasswordEntry.IsPassword;
+                ConfirmPasswordEntry.IsPassword = !ConfirmPasswordEntry.IsPassword;
             }
         }
 

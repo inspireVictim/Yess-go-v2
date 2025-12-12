@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ public partial class RegisterViewModel : ObservableObject
 {
     private readonly IAuthService _authService;
     private readonly ILogger<RegisterViewModel>? _logger;
+    private readonly SemaphoreSlim _registerLock = new(1, 1);
 
     [ObservableProperty] private string firstName = string.Empty;
     [ObservableProperty] private string lastName = string.Empty;
@@ -26,6 +28,16 @@ public partial class RegisterViewModel : ObservableObject
     [ObservableProperty] private bool hasError = false;
     [ObservableProperty] private string? phoneError;
     [ObservableProperty] private bool hasPhoneError = false;
+    [ObservableProperty] private string? firstNameError;
+    [ObservableProperty] private bool hasFirstNameError = false;
+    [ObservableProperty] private string? lastNameError;
+    [ObservableProperty] private bool hasLastNameError = false;
+    [ObservableProperty] private string? passwordError;
+    [ObservableProperty] private bool hasPasswordError = false;
+    [ObservableProperty] private string? confirmPasswordError;
+    [ObservableProperty] private bool hasConfirmPasswordError = false;
+    [ObservableProperty] private string? verificationCodeError;
+    [ObservableProperty] private bool hasVerificationCodeError = false;
     [ObservableProperty] private bool isPolicyAcknowledged = false;
 
     // SMS verification
@@ -38,7 +50,7 @@ public partial class RegisterViewModel : ObservableObject
     // Реферальный код из URL
     [ObservableProperty] private string? referralCode;
     
-    // Флаг успешной регистрации - предотвращает повторный вызов verify-code
+    // Флаг успешной регистрации - предотвращает повторный вызов
     [ObservableProperty] private bool isRegistrationSuccessful = false;
 
     public RegisterViewModel(IAuthService authService, ILogger<RegisterViewModel>? logger = null)
@@ -53,66 +65,114 @@ public partial class RegisterViewModel : ObservableObject
         // Защита от повторного вызова после успешной регистрации
         if (IsRegistrationSuccessful)
         {
-            _logger?.LogWarning("Registration already completed, ignoring duplicate call");
+            _logger?.LogWarning("[RegisterViewModel] Registration already completed, ignoring duplicate call");
             return;
         }
 
-        if (IsBusy)
-            return;
-
-        // Step 1: request code
-        if (!IsVerificationStep)
+        // Защита от повторных вызовов
+        if (!await _registerLock.WaitAsync(0))
         {
-            await SendVerificationCodeAsync();
+            _logger?.LogWarning("[RegisterViewModel] Registration already in progress, ignoring duplicate call");
             return;
         }
 
-        // Step 2: register
-        await VerifyCodeAndRegisterAsync();
+        try
+        {
+            // Step 1: request code
+            if (!IsVerificationStep)
+            {
+                await SendVerificationCodeAsync();
+                // _registerLock освобождается в SendVerificationCodeAsync после успешной отправки кода
+                // чтобы пользователь мог продолжить регистрацию
+                return;
+            }
+
+            // Step 2: register
+            await VerifyCodeAndRegisterAsync();
+            // _registerLock освобождается в VerifyCodeAndRegisterAsync после успешной регистрации
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[RegisterViewModel] Unexpected error in RegisterAsync: {Message}", ex.Message);
+            ShowError($"Произошла ошибка: {ex.Message}");
+            IsBusy = false;
+            _registerLock.Release();
+        }
     }
 
     private async Task SendVerificationCodeAsync()
     {
-        // Очищаем предыдущие ошибки
-        HasPhoneError = false;
-        PhoneError = null;
-        ClearMessages();
+        // Очищаем ошибки
+        ClearErrors();
 
-        // Валидация телефона
-        if (string.IsNullOrWhiteSpace(Phone))
+        _logger?.LogInformation("[RegisterViewModel] SendVerificationCodeAsync: Starting. Lock acquired.");
+
+        // Валидация всех обязательных полей перед отправкой кода
+        var validationErrors = new List<string>();
+
+        var firstNameError = ValidateFirstName();
+        if (firstNameError != null)
         {
-            PhoneError = "Введите номер телефона";
+            FirstNameError = firstNameError;
+            HasFirstNameError = true;
+            validationErrors.Add(firstNameError);
+        }
+
+        var lastNameError = ValidateLastName();
+        if (lastNameError != null)
+        {
+            LastNameError = lastNameError;
+            HasLastNameError = true;
+            validationErrors.Add(lastNameError);
+        }
+
+        var phoneError = ValidatePhone();
+        if (phoneError != null)
+        {
+            PhoneError = phoneError;
             HasPhoneError = true;
+            validationErrors.Add(phoneError);
+        }
+
+        var passwordError = ValidatePassword();
+        if (passwordError != null)
+        {
+            PasswordError = passwordError;
+            HasPasswordError = true;
+            validationErrors.Add(passwordError);
+        }
+
+        var confirmPasswordError = ValidateConfirmPassword();
+        if (confirmPasswordError != null)
+        {
+            ConfirmPasswordError = confirmPasswordError;
+            HasConfirmPasswordError = true;
+            validationErrors.Add(confirmPasswordError);
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            ShowError(string.Join("\n", validationErrors));
+            _logger?.LogWarning("[RegisterViewModel] Validation failed. Errors: {Errors}. IsBusy set to false, lock released.", string.Join("; ", validationErrors));
+            IsBusy = false;
+            _registerLock.Release();
             return;
         }
 
         var phoneTrimmed = Phone.Trim();
-        if (string.IsNullOrWhiteSpace(phoneTrimmed))
-        {
-            PhoneError = "Введите номер телефона";
-            HasPhoneError = true;
-            return;
-        }
-
         var normalizedPhone = NormalizePhone(phoneTrimmed);
-
-        if (!IsPhoneValid(normalizedPhone))
-        {
-            PhoneError = "Введите корректный номер телефона (9 цифр)";
-            HasPhoneError = true;
-            return;
-        }
-        HasPhoneError = false;
 
         try
         {
             IsBusy = true;
+            _logger?.LogInformation("[RegisterViewModel] IsBusy set to true. Sending verification code to: {Phone}", normalizedPhone);
             ClearMessages();
 
-            _logger?.LogInformation("[RegisterViewModel] Sending verification code to: {Phone}", normalizedPhone);
             var startTime = DateTime.UtcNow;
 
-            var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
+            // Используем таймаут для отправки кода (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var result = await _authService.SendVerificationCodeAsync(normalizedPhone, cts.Token);
             
             var duration = DateTime.UtcNow - startTime;
             _logger?.LogInformation("[RegisterViewModel] Verification code sent in {Duration}ms", duration.TotalMilliseconds);
@@ -122,6 +182,8 @@ public partial class RegisterViewModel : ObservableObject
             {
                 _logger?.LogError("[RegisterViewModel] SendVerificationCodeAsync returned null");
                 ShowError("Получен пустой ответ от сервера");
+                IsBusy = false;
+                _registerLock.Release();
                 return;
             }
 
@@ -132,37 +194,59 @@ public partial class RegisterViewModel : ObservableObject
 
             IsCodeSent = true;
             IsVerificationStep = true;
-            SuccessMessage = "Код сгенерирован. Используйте его для верификации.";
+            SuccessMessage = "Код отправлен. Введите его для завершения регистрации.";
+            
+            // Сбрасываем IsBusy после успешной отправки кода, чтобы кнопка стала активной для второго этапа
+            IsBusy = false;
+            _logger?.LogInformation("[RegisterViewModel] Verification code sent successfully. IsBusy set to false, lock released. User can now proceed with registration.");
+            
+            // Освобождаем lock после успешной отправки кода, чтобы пользователь мог продолжить
+            _registerLock.Release();
+        }
+        catch (OperationCanceledException)
+        {
+            ShowError("Операция отправки кода заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
+            _logger?.LogWarning("[RegisterViewModel] Send verification code operation timed out after 15 seconds. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (NetworkException ex)
         {
-            ShowError("Ошибка сети. Проверьте подключение к интернету.");
-            _logger?.LogError(ex, "Network error during code sending");
+            var errorMessage = ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+                ? "Сервер не отвечает. Проверьте подключение к интернету."
+                : "Ошибка сети. Проверьте подключение к интернету.";
+            ShowError(errorMessage);
+            _logger?.LogError(ex, "[RegisterViewModel] Network error during code sending: {Message}. IsBusy set to false, lock released.", ex.Message);
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (BadRequestException ex)
         {
-            // Проверяем, не является ли ошибка о том, что пользователь уже зарегистрирован
             if (ex.Message != null && ex.Message.Contains("уже зарегистрирован", StringComparison.OrdinalIgnoreCase))
             {
-                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа или используйте код для восстановления доступа.");
-                _logger?.LogInformation("User already registered, suggesting login page");
+                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа.");
             }
             else
             {
                 ShowError(ParseApiError(ex.Message));
             }
+            _logger?.LogWarning(ex, "[RegisterViewModel] Bad request during code sending. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (ApiException ex)
         {
             ShowError($"Ошибка API: {ex.Message}");
+            _logger?.LogError(ex, "[RegisterViewModel] API error during code sending. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (Exception ex)
         {
             ShowError($"Ошибка отправки кода: {ex.Message}");
-        }
-        finally
-        {
+            _logger?.LogError(ex, "[RegisterViewModel] Unexpected error during code sending. IsBusy set to false, lock released.");
             IsBusy = false;
+            _registerLock.Release();
         }
     }
 
@@ -171,123 +255,94 @@ public partial class RegisterViewModel : ObservableObject
         // Защита от повторного вызова после успешной регистрации
         if (IsRegistrationSuccessful)
         {
-            _logger?.LogWarning("Registration already completed, ignoring duplicate verify-code call");
+            _logger?.LogWarning("[RegisterViewModel] Registration already completed, ignoring duplicate verify-code call. Lock released.");
+            IsBusy = false;
+            _registerLock.Release();
             return;
         }
 
-        if (IsBusy)
+        _logger?.LogInformation("[RegisterViewModel] VerifyCodeAndRegisterAsync: Starting. Lock acquired.");
+
+        // Очищаем ошибки
+        ClearErrors();
+
+        // Валидация всех полей
+        var validationErrors = new List<string>();
+
+        var firstNameError = ValidateFirstName();
+        if (firstNameError != null)
         {
-            _logger?.LogWarning("Registration already in progress, ignoring duplicate call");
-            return;
+            FirstNameError = firstNameError;
+            HasFirstNameError = true;
+            validationErrors.Add(firstNameError);
         }
 
-        // Очищаем предыдущие ошибки
-        HasPhoneError = false;
-        PhoneError = null;
-        ClearMessages();
-
-        // Validate code
-        if (string.IsNullOrWhiteSpace(VerificationCode))
+        var lastNameError = ValidateLastName();
+        if (lastNameError != null)
         {
-            ShowError("Введите код подтверждения");
-            return;
-        }
-        
-        var codeTrimmed = VerificationCode.Trim();
-        if (string.IsNullOrWhiteSpace(codeTrimmed) || codeTrimmed.Length < 4)
-        {
-            ShowError("Введите код подтверждения (минимум 4 символа)");
-            return;
+            LastNameError = lastNameError;
+            HasLastNameError = true;
+            validationErrors.Add(lastNameError);
         }
 
-        // Validate names
-        if (string.IsNullOrWhiteSpace(FirstName))
+        var phoneError = ValidatePhone();
+        if (phoneError != null)
         {
-            ShowError("Введите имя");
-            return;
-        }
-        
-        var firstNameTrimmed = FirstName.Trim();
-        if (string.IsNullOrWhiteSpace(firstNameTrimmed))
-        {
-            ShowError("Введите имя");
-            return;
-        }
-        
-        if (string.IsNullOrWhiteSpace(LastName))
-        {
-            ShowError("Введите фамилию");
-            return;
-        }
-        
-        var lastNameTrimmed = LastName.Trim();
-        if (string.IsNullOrWhiteSpace(lastNameTrimmed))
-        {
-            ShowError("Введите фамилию");
-            return;
-        }
-
-        // Validate phone
-        if (string.IsNullOrWhiteSpace(Phone))
-        {
-            PhoneError = "Введите номер телефона";
+            PhoneError = phoneError;
             HasPhoneError = true;
-            return;
-        }
-        
-        var phoneTrimmed = Phone.Trim();
-        var normalizedPhone = NormalizePhone(phoneTrimmed);
-        if (!IsPhoneValid(normalizedPhone))
-        {
-            PhoneError = "Введите корректный номер телефона";
-            HasPhoneError = true;
-            return;
-        }
-        HasPhoneError = false;
-
-        // Validate password
-        if (string.IsNullOrWhiteSpace(Password))
-        {
-            ShowError("Введите пароль");
-            return;
-        }
-        
-        var passwordTrimmed = Password.Trim();
-        if (string.IsNullOrWhiteSpace(passwordTrimmed))
-        {
-            ShowError("Введите пароль");
-            return;
-        }
-        
-        if (passwordTrimmed.Length < 6)
-        {
-            ShowError("Пароль должен содержать минимум 6 символов");
-            return;
-        }
-        
-        if (string.IsNullOrWhiteSpace(ConfirmPassword))
-        {
-            ShowError("Подтвердите пароль");
-            return;
-        }
-        
-        var confirmPasswordTrimmed = ConfirmPassword.Trim();
-        if (passwordTrimmed != confirmPasswordTrimmed)
-        {
-            ShowError("Пароли не совпадают");
-            return;
+            validationErrors.Add(phoneError);
         }
 
-        // NEW — Validate policy acknowledgment
+        var passwordError = ValidatePassword();
+        if (passwordError != null)
+        {
+            PasswordError = passwordError;
+            HasPasswordError = true;
+            validationErrors.Add(passwordError);
+        }
+
+        var confirmPasswordError = ValidateConfirmPassword();
+        if (confirmPasswordError != null)
+        {
+            ConfirmPasswordError = confirmPasswordError;
+            HasConfirmPasswordError = true;
+            validationErrors.Add(confirmPasswordError);
+        }
+
+        var verificationCodeError = ValidateVerificationCode();
+        if (verificationCodeError != null)
+        {
+            VerificationCodeError = verificationCodeError;
+            HasVerificationCodeError = true;
+            validationErrors.Add(verificationCodeError);
+        }
+
         if (!IsPolicyAcknowledged)
         {
-            ShowError("Вы должны подтвердить, что ознакомлены с политикой использования");
+            validationErrors.Add("Вы должны подтвердить, что ознакомлены с политикой использования");
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            ShowError(string.Join("\n", validationErrors));
+            _logger?.LogWarning("[RegisterViewModel] Validation failed. Errors: {Errors}. IsBusy set to false, lock released.", string.Join("; ", validationErrors));
+            IsBusy = false;
+            _registerLock.Release();
             return;
         }
+
+        // Все поля валидны, продолжаем регистрацию
+        var codeTrimmed = VerificationCode.Trim();
+        var firstNameTrimmed = FirstName.Trim();
+        var lastNameTrimmed = LastName.Trim();
+        var phoneTrimmed = Phone.Trim();
+        var normalizedPhone = NormalizePhone(phoneTrimmed);
+        var passwordTrimmed = Password.Trim();
 
         try
         {
             IsBusy = true;
+            _logger?.LogInformation("[RegisterViewModel] All fields validated. IsBusy set to true. Starting registration.");
             ClearMessages();
 
             var request = new VerifyCodeRequest
@@ -303,7 +358,9 @@ public partial class RegisterViewModel : ObservableObject
             _logger?.LogInformation("[RegisterViewModel] Attempting registration for phone: {Phone}", normalizedPhone);
             var startTime = DateTime.UtcNow;
 
-            var response = await _authService.VerifyCodeAndRegisterAsync(request);
+            // Используем таймаут для регистрации (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await _authService.VerifyCodeAndRegisterAsync(request, cts.Token);
             
             var duration = DateTime.UtcNow - startTime;
             var userId = response?.UserId ?? response?.User?.Id ?? 0;
@@ -313,56 +370,204 @@ public partial class RegisterViewModel : ObservableObject
             // Проверка на null response
             if (response == null)
             {
-                _logger?.LogError("[RegisterViewModel] Registration response is null");
+                _logger?.LogError("[RegisterViewModel] Registration response is null. IsBusy set to false, lock released.");
                 ShowError("Получен пустой ответ от сервера при регистрации");
+                IsBusy = false;
+                _registerLock.Release();
                 return;
             }
             
-            // Проверка на валидный ID пользователя
-            if (userId <= 0)
+            // Проверка на валидный токен
+            if (string.IsNullOrWhiteSpace(response.AccessToken))
             {
-                _logger?.LogWarning("[RegisterViewModel] Registration response has invalid user ID: UserId={UserId}, User.Id={UserId}", 
-                    response.UserId, response.User?.Id ?? 0);
+                _logger?.LogError("[RegisterViewModel] AccessToken is null or empty in response. IsBusy set to false, lock released.");
+                ShowError("Не получен токен доступа от сервера");
+                IsBusy = false;
+                _registerLock.Release();
+                return;
             }
 
             // Устанавливаем флаг успешной регистрации ПЕРЕД вызовом OnRegisterSuccess
-            // чтобы предотвратить повторный вызов, если пользователь быстро нажмет кнопку
             IsRegistrationSuccessful = true;
-            _logger?.LogInformation("Registration successful for phone: {Phone}, preventing duplicate calls", normalizedPhone);
+            _logger?.LogInformation("[RegisterViewModel] Registration successful for phone: {Phone}. IsRegistrationSuccessful set to true. Calling OnRegisterSuccess.", normalizedPhone);
 
-            if (OnRegisterSuccess is not null)
-                await OnRegisterSuccess.Invoke(response);
+            // Вызываем обработчик успешной регистрации
+            // IsBusy остается true до завершения навигации, lock освобождается после
+            if (OnRegisterSuccess != null)
+            {
+                try
+                {
+                    await OnRegisterSuccess.Invoke(response);
+                    _logger?.LogInformation("[RegisterViewModel] OnRegisterSuccess completed. IsBusy set to false, lock released.");
+                }
+                catch (Exception navEx)
+                {
+                    _logger?.LogError(navEx, "[RegisterViewModel] Error in OnRegisterSuccess: {Message}", navEx.Message);
+                }
+                finally
+                {
+                    // Освобождаем lock после завершения обработки (включая навигацию)
+                    IsBusy = false;
+                    _registerLock.Release();
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("[RegisterViewModel] OnRegisterSuccess is null. IsBusy set to false, lock released.");
+                IsBusy = false;
+                _registerLock.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            ShowError("Операция регистрации заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
+            _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (NetworkException ex)
         {
-            ShowError("Ошибка сети. Проверьте подключение к интернету.");
-            _logger?.LogError(ex, "Network error during registration");
+            var errorMessage = ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+                ? "Сервер не отвечает. Проверьте подключение к интернету."
+                : "Ошибка сети. Проверьте подключение к интернету.";
+            ShowError(errorMessage);
+            _logger?.LogError(ex, "[RegisterViewModel] Network error during registration: {Message}. IsBusy set to false, lock released.", ex.Message);
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (BadRequestException ex)
         {
-            // Проверяем, не является ли ошибка о том, что пользователь уже зарегистрирован
             if (ex.Message != null && ex.Message.Contains("уже зарегистрирован", StringComparison.OrdinalIgnoreCase))
             {
-                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа или используйте код для восстановления доступа.");
-                _logger?.LogInformation("User already registered during registration, suggesting login page");
+                ShowError("Этот номер телефона уже зарегистрирован. Перейдите на страницу входа.");
             }
             else
             {
                 ShowError(ParseApiError(ex.Message));
             }
+            _logger?.LogWarning(ex, "[RegisterViewModel] Bad request during registration. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
+        }
+        catch (UnauthorizedException ex)
+        {
+            ShowError("Ошибка авторизации. Проверьте правильность введенных данных.");
+            _logger?.LogWarning(ex, "[RegisterViewModel] Unauthorized during registration. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (ApiException ex)
         {
             ShowError($"Ошибка API: {ex.Message}");
+            _logger?.LogError(ex, "[RegisterViewModel] API error during registration. IsBusy set to false, lock released.");
+            IsBusy = false;
+            _registerLock.Release();
         }
         catch (Exception ex)
         {
             ShowError($"Неизвестная ошибка: {ex.Message}");
-        }
-        finally
-        {
+            _logger?.LogError(ex, "[RegisterViewModel] Unexpected error during registration. IsBusy set to false, lock released.");
             IsBusy = false;
+            _registerLock.Release();
         }
+    }
+
+    // Упрощенная валидация - возвращает ошибку или null
+    private string? ValidateFirstName()
+    {
+        if (string.IsNullOrWhiteSpace(FirstName))
+            return "Введите имя";
+        
+        if (string.IsNullOrWhiteSpace(FirstName.Trim()))
+            return "Введите имя";
+        
+        return null;
+    }
+
+    private string? ValidateLastName()
+    {
+        if (string.IsNullOrWhiteSpace(LastName))
+            return "Введите фамилию";
+        
+        if (string.IsNullOrWhiteSpace(LastName.Trim()))
+            return "Введите фамилию";
+        
+        return null;
+    }
+
+    private string? ValidatePhone()
+    {
+        if (string.IsNullOrWhiteSpace(Phone))
+            return "Введите номер телефона";
+
+        var phoneTrimmed = Phone.Trim();
+        // Убрана избыточная проверка - если Phone не пустой, то phoneTrimmed тоже не будет пустым после Trim()
+        var normalizedPhone = NormalizePhone(phoneTrimmed);
+        if (!IsPhoneValid(normalizedPhone))
+            return "Введите корректный номер телефона (9 цифр)";
+
+        return null;
+    }
+
+    private string? ValidatePassword()
+    {
+        if (string.IsNullOrWhiteSpace(Password))
+            return "Введите пароль";
+
+        var passwordTrimmed = Password.Trim();
+        // Убрана избыточная проверка - если Password не пустой, то passwordTrimmed тоже не будет пустым после Trim()
+        if (passwordTrimmed.Length < 6)
+            return "Пароль должен содержать минимум 6 символов";
+
+        return null;
+    }
+
+    private string? ValidateConfirmPassword()
+    {
+        if (string.IsNullOrWhiteSpace(ConfirmPassword))
+            return "Подтвердите пароль";
+
+        var confirmPasswordTrimmed = ConfirmPassword.Trim();
+        var passwordTrimmed = Password.Trim();
+        
+        // Проверяем, что основной пароль не пустой
+        if (string.IsNullOrWhiteSpace(passwordTrimmed))
+            return "Сначала введите пароль";
+        
+        if (passwordTrimmed != confirmPasswordTrimmed)
+            return "Пароли не совпадают";
+
+        return null;
+    }
+
+    private string? ValidateVerificationCode()
+    {
+        if (string.IsNullOrWhiteSpace(VerificationCode))
+            return "Введите код подтверждения";
+
+        var codeTrimmed = VerificationCode.Trim();
+        if (string.IsNullOrWhiteSpace(codeTrimmed) || codeTrimmed.Length < 4)
+            return "Код должен содержать минимум 4 символа";
+
+        return null;
+    }
+
+    private void ClearErrors()
+    {
+        HasError = false;
+        ErrorMessage = null;
+        HasPhoneError = false;
+        PhoneError = null;
+        HasFirstNameError = false;
+        FirstNameError = null;
+        HasLastNameError = false;
+        LastNameError = null;
+        HasPasswordError = false;
+        PasswordError = null;
+        HasConfirmPasswordError = false;
+        ConfirmPasswordError = null;
+        HasVerificationCodeError = false;
+        VerificationCodeError = null;
     }
 
     private void ClearMessages()

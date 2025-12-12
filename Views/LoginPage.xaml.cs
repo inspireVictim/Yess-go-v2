@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Services.Domain;
@@ -13,6 +12,7 @@ namespace YessGoFront.Views
     public partial class LoginPage : ContentPage
     {
         private readonly LoginViewModel _viewModel;
+        private readonly AuthNavigationHandler _authNavigationHandler;
 
         public LoginPage()
         {
@@ -21,6 +21,7 @@ namespace YessGoFront.Views
             // Получаем сервисы через DI
             var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
             var logger = MauiProgram.Services.GetService<ILogger<LoginViewModel>>();
+            _authNavigationHandler = MauiProgram.Services.GetRequiredService<AuthNavigationHandler>();
 
             _viewModel = new LoginViewModel(authService, logger);
             BindingContext = _viewModel;
@@ -52,6 +53,11 @@ namespace YessGoFront.Views
                         _viewModel.ClearFields();
                     }
                 }
+                else
+                {
+                    // Если сервис недоступен - очищаем поля для безопасности
+                    _viewModel.ClearFields();
+                }
             }
             catch (Exception ex)
             {
@@ -63,122 +69,10 @@ namespace YessGoFront.Views
 
         private async Task OnLoginSuccess(Services.Api.AuthResponse response)
         {
-            try
-            {
-                // Проверка на null response
-                if (response == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: Login response is null");
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
-                    {
-                        await DisplayAlert("Ошибка", "Получен пустой ответ от сервера. Попробуйте войти снова.", "OK");
-                    });
-                    return;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response.UserId}");
-
-                // Проверка на валидный токен
-                if (string.IsNullOrWhiteSpace(response.AccessToken))
-                {
-                    System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: AccessToken is null or empty");
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
-                    {
-                        await DisplayAlert("Ошибка", "Не получен токен доступа. Попробуйте войти снова.", "OK");
-                    });
-                    return;
-                }
-
-                // Проверяем, что токен реально сохранён
-                var authService = MauiProgram.Services
-                    .GetRequiredService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
-
-                var savedToken = await authService.GetAccessTokenAsync();
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] Token saved: {!string.IsNullOrEmpty(savedToken)}");
-                
-                if (string.IsNullOrEmpty(savedToken))
-                {
-                    System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: Token was not saved properly");
-                }
-
-                // Обновляем AccountStore (учитываем rememberMe!)
-                var user = response.User;
-                var email = user?.Email ?? user?.Phone ?? string.Empty;
-                var firstName = user?.FirstName ?? string.Empty;
-                var lastName = user?.LastName ?? string.Empty;
-                var phone = user?.Phone ?? string.Empty;
-                var rememberMe = _viewModel.RememberMe;
-
-                AccountStore.Instance.SignIn(
-                    email,
-                    firstName,
-                    lastName,
-                    rememberMe,
-                    phone
-                );
-
-                var isSignedIn = AccountStore.Instance.IsSignedIn;
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] AccountStore updated. IsSignedIn: {isSignedIn}, Email: {AccountStore.Instance.Email}, RememberMe: {rememberMe}");
-
-                if (!isSignedIn)
-                {
-                    System.Diagnostics.Debug.WriteLine("[LoginPage] WARNING: IsSignedIn is false after SignIn! This should not happen.");
-                }
-
-                // Проверяем, есть ли валидный PIN (с очисткой старого/повреждённого)
-                var domainAuthService = MauiProgram.Services.GetRequiredService<IAuthService>();
-                var hasPin = await domainAuthService.HasPinAsync();
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] OnLoginSuccess: hasValidPin={hasPin}");
-
-                // Навигацию делаем на главном потоке
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try
-                    {
-                        var shell = Shell.Current;
-                        if (shell == null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] ERROR: Shell.Current is null");
-                            await DisplayAlert("Ошибка", "Не удалось выполнить навигацию. Перезапустите приложение.", "OK");
-                            return;
-                        }
-
-                        if (!hasPin)
-                        {
-                            // Если валидного PIN-кода нет - перейти на создание PIN
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] No valid PIN found, navigating to PIN creation page");
-                            await shell.GoToAsync("///pinlogin?isCreatingPin=true", animate: true);
-                        }
-                        else
-                        {
-                            // Если есть валидный PIN - сразу на экран ввода PIN
-                            System.Diagnostics.Debug.WriteLine("[LoginPage] Valid PIN exists, navigating to PIN login page");
-                            await shell.GoToAsync("///pinlogin", animate: true);
-                        }
-                    }
-                    catch (Exception navEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[LoginPage] Navigation error: {navEx.Message}");
-                        System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {navEx.StackTrace}");
-                        
-                        // Показываем ошибку пользователю
-                        try
-                        {
-                            await DisplayAlert("Ошибка навигации", 
-                                $"Не удалось перейти на следующий экран: {navEx.Message}", "OK");
-                        }
-                        catch
-                        {
-                            // Игнорируем ошибки при показе алерта
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] Error in OnLoginSuccess: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[LoginPage] Stack trace: {ex.StackTrace}");
-            }
+            System.Diagnostics.Debug.WriteLine($"[LoginPage] Login success! UserId: {response?.UserId}");
+            
+            // Передаем обработку в AuthNavigationHandler
+            await _authNavigationHandler.HandleSuccessfulAuthAsync(response, _viewModel.RememberMe);
         }
 
         private async void OpenRegister_Tapped(object? sender, EventArgs e)

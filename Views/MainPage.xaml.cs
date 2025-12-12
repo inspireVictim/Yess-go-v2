@@ -101,9 +101,12 @@ namespace YessGoFront.Views
 
             HookPartnerRows();
 
-            // ДОП. ФИКС — ждём загрузки контента (BindLayout)
-            await Task.Delay(300);
-            StartSmoothAutoScroll();
+            // ДОП. ФИКС — ждём загрузки контента (BindLayout) в фоне (fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(300);
+                await MainThread.InvokeOnMainThreadAsync(() => StartSmoothAutoScroll());
+            });
 
             // Navbar
             if (BottomBar != null)
@@ -121,7 +124,8 @@ namespace YessGoFront.Views
                         viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
                 }
 
-                await viewModel.RefreshUserAsync();
+                // Выполняем RefreshUserAsync в фоне без ожидания
+                _ = viewModel.RefreshUserAsync();
             }
         }
 

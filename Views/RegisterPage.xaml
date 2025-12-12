@@ -50,6 +50,12 @@
                                    Text="{Binding FirstName}" />
                         </Grid>
                     </Border>
+                    <!-- Ошибка имени -->
+                    <Label Text="{Binding FirstNameError}" 
+                           IsVisible="{Binding HasFirstNameError}"
+                           TextColor="#D32F2F" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
 
                     <!-- Поле Фамилия -->
                     <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
@@ -64,6 +70,12 @@
                                    Text="{Binding LastName}" />
                         </Grid>
                     </Border>
+                    <!-- Ошибка фамилии -->
+                    <Label Text="{Binding LastNameError}" 
+                           IsVisible="{Binding HasLastNameError}"
+                           TextColor="#D32F2F" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
 
                     <!-- Поле Телефон -->
                     <components:PhoneEntry x:Name="PhoneEntryControl"
@@ -127,6 +139,12 @@
                                    MaxLength="6" />
                         </Grid>
                     </Border>
+                    <!-- Ошибка кода подтверждения -->
+                    <Label Text="{Binding VerificationCodeError}" 
+                           IsVisible="{Binding HasVerificationCodeError}"
+                           TextColor="#D32F2F" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
 
                     <!-- Поле Пароль -->
                     <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
@@ -160,6 +178,12 @@
                             </Image>
                         </Grid>
                     </Border>
+                    <!-- Ошибка пароля -->
+                    <Label Text="{Binding PasswordError}" 
+                           IsVisible="{Binding HasPasswordError}"
+                           TextColor="#D32F2F" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
 
                     <!-- Поле Подтверждение пароля -->
                     <Border BackgroundColor="#E0EFE9" Stroke="Transparent" StrokeShape="RoundRectangle 16" HeightRequest="52">
@@ -193,6 +217,12 @@
                             </Image>
                         </Grid>
                     </Border>
+                    <!-- Ошибка подтверждения пароля -->
+                    <Label Text="{Binding ConfirmPasswordError}" 
+                           IsVisible="{Binding HasConfirmPasswordError}"
+                           TextColor="#D32F2F" 
+                           FontSize="12"
+                           Margin="0,-8,0,0"/>
 
                     <!-- Текст с ссылкой на политику конфиденциальности и чекбокс -->
                     <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
@@ -235,13 +265,30 @@
                                 Command="{Binding RegisterCommand}"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
                             <Button.Triggers>
-                                <DataTrigger TargetType="Button" Binding="{Binding IsBusy}" Value="True">
-                                    <Setter Property="Text" Value="Отправка..." />
+                                <!-- Текст кнопки в зависимости от этапа и состояния -->
+                                <MultiTrigger TargetType="Button">
+                                    <MultiTrigger.Conditions>
+                                        <BindingCondition Binding="{Binding IsVerificationStep}" Value="False" />
+                                        <BindingCondition Binding="{Binding IsBusy}" Value="True" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter Property="Text" Value="Отправка кода..." />
                                     <Setter Property="Opacity" Value="0.7" />
-                                </DataTrigger>
-                                <DataTrigger TargetType="Button" Binding="{Binding IsVerificationStep}" Value="True">
+                                </MultiTrigger>
+                                <MultiTrigger TargetType="Button">
+                                    <MultiTrigger.Conditions>
+                                        <BindingCondition Binding="{Binding IsVerificationStep}" Value="True" />
+                                        <BindingCondition Binding="{Binding IsBusy}" Value="True" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter Property="Text" Value="Регистрация..." />
+                                    <Setter Property="Opacity" Value="0.7" />
+                                </MultiTrigger>
+                                <MultiTrigger TargetType="Button">
+                                    <MultiTrigger.Conditions>
+                                        <BindingCondition Binding="{Binding IsVerificationStep}" Value="True" />
+                                        <BindingCondition Binding="{Binding IsBusy}" Value="False" />
+                                    </MultiTrigger.Conditions>
                                     <Setter Property="Text" Value="Подтвердить и зарегистрироваться" />
-                                </DataTrigger>
+                                </MultiTrigger>
                                 <DataTrigger TargetType="Button" Binding="{Binding IsRegistrationSuccessful}" Value="True">
                                     <Setter Property="IsEnabled" Value="False" />
                                     <Setter Property="Text" Value="Регистрация завершена" />
@@ -250,7 +297,7 @@
                             </Button.Triggers>
                         </Button>
                         <ActivityIndicator IsRunning="{Binding IsBusy}" 
-                                          IsVisible="{Binding IsBusy}"
+                                          IsVisible="{Binding IsBusy}" 
                                           Color="White"
                                           VerticalOptions="Center"
                                           HorizontalOptions="Center" />

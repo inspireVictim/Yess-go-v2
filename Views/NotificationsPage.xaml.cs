@@ -28,32 +28,34 @@ public partial class NotificationsPage : ContentPage
     {
         base.OnAppearing();
         
-        try 
+        // Обновляем навигацию сразу
+        if (this.FindByName<BottomNavBar>("BottomBar") is BottomNavBar bottomBar)
         {
-            // Update bottom navigation bar
-            if (this.FindByName<BottomNavBar>("BottomBar") is BottomNavBar bottomBar)
-            {
-                bottomBar.UpdateSelectedTab("Notifications");
-            }
-            
-            // Ensure ViewModel is initialized and load notifications
-            if (!_isInitialized)
-            {
-                await LoadInitialDataAsync();
-                _isInitialized = true;
-            }
-            else
-            {
-                // Refresh the notifications
-                await _viewModel.LoadInitialAsync();
-            }
+            bottomBar.UpdateSelectedTab("Notifications");
         }
-        catch (Exception ex)
+        
+        // Загружаем уведомления в фоне без блокировки UI
+        _ = Task.Run(async () =>
         {
-            Console.WriteLine($"Error in OnAppearing: {ex}");
-            // Optionally show an error message to the user
-            await DisplayAlert("Ошибка", "Не удалось загрузить уведомления. Пожалуйста, попробуйте позже.", "OK");
-        }
+            try
+            {
+                if (!_isInitialized)
+                {
+                    await LoadInitialDataAsync();
+                    _isInitialized = true;
+                }
+                else
+                {
+                    // Refresh the notifications
+                    await _viewModel.LoadInitialAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in OnAppearing: {ex}");
+                // Ошибки обрабатываются в ViewModel
+            }
+        });
     }
 
     private async Task LoadInitialDataAsync()

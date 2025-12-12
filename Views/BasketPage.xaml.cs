@@ -18,9 +18,10 @@ public partial class BasketPage : ContentPage
 
         // Получаем сервисы через DI
         var cartService = MauiProgram.Services.GetRequiredService<ICartService>();
+        var partnersService = MauiProgram.Services.GetRequiredService<IPartnersService>();
         var logger = MauiProgram.Services.GetService<ILogger<BasketViewModel>>();
 
-        _viewModel = new BasketViewModel(cartService, logger);
+        _viewModel = new BasketViewModel(cartService, partnersService, logger);
         BindingContext = _viewModel;
     }
 

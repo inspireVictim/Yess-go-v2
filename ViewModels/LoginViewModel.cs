@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public partial class LoginViewModel : ObservableObject
 {
     private readonly IAuthService _authService;
     private readonly ILogger<LoginViewModel>? _logger;
+    private readonly SemaphoreSlim _loginLock = new(1, 1);
 
     [ObservableProperty] private string phone = string.Empty;
     [ObservableProperty] private string password = string.Empty;
@@ -33,81 +35,43 @@ public partial class LoginViewModel : ObservableObject
     [RelayCommand]
     private async Task LoginAsync()
     {
-        if (IsBusy)
+        // Защита от повторных вызовов
+        if (!await _loginLock.WaitAsync(0))
         {
-            _logger?.LogWarning("[LoginViewModel] Login attempt while busy, ignoring");
-            return;
-        }
-
-        // Очищаем предыдущие ошибки
-        HasError = false;
-        ErrorMessage = null;
-
-        // Валидация телефона
-        if (string.IsNullOrWhiteSpace(Phone))
-        {
-            ShowError("Введите номер телефона");
-            return;
-        }
-
-        var phoneTrimmed = Phone.Trim();
-        if (string.IsNullOrWhiteSpace(phoneTrimmed))
-        {
-            ShowError("Введите номер телефона");
-            return;
-        }
-
-        // Phone уже содержит полный номер с +996 от PhoneEntry (FullPhoneNumber)
-        // Проверяем валидность: должно быть 9 цифр после +996
-        var phoneDigits = new string(phoneTrimmed.Where(char.IsDigit).ToArray());
-        // Убираем префикс 996 если есть (PhoneEntry уже добавил +996)
-        if (phoneDigits.StartsWith("996") && phoneDigits.Length > 3)
-        {
-            phoneDigits = phoneDigits.Substring(3);
-        }
-        if (phoneDigits.Length != 9)
-        {
-            ShowError("Введите корректный номер телефона (9 цифр)");
-            return;
-        }
-
-        // Phone уже содержит +996 от PhoneEntry, используем как есть
-        var normalizedPhone = phoneTrimmed.StartsWith("+996") ? phoneTrimmed : "+996" + phoneDigits;
-
-        // Валидация пароля
-        if (string.IsNullOrWhiteSpace(Password))
-        {
-            ShowError("Введите пароль");
-            return;
-        }
-
-        var passwordTrimmed = Password.Trim();
-        if (string.IsNullOrWhiteSpace(passwordTrimmed))
-        {
-            ShowError("Введите пароль");
-            return;
-        }
-        
-        if (passwordTrimmed.Length < 6)
-        {
-            ShowError("Пароль должен содержать минимум 6 символов");
+            _logger?.LogWarning("[LoginViewModel] Login already in progress, ignoring duplicate call");
             return;
         }
 
         try
         {
-            IsBusy = true;
+            // Очищаем предыдущие ошибки
             HasError = false;
             ErrorMessage = null;
 
+            // Простая валидация перед отправкой
+            var validationError = ValidateInputs();
+            if (validationError != null)
+            {
+                ShowError(validationError);
+                return;
+            }
+
+            // Нормализуем телефон (используем оптимизированный метод)
+            var phoneTrimmed = Phone.Trim();
+            var normalizedPhone = NormalizePhone(phoneTrimmed);
+            var passwordTrimmed = Password.Trim();
+
+            IsBusy = true;
             _logger?.LogInformation("[LoginViewModel] Attempting login for phone: {Phone}", normalizedPhone);
             var startTime = DateTime.UtcNow;
 
-            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, passwordTrimmed);
+            // Используем таймаут для операции входа (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, passwordTrimmed, cts.Token);
             
             var duration = DateTime.UtcNow - startTime;
             _logger?.LogInformation("[LoginViewModel] Login successful in {Duration}ms. UserId: {UserId}", 
-                duration.TotalMilliseconds, response.UserId);
+                duration.TotalMilliseconds, response?.UserId ?? 0);
             
             // Проверка на null response
             if (response == null)
@@ -125,15 +89,24 @@ public partial class LoginViewModel : ObservableObject
                 return;
             }
 
-            if (OnLoginSuccess is not null)
+            // Вызываем событие успешного входа
+            if (OnLoginSuccess != null)
+            {
                 await OnLoginSuccess.Invoke(response);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
+            _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
         }
         catch (NetworkException ex)
         {
-            // Показываем более детальное сообщение об ошибке
-            var errorMessage = ex.Message.Contains("timeout") 
+            var errorMessage = ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
                 ? "Сервер не отвечает. Проверьте подключение к интернету."
-                : ex.Message.Contains("cleartext") || ex.Message.Contains("SSL") || ex.Message.Contains("certificate")
+                : ex.Message.Contains("cleartext", StringComparison.OrdinalIgnoreCase) || 
+                  ex.Message.Contains("SSL", StringComparison.OrdinalIgnoreCase) || 
+                  ex.Message.Contains("certificate", StringComparison.OrdinalIgnoreCase)
                 ? "Ошибка подключения к серверу. Проверьте настройки сети."
                 : "Ошибка сети. Проверьте интернет-соединение.";
             
@@ -150,9 +123,10 @@ public partial class LoginViewModel : ObservableObject
         }
         catch (UnauthorizedException ex)
         {
-            ShowError(ex.Message.Contains("Неверный") || ex.Message.Contains("неверный") 
+            ShowError(ex.Message.Contains("Неверный", StringComparison.OrdinalIgnoreCase) || 
+                     ex.Message.Contains("неверный", StringComparison.OrdinalIgnoreCase)
                 ? ex.Message 
-                : "Неверный Email/телефон или пароль");
+                : "Неверный телефон или пароль");
             _logger?.LogWarning(ex, "Unauthorized login attempt");
         }
         catch (BadRequestException ex)
@@ -173,7 +147,44 @@ public partial class LoginViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _loginLock.Release();
         }
+    }
+
+    private string? ValidateInputs()
+    {
+        // Валидация телефона
+        if (string.IsNullOrWhiteSpace(Phone))
+        {
+            return "Введите номер телефона";
+        }
+
+        var phoneTrimmed = Phone.Trim();
+        // Убрана избыточная проверка - если Phone не пустой, то phoneTrimmed тоже не будет пустым после Trim()
+        var phoneDigits = new string(phoneTrimmed.Where(char.IsDigit).ToArray());
+        if (phoneDigits.StartsWith("996") && phoneDigits.Length > 3)
+        {
+            phoneDigits = phoneDigits.Substring(3);
+        }
+        if (phoneDigits.Length != 9)
+        {
+            return "Введите корректный номер телефона (9 цифр)";
+        }
+
+        // Валидация пароля
+        if (string.IsNullOrWhiteSpace(Password))
+        {
+            return "Введите пароль";
+        }
+
+        var passwordTrimmed = Password.Trim();
+        // Убрана избыточная проверка - если Password не пустой, то passwordTrimmed тоже не будет пустым после Trim()
+        if (passwordTrimmed.Length < 6)
+        {
+            return "Пароль должен содержать минимум 6 символов";
+        }
+
+        return null; // Валидация прошла успешно
     }
 
     private void ShowError(string message)
@@ -198,5 +209,24 @@ public partial class LoginViewModel : ObservableObject
     }
 
     public event Func<AuthResponse, Task>? OnLoginSuccess;
+
+    private static string NormalizePhone(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return string.Empty;
+
+        if (input.StartsWith("+996"))
+            return input;
+
+        var digits = new string(input.Where(char.IsDigit).ToArray());
+
+        if (digits.StartsWith("996") && digits.Length > 3)
+            digits = digits[3..];
+
+        if (digits.StartsWith("0") && digits.Length > 1)
+            digits = digits[1..];
+
+        return digits.Length == 9 ? "+996" + digits : input;
+    }
 
 }

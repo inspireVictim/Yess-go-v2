@@ -159,7 +159,7 @@ public class ImageLoadingBehavior : Behavior<Image>
         {
             // Для локальных файлов скрываем сразу, для URL даём время на загрузку
             bool isUrl = _image.Source is UriImageSource;
-            int delay = isUrl ? 2000 : 100; // 2 секунды для URL, 100мс для локальных
+            int delay = isUrl ? 500 : 50; // 500ms для URL, 50ms для локальных (оптимизировано)
             
             System.Diagnostics.Debug.WriteLine($"[ImageLoadingBehavior] Source set, waiting {delay}ms before hiding placeholder (isUrl: {isUrl})");
             

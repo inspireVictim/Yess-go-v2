@@ -1,17 +1,17 @@
 namespace YessGoFront.Services.Api;
 
 /// <summary>
-/// API сервис для работы с платежами через Finik SDK (через backend)
+/// API сервис для работы с платежами через Finik Web SDK (через backend)
 /// </summary>
 public interface IPaymentApiService
 {
     /// <summary>
-    /// Создает платеж через Finik SDK на backend
+    /// Создает платеж через Finik Web SDK на backend
     /// </summary>
-    /// <param name="request">Параметры платежного запроса</param>
+    /// <param name="amount">Сумма платежа</param>
     /// <param name="ct">Токен отмены</param>
-    /// <returns>Результат создания платежа</returns>
-    Task<CreateFinikPaymentResponse> CreateFinikPaymentAsync(CreateFinikPaymentRequest request, CancellationToken ct = default);
+    /// <returns>URL страницы оплаты Finik</returns>
+    Task<CreatePaymentResponse> CreatePaymentAsync(decimal amount, CancellationToken ct = default);
 
     /// <summary>
     /// Получает статус платежа по ID
@@ -23,75 +23,19 @@ public interface IPaymentApiService
 }
 
 /// <summary>
-/// Запрос на создание платежа через Finik SDK
+/// Ответ на создание платежа через Finik Web SDK
 /// </summary>
-public class CreateFinikPaymentRequest
+public class CreatePaymentResponse
 {
     /// <summary>
-    /// Сумма платежа
+    /// URL страницы оплаты Finik для отображения в WebView
     /// </summary>
-    public decimal Amount { get; set; }
+    public string PaymentUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Описание товара/услуги
+    /// URL для редиректа после успешной оплаты (для отслеживания завершения оплаты)
     /// </summary>
-    public string? Description { get; set; }
-
-    /// <summary>
-    /// Название товара (на английском)
-    /// </summary>
-    public string? NameEn { get; set; }
-
-    /// <summary>
-    /// Уникальный ID запроса (для предотвращения дубликатов)
-    /// </summary>
-    public string? RequestId { get; set; }
-
-    /// <summary>
-    /// Дополнительные поля, которые будут возвращены в callback
-    /// </summary>
-    public Dictionary<string, string>? RequiredFields { get; set; }
-
-    /// <summary>
-    /// Максимальное количество раз, которое товар может быть приобретен
-    /// </summary>
-    public int? MaxAvailableQuantity { get; set; }
-}
-
-/// <summary>
-/// Ответ на создание платежа через Finik SDK
-/// </summary>
-public class CreateFinikPaymentResponse
-{
-    /// <summary>
-    /// ID платежа на backend
-    /// </summary>
-    public string PaymentId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// URL для оплаты (если нужен WebView)
-    /// </summary>
-    public string? PaymentUrl { get; set; }
-
-    /// <summary>
-    /// Статус платежа (pending, completed, failed)
-    /// </summary>
-    public string Status { get; set; } = string.Empty;
-
-    /// <summary>
-    /// ID транзакции от Finik
-    /// </summary>
-    public string? TransactionId { get; set; }
-
-    /// <summary>
-    /// Сумма платежа
-    /// </summary>
-    public decimal? Amount { get; set; }
-
-    /// <summary>
-    /// Сообщение об ошибке (если есть)
-    /// </summary>
-    public string? ErrorMessage { get; set; }
+    public string? RedirectUrl { get; set; }
 }
 
 /// <summary>

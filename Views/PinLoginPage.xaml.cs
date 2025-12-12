@@ -325,12 +325,31 @@ namespace YessGoFront.Views
                                     
                                     if (globalAuthService != null)
                                     {
-                                        tokensValid = await globalAuthService.EnsureValidTokensAsync();
+                                        // Используем таймаут для обновления токенов (10 секунд)
+                                        using var tokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                        try
+                                        {
+                                            tokensValid = await globalAuthService.EnsureValidTokensAsync(tokenCts.Token);
+                                        }
+                                        catch (OperationCanceledException)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Token refresh timed out after biometric auth");
+                                            tokensValid = false;
+                                        }
                                     }
                                     else if (_authService != null)
                                     {
-                                        // Fallback на старый метод
-                                        tokensValid = await _authService.RefreshTokenAsync();
+                                        // Fallback на старый метод с таймаутом
+                                        using var tokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                        try
+                                        {
+                                            tokensValid = await _authService.RefreshTokenAsync(tokenCts.Token);
+                                        }
+                                        catch (OperationCanceledException)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine("[PinLoginPage] Token refresh timed out (fallback method)");
+                                            tokensValid = false;
+                                        }
                                     }
                                     
                                     if (tokensValid)
@@ -703,12 +722,31 @@ namespace YessGoFront.Views
                             
                             if (globalAuthService != null)
                             {
-                                tokensValid = await globalAuthService.EnsureValidTokensAsync();
+                                // Используем таймаут для обновления токенов (10 секунд)
+                                using var tokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                try
+                                {
+                                    tokensValid = await globalAuthService.EnsureValidTokensAsync(tokenCts.Token);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Token refresh timed out after PIN verification");
+                                    tokensValid = false;
+                                }
                             }
                             else if (_authService != null)
                             {
-                                // Fallback на старый метод
-                                tokensValid = await _authService.RefreshTokenAsync();
+                                // Fallback на старый метод с таймаутом
+                                using var tokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                try
+                                {
+                                    tokensValid = await _authService.RefreshTokenAsync(tokenCts.Token);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[PinLoginPage] Token refresh timed out (fallback method)");
+                                    tokensValid = false;
+                                }
                             }
                             
                             if (tokensValid)

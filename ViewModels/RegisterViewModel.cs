@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -170,22 +168,7 @@ public partial class RegisterViewModel : ObservableObject
 
             var startTime = DateTime.UtcNow;
 
-            // Используем таймаут для отправки кода (15 секунд)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var result = await _authService.SendVerificationCodeAsync(normalizedPhone, cts.Token);
-            
-            var duration = DateTime.UtcNow - startTime;
-            _logger?.LogInformation("[RegisterViewModel] Verification code sent in {Duration}ms", duration.TotalMilliseconds);
-
-            // Проверка на null результат
-            if (result == null)
-            {
-                _logger?.LogError("[RegisterViewModel] SendVerificationCodeAsync returned null");
-                ShowError("Получен пустой ответ от сервера");
-                IsBusy = false;
-                _registerLock.Release();
-                return;
-            }
+            var result = await _authService.SendVerificationCodeAsync(normalizedPhone);
 
             if (result.TryGetValue("code", out var codeObj) && codeObj != null)
                 DisplayedVerificationCode = codeObj.ToString();
@@ -209,6 +192,11 @@ public partial class RegisterViewModel : ObservableObject
             _logger?.LogWarning("[RegisterViewModel] Send verification code operation timed out after 15 seconds. IsBusy set to false, lock released.");
             IsBusy = false;
             _registerLock.Release();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[RegisterViewModel] Send verification code operation timed out after 15 seconds");
+            ShowError("Операция отправки кода заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {
@@ -358,34 +346,7 @@ public partial class RegisterViewModel : ObservableObject
             _logger?.LogInformation("[RegisterViewModel] Attempting registration for phone: {Phone}", normalizedPhone);
             var startTime = DateTime.UtcNow;
 
-            // Используем таймаут для регистрации (15 секунд)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var response = await _authService.VerifyCodeAndRegisterAsync(request, cts.Token);
-            
-            var duration = DateTime.UtcNow - startTime;
-            var userId = response?.UserId ?? response?.User?.Id ?? 0;
-            _logger?.LogInformation("[RegisterViewModel] Registration successful in {Duration}ms. UserId: {UserId}", 
-                duration.TotalMilliseconds, userId);
-            
-            // Проверка на null response
-            if (response == null)
-            {
-                _logger?.LogError("[RegisterViewModel] Registration response is null. IsBusy set to false, lock released.");
-                ShowError("Получен пустой ответ от сервера при регистрации");
-                IsBusy = false;
-                _registerLock.Release();
-                return;
-            }
-            
-            // Проверка на валидный токен
-            if (string.IsNullOrWhiteSpace(response.AccessToken))
-            {
-                _logger?.LogError("[RegisterViewModel] AccessToken is null or empty in response. IsBusy set to false, lock released.");
-                ShowError("Не получен токен доступа от сервера");
-                IsBusy = false;
-                _registerLock.Release();
-                return;
-            }
+            var response = await _authService.VerifyCodeAndRegisterAsync(request);
 
             // Устанавливаем флаг успешной регистрации ПЕРЕД вызовом OnRegisterSuccess
             IsRegistrationSuccessful = true;
@@ -424,6 +385,11 @@ public partial class RegisterViewModel : ObservableObject
             _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds. IsBusy set to false, lock released.");
             IsBusy = false;
             _registerLock.Release();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds");
+            ShowError("Операция регистрации заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {

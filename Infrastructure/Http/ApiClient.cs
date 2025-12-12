@@ -227,9 +227,22 @@ public abstract class ApiClient
             var uri = BuildUri(endpoint);
             Logger?.LogDebug("POST {Url}", uri);
 
+            // Создаем CancellationToken с таймаутом, если не передан
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!ct.CanBeCanceled)
+            {
+                cts.CancelAfter(DefaultTimeout);
+            }
+
             var content = JsonContent.Create(request, options: JsonOptions);
-            var response = await HttpClient.PostAsync(uri, content, ct);
+            var response = await HttpClient.PostAsync(uri, content, cts.Token);
             await EnsureSuccessStatusCode(response);
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || !ct.IsCancellationRequested)
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogError(ex, "[ApiClient] Request timeout for POST {Url}", uri);
+            throw new NetworkException("Превышено время ожидания ответа от сервера. Проверьте подключение к интернету.", ex);
         }
         catch (Exception ex) when (NetworkException.IsNetworkError(ex))
         {
@@ -244,12 +257,25 @@ public abstract class ApiClient
             var uri = BuildUri(endpoint);
             Logger?.LogDebug("PUT {Url}", uri);
 
+            // Создаем CancellationToken с таймаутом, если не передан
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!ct.CanBeCanceled)
+            {
+                cts.CancelAfter(DefaultTimeout);
+            }
+
             var content = JsonContent.Create(request, options: JsonOptions);
-            var response = await HttpClient.PutAsync(uri, content, ct);
+            var response = await HttpClient.PutAsync(uri, content, cts.Token);
             await EnsureSuccessStatusCode(response);
 
-            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cts.Token)
                    ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || !ct.IsCancellationRequested)
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogError(ex, "[ApiClient] Request timeout for PUT {Url}", uri);
+            throw new NetworkException("Превышено время ожидания ответа от сервера. Проверьте подключение к интернету.", ex);
         }
         catch (Exception ex) when (NetworkException.IsNetworkError(ex))
         {
@@ -264,12 +290,25 @@ public abstract class ApiClient
             var uri = BuildUri(endpoint);
             Logger?.LogDebug("PATCH {Url}", uri);
 
+            // Создаем CancellationToken с таймаутом, если не передан
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!ct.CanBeCanceled)
+            {
+                cts.CancelAfter(DefaultTimeout);
+            }
+
             var content = JsonContent.Create(request, options: JsonOptions);
-            var response = await HttpClient.PatchAsync(uri, content, ct);
+            var response = await HttpClient.PatchAsync(uri, content, cts.Token);
             await EnsureSuccessStatusCode(response);
 
-            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct)
+            return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cts.Token)
                    ?? throw new ApiException("Не удалось десериализовать ответ сервера");
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || !ct.IsCancellationRequested)
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogError(ex, "[ApiClient] Request timeout for PATCH {Url}", uri);
+            throw new NetworkException("Превышено время ожидания ответа от сервера. Проверьте подключение к интернету.", ex);
         }
         catch (Exception ex) when (NetworkException.IsNetworkError(ex))
         {
@@ -284,9 +323,22 @@ public abstract class ApiClient
             var uri = BuildUri(endpoint);
             Logger?.LogDebug("PATCH {Url}", uri);
 
+            // Создаем CancellationToken с таймаутом, если не передан
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!ct.CanBeCanceled)
+            {
+                cts.CancelAfter(DefaultTimeout);
+            }
+
             var content = JsonContent.Create(request, options: JsonOptions);
-            var response = await HttpClient.PatchAsync(uri, content, ct);
+            var response = await HttpClient.PatchAsync(uri, content, cts.Token);
             await EnsureSuccessStatusCode(response);
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || !ct.IsCancellationRequested)
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogError(ex, "[ApiClient] Request timeout for PATCH {Url}", uri);
+            throw new NetworkException("Превышено время ожидания ответа от сервера. Проверьте подключение к интернету.", ex);
         }
         catch (Exception ex) when (NetworkException.IsNetworkError(ex))
         {
@@ -301,8 +353,21 @@ public abstract class ApiClient
             var uri = BuildUri(endpoint);
             Logger?.LogDebug("DELETE {Url}", uri);
 
-            var response = await HttpClient.DeleteAsync(uri, ct);
+            // Создаем CancellationToken с таймаутом, если не передан
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!ct.CanBeCanceled)
+            {
+                cts.CancelAfter(DefaultTimeout);
+            }
+
+            var response = await HttpClient.DeleteAsync(uri, cts.Token);
             await EnsureSuccessStatusCode(response);
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || !ct.IsCancellationRequested)
+        {
+            var uri = BuildUri(endpoint);
+            Logger?.LogError(ex, "[ApiClient] Request timeout for DELETE {Url}", uri);
+            throw new NetworkException("Превышено время ожидания ответа от сервера. Проверьте подключение к интернету.", ex);
         }
         catch (Exception ex) when (NetworkException.IsNetworkError(ex))
         {

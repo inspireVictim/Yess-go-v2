@@ -60,18 +60,18 @@ public static class ApiEndpoints
     // Wallet endpoints
     public static class WalletEndpoints
     {
-        // Используем endpoint из payments, который работает с текущим пользователем из токена
-        public const string Balance = $"{ApiVersion}/payments/balance";
-        public const string Transactions = $"{ApiVersion}/payments/transactions";
+        // Используем правильный endpoint для баланса согласно API документации
+        public const string Balance = $"{Wallet}/balance";
+        public const string Transactions = $"{Wallet}/transactions";
         public const string TopUp = $"{Wallet}/topup";
         public const string Transfer = $"{ApiVersion}/payments/transfer";
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }
 
-    // Payment endpoints (для работы с Finik SDK через backend)
+    // Payment endpoints (для работы с Finik Web SDK через backend)
     public static class PaymentEndpoints
     {
-        public const string CreateFinikPayment = $"{ApiVersion}/payment/finik/create";
+        public const string Create = $"{ApiVersion}/payments/create";
         public static string GetPaymentStatus(string paymentId) => $"{ApiVersion}/payments/{Uri.EscapeDataString(paymentId)}/status";
     }
 

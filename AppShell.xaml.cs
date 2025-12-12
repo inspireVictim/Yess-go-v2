@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
 using YessGoFront.Views;
@@ -10,10 +11,11 @@ namespace YessGoFront
     public partial class AppShell : Shell
     {
         private bool _initialized;
-        private static User? _cachedLocalUser;
-        private static bool? _cachedHasPin;
-        private static DateTime _cacheTimestamp = DateTime.MinValue;
-        private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(1);
+        
+        // Cache fields for background initialization
+        private User? _cachedLocalUser;
+        private bool _cachedHasPin;
+        private DateTime _cacheTimestamp = DateTime.MinValue;
 
         public AppShell()
         {
@@ -51,6 +53,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
             Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
             Routing.RegisterRoute("receipt", typeof(Views.ReceiptPage));
+            Routing.RegisterRoute(nameof(Views.FinikPaymentPage), typeof(Views.FinikPaymentPage));
 
 
         }
@@ -203,23 +206,67 @@ namespace YessGoFront
                 // 2. Полная проверка auth (обновляем кэш)
                 var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
                 
-                // Обновляем кэш localUser
-                var localUser = await authService.GetLocalUserAsync();
+                // Обновляем кэш localUser с таймаутом
+                User? localUser = null;
+                try
+                {
+                    using var localUserCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    localUser = await authService.GetLocalUserAsync();
+                }
+                catch (OperationCanceledException)
+                {
+                    Debug.WriteLine("[AppShell] Background: GetLocalUserAsync timed out");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[AppShell] Background: Error getting local user: {ex.Message}");
+                }
+                
                 _cachedLocalUser = localUser;
                 
                 if (localUser != null)
                 {
                     Debug.WriteLine($"[AppShell] Background: LocalUser found (UserId={localUser.Id})");
                     
-                    // Обновляем кэш PIN
-                    var hasValidPin = await authService.HasPinAsync();
+                    // Обновляем кэш PIN с таймаутом
+                    bool hasValidPin = false;
+                    try
+                    {
+                        using var hasPinCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        // HasPinAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                        hasValidPin = await Task.Run(async () => await authService.HasPinAsync(), hasPinCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Debug.WriteLine("[AppShell] Background: HasPinAsync timed out");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[AppShell] Background: Error checking PIN: {ex.Message}");
+                    }
+                    
                     _cachedHasPin = hasValidPin;
                     _cacheTimestamp = DateTime.UtcNow;
                     
                     // Проверяем и обновляем токены в фоне
                     if (authenticationService != null)
                     {
-                        var accessToken = await authenticationService.GetAccessTokenAsync();
+                        string? accessToken = null;
+                        try
+                        {
+                            using var accessTokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                            // GetAccessTokenAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                            accessToken = await Task.Run(async () => await authenticationService.GetAccessTokenAsync(), accessTokenCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Debug.WriteLine("[AppShell] Background: GetAccessTokenAsync timed out");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[AppShell] Background: Error getting access token: {ex.Message}");
+                        }
+                        
                         if (!string.IsNullOrWhiteSpace(accessToken))
                         {
                             var isTokenValid = Infrastructure.Auth.JwtHelper.IsTokenValid(accessToken);
@@ -227,17 +274,60 @@ namespace YessGoFront
                             if (!isTokenValid)
                             {
                                 Debug.WriteLine("[AppShell] Background: Token expired, refreshing...");
-                                var refreshToken = await authenticationService.GetRefreshTokenAsync();
+                                string? refreshToken = null;
+                                try
+                                {
+                                    using var refreshTokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                    // GetRefreshTokenAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                                    refreshToken = await Task.Run(async () => await authenticationService.GetRefreshTokenAsync(), refreshTokenCts.Token);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    Debug.WriteLine("[AppShell] Background: GetRefreshTokenAsync timed out");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[AppShell] Background: Error getting refresh token: {ex.Message}");
+                                }
+                                
                                 if (!string.IsNullOrWhiteSpace(refreshToken))
                                 {
                                     try
                                     {
-                                        await authenticationService.RefreshTokenAsync();
-                                        Debug.WriteLine("[AppShell] Background: Token refreshed successfully");
+                                        // Используем таймаут для обновления токенов (10 секунд)
+                                        using var tokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                        
+                                        // Используем GlobalAuthService для централизованного управления токенами
+                                        // Создаем scope для получения GlobalAuthService
+                                        using var authScope = MauiProgram.Services.CreateScope();
+                                        var globalAuthService = authScope.ServiceProvider.GetService<YessGoFront.Services.GlobalAuthService>();
+                                        if (globalAuthService != null)
+                                        {
+                                            var tokensValid = await globalAuthService.EnsureValidTokensAsync(tokenCts.Token);
+                                            if (tokensValid)
+                                            {
+                                                Debug.WriteLine("[AppShell] Background: Tokens refreshed successfully via GlobalAuthService");
+                                            }
+                                            else
+                                            {
+                                                Debug.WriteLine("[AppShell] Background: Failed to refresh tokens via GlobalAuthService");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Fallback на старый метод (IAuthenticationService.RefreshTokenAsync не принимает CancellationToken)
+                                            await authenticationService.RefreshTokenAsync();
+                                            Debug.WriteLine("[AppShell] Background: Token refreshed successfully (fallback method)");
+                                        }
+                                    }
+                                    catch (OperationCanceledException)
+                                    {
+                                        Debug.WriteLine("[AppShell] Background: Token refresh timed out");
                                     }
                                     catch (Exception ex)
                                     {
                                         Debug.WriteLine($"[AppShell] Background: Token refresh failed: {ex.Message}");
+                                        Debug.WriteLine($"[AppShell] Background: StackTrace: {ex.StackTrace}");
                                     }
                                 }
                             }
@@ -257,26 +347,78 @@ namespace YessGoFront
                     var hasRefreshToken = false;
                     if (authenticationService != null)
                     {
-                        var refreshToken = await authenticationService.GetRefreshTokenAsync();
+                        string? refreshToken = null;
+                        try
+                        {
+                            using var refreshTokenCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                            // GetRefreshTokenAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                            refreshToken = await Task.Run(async () => await authenticationService.GetRefreshTokenAsync(), refreshTokenCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Debug.WriteLine("[AppShell] Background: GetRefreshTokenAsync (check) timed out");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[AppShell] Background: Error getting refresh token (check): {ex.Message}");
+                        }
+                        
                         hasRefreshToken = !string.IsNullOrWhiteSpace(refreshToken);
                     }
 
                     if (hasRefreshToken)
                     {
                         Debug.WriteLine("[AppShell] Background: No local user but has refresh token → attempting auto-login");
-                        var autoLoginSuccess = await authService.AutoLoginIfNoLocalUserAsync();
-                        
-                        if (autoLoginSuccess)
+                        try
                         {
-                            var hasValidPin = await authService.HasPinAsync();
-                            _cachedHasPin = hasValidPin;
-                            _cacheTimestamp = DateTime.UtcNow;
+                            // Используем таймаут для auto-login (15 секунд)
+                            using var autoLoginCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                            var autoLoginSuccess = await authService.AutoLoginIfNoLocalUserAsync(autoLoginCts.Token);
                             
-                            Debug.WriteLine($"[AppShell] Background: Auto-login successful, hasPin={hasValidPin}");
+                            if (autoLoginSuccess)
+                            {
+                                bool hasValidPin = false;
+                                try
+                                {
+                                    using var hasPinCts2 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                                    // HasPinAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                                    hasValidPin = await Task.Run(async () => await authService.HasPinAsync(), hasPinCts2.Token);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    Debug.WriteLine("[AppShell] Background: HasPinAsync (after auto-login) timed out");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[AppShell] Background: Error checking PIN after auto-login: {ex.Message}");
+                                }
+                                
+                                _cachedHasPin = hasValidPin;
+                                _cacheTimestamp = DateTime.UtcNow;
+                                
+                                Debug.WriteLine($"[AppShell] Background: Auto-login successful, hasPin={hasValidPin}");
+                            }
+                            else
+                            {
+                                Debug.WriteLine("[AppShell] Background: Auto-login failed");
+                                if (authenticationService != null)
+                                {
+                                    await authenticationService.ClearTokensAsync();
+                                }
+                            }
                         }
-                        else
+                        catch (OperationCanceledException)
                         {
-                            Debug.WriteLine("[AppShell] Background: Auto-login failed");
+                            Debug.WriteLine("[AppShell] Background: Auto-login timed out");
+                            if (authenticationService != null)
+                            {
+                                await authenticationService.ClearTokensAsync();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[AppShell] Background: Auto-login error: {ex.Message}");
+                            Debug.WriteLine($"[AppShell] Background: StackTrace: {ex.StackTrace}");
                             if (authenticationService != null)
                             {
                                 await authenticationService.ClearTokensAsync();

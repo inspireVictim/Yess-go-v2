@@ -65,29 +65,8 @@ public partial class LoginViewModel : ObservableObject
             _logger?.LogInformation("[LoginViewModel] Attempting login for phone: {Phone}", normalizedPhone);
             var startTime = DateTime.UtcNow;
 
-            // Используем таймаут для операции входа (15 секунд)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, passwordTrimmed, cts.Token);
-            
-            var duration = DateTime.UtcNow - startTime;
-            _logger?.LogInformation("[LoginViewModel] Login successful in {Duration}ms. UserId: {UserId}", 
-                duration.TotalMilliseconds, response?.UserId ?? 0);
-            
-            // Проверка на null response
-            if (response == null)
-            {
-                _logger?.LogError("[LoginViewModel] Login response is null");
-                ShowError("Получен пустой ответ от сервера");
-                return;
-            }
-            
-            // Проверка на валидный токен
-            if (string.IsNullOrWhiteSpace(response.AccessToken))
-            {
-                _logger?.LogError("[LoginViewModel] AccessToken is null or empty in response");
-                ShowError("Не получен токен доступа от сервера");
-                return;
-            }
+            var response = await _authService.LoginWithPhoneAsync(normalizedPhone, Password);
+            _logger?.LogInformation("Login successful. UserId: {UserId}", response.UserId);
 
             // Вызываем событие успешного входа
             if (OnLoginSuccess != null)
@@ -99,6 +78,11 @@ public partial class LoginViewModel : ObservableObject
         {
             ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
             _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
+            ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {

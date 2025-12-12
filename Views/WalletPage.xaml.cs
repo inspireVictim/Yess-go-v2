@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
@@ -9,6 +10,10 @@ namespace YessGoFront.Views
 {
     public partial class WalletPage : ContentPage
     {
+        private readonly SemaphoreSlim _loadBalanceLock = new(1, 1);
+        private DateTime _lastBalanceLoad = DateTime.MinValue;
+        private const int BalanceCacheSeconds = 30;
+
         public WalletPage()
         {
             InitializeComponent();
@@ -23,24 +28,37 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
             // Обновляем баланс при каждом появлении страницы
-            await LoadBalanceAsync();
+            _ = LoadBalanceAsync();
         }
 
         private async Task LoadBalanceAsync()
         {
+            // Проверяем кэш
+            if ((DateTime.Now - _lastBalanceLoad).TotalSeconds < BalanceCacheSeconds)
+                return;
+
+            if (!await _loadBalanceLock.WaitAsync(0))
+                return; // Уже выполняется
+
             try
             {
                 var walletService = MauiProgram.Services.GetService<IWalletService>();
                 if (walletService != null)
                 {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                     var balance = await walletService.GetBalanceAsync();
                     BalanceStore.Instance.Balance = balance;
+                    _lastBalanceLoad = DateTime.Now;
                     System.Diagnostics.Debug.WriteLine($"[WalletPage] Баланс загружен из БД: {balance}");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[WalletPage] Ошибка загрузки баланса: {ex.Message}");
+            }
+            finally
+            {
+                _loadBalanceLock.Release();
             }
         }
 

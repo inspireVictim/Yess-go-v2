@@ -84,6 +84,14 @@ namespace YessGoFront.ViewModels
         private DateTime _pauseStartTime;
         private TimeSpan _pausedDuration = TimeSpan.Zero;
 
+        // Оптимизация: защита от повторных вызовов и кэширование
+        private readonly SemaphoreSlim _loadUserLock = new(1, 1);
+        private readonly SemaphoreSlim _loadPartnersLock = new(1, 1);
+        private readonly SemaphoreSlim _loadBalanceLock = new(1, 1);
+        private int? _cachedUserId;
+        private DateTime _lastBalanceUpdate = DateTime.MinValue;
+        private const int BalanceCacheSeconds = 30;
+
         // ====== Команды ======
         public IAsyncRelayCommand<StoryModel> OpenStoryAsyncCommand { get; }
         public IRelayCommand CloseStoryCommand { get; }
@@ -199,6 +207,13 @@ namespace YessGoFront.ViewModels
 
         public async Task LoadBalanceAsync(CancellationToken ct = default)
         {
+            // Проверяем кэш
+            if ((DateTime.Now - _lastBalanceUpdate).TotalSeconds < BalanceCacheSeconds)
+                return;
+
+            if (!await _loadBalanceLock.WaitAsync(0))
+                return; // Уже выполняется
+
             try
             {
                 if (_walletService == null)
@@ -241,15 +256,24 @@ namespace YessGoFront.ViewModels
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading wallet balance: {ex.Message}");
                 // Не обновляем баланс при ошибке, оставляем старое значение
             }
+            finally
+            {
+                _loadBalanceLock.Release();
+            }
         }
 
         private async Task LoadUserAsync()
         {
+            if (!await _loadUserLock.WaitAsync(0))
+                return; // Уже выполняется
+
             try
             {
                 if (_authService == null)
                     return;
 
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                
                 var localUser = await _authService.GetLocalUserAsync();
                 if (localUser != null)
                 {
@@ -259,14 +283,22 @@ namespace YessGoFront.ViewModels
                     {
                         try
                         {
-                            var accessToken = await _authenticationService.GetAccessTokenAsync();
-                            if (!string.IsNullOrWhiteSpace(accessToken))
+                            // Используем таймаут для получения токена
+                            var tokenTask = _authenticationService.GetAccessTokenAsync();
+                            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                            var completedTask = await Task.WhenAny(tokenTask, timeoutTask);
+                            
+                            if (completedTask == tokenTask)
                             {
-                                var phoneFromToken = JwtHelper.GetPhone(accessToken);
-                                if (!string.IsNullOrWhiteSpace(phoneFromToken))
+                                var accessToken = await tokenTask;
+                                if (!string.IsNullOrWhiteSpace(accessToken))
                                 {
-                                    phone = phoneFromToken;
-                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token: {phone}");
+                                    var phoneFromToken = JwtHelper.GetPhone(accessToken);
+                                    if (!string.IsNullOrWhiteSpace(phoneFromToken))
+                                    {
+                                        phone = phoneFromToken;
+                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token: {phone}");
+                                    }
                                 }
                             }
                         }
@@ -299,17 +331,10 @@ namespace YessGoFront.ViewModels
                             
                             if (userProfile != null)
                             {
-                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Got profile from API: FirstName='{userProfile.FirstName}', LastName='{userProfile.LastName}'");
-                                
-                                // Формируем ФИО из FirstName и LastName напрямую (не используем DisplayName, так как он может вернуть телефон)
-                                var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
-                                var lastName = userProfile.LastName?.Trim() ?? string.Empty;
-                                var fullName = $"{firstName} {lastName}".Trim();
-                                
-                                if (!string.IsNullOrWhiteSpace(fullName))
+                                var userProfile = await _authService.GetUserProfileAsync();
+                                if (userProfile != null)
                                 {
-                                    displayName = fullName;
-                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Got profile from API: FirstName='{userProfile.FirstName}', LastName='{userProfile.LastName}'");
                                     
                                     // Небольшая задержка, чтобы дать время SaveOrUpdateUserAsync сохранить данные в БД
                                     await Task.Delay(100);
@@ -319,8 +344,22 @@ namespace YessGoFront.ViewModels
                                     if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name) && 
                                         !updatedUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        displayName = updatedUser.Name;
-                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Updated displayName from DB after profile load: {displayName}");
+                                        var updatedDisplayName = fullName;
+                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
+                                        
+                                        // Перезагружаем пользователя из БД, чтобы получить обновленное имя
+                                        var updatedUser = await _authService.GetLocalUserAsync();
+                                        if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name))
+                                        {
+                                            updatedDisplayName = updatedUser.Name;
+                                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Updated displayName from DB after profile load: {updatedDisplayName}");
+                                        }
+                                        
+                                        // Обновляем UI на главном потоке
+                                        await MainThread.InvokeOnMainThreadAsync(() =>
+                                        {
+                                            DisplayName = updatedDisplayName;
+                                        });
                                     }
                                     else
                                     {
@@ -416,8 +455,12 @@ namespace YessGoFront.ViewModels
                     {
                         try
                         {
-                            var accessToken = await _authenticationService.GetAccessTokenAsync();
-                            if (!string.IsNullOrWhiteSpace(accessToken))
+                            // Используем таймаут для получения токена
+                            var tokenTask = _authenticationService.GetAccessTokenAsync();
+                            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                            var completedTask = await Task.WhenAny(tokenTask, timeoutTask);
+                            
+                            if (completedTask == tokenTask)
                             {
                                 phone = JwtHelper.GetPhone(accessToken);
                                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token (no local user): {phone}");
@@ -488,6 +531,10 @@ namespace YessGoFront.ViewModels
                     DisplayName = "Пользователь";
                     Phone = string.Empty;
                 });
+            }
+            finally
+            {
+                _loadUserLock.Release();
             }
         }
 
@@ -676,6 +723,9 @@ namespace YessGoFront.ViewModels
 
         private async Task LoadPartnersAsync()
         {
+            if (!await _loadPartnersLock.WaitAsync(0))
+                return; // Уже выполняется
+
             try
             {
                 System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров из БД");
@@ -770,41 +820,39 @@ namespace YessGoFront.ViewModels
                     return;
                 }
 
-                // Приводим к единому формату - ВСЕ партнёры из БД, даже без логотипов
-                var list = partners
-                    .OfType<PartnerDto>()
-                    .Select(p => 
-                    {
-                        var logoUrl = p.LogoUrl?.Trim() ?? "";
-                        
-                        // Нормализуем URL: если это относительный путь, он будет обработан конвертером
-                        // Но если URL пустой или null, оставляем пустым - будет показан текст
-                        if (!string.IsNullOrWhiteSpace(logoUrl))
+                // Обработку данных выполняем в фоне для оптимизации
+                var list = await Task.Run(() =>
+                {
+                    return partners
+                        .OfType<PartnerDto>()
+                        .Select(p => 
                         {
-                            // Если URL не начинается с http/https, но начинается с /, это относительный путь
-                            // Конвертер сам добавит базовый URL
-                            if (!logoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                                !logoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-                                !logoUrl.StartsWith("/"))
+                            var logoUrl = p.LogoUrl?.Trim() ?? "";
+                            
+                            // Нормализуем URL: если это относительный путь, он будет обработан конвертером
+                            // Но если URL пустой или null, оставляем пустым - будет показан текст
+                            if (!string.IsNullOrWhiteSpace(logoUrl))
                             {
-                                // Если URL не начинается с /, добавляем его
-                                logoUrl = "/" + logoUrl.TrimStart('/');
+                                // Если URL не начинается с http/https, но начинается с /, это относительный путь
+                                // Конвертер сам добавит базовый URL
+                                if (!logoUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                    !logoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                    !logoUrl.StartsWith("/"))
+                                {
+                                    // Если URL не начинается с /, добавляем его
+                                    logoUrl = "/" + logoUrl.TrimStart('/');
+                                }
                             }
-                        }
-                        
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partner из БД: Id={p.Id}, Name={p.Name}, LogoUrl={(string.IsNullOrWhiteSpace(logoUrl) ? "empty" : logoUrl)}");
-#if ANDROID
-                        Android.Util.Log.Info("MainPageViewModel", $"[LoadPartnersAsync] Partner: Id={p.Id}, Name={p.Name}, LogoUrl={(string.IsNullOrWhiteSpace(logoUrl) ? "empty" : logoUrl)}");
-#endif
-                        
-                        return new PartnerLogoModel
-                        {
-                            Id = p.Id.ToString(),
-                            Name = p.Name ?? "Партнёр",
-                            Logo = logoUrl // Сохраняем даже пустой LogoUrl - конвертер обработает
-                        };
-                    })
-                    .ToList(); // НЕ фильтруем - показываем ВСЕ партнёры из БД
+                            
+                            return new PartnerLogoModel
+                            {
+                                Id = p.Id.ToString(),
+                                Name = p.Name ?? "Партнёр",
+                                Logo = logoUrl // Сохраняем даже пустой LogoUrl - конвертер обработает
+                            };
+                        })
+                        .ToList(); // НЕ фильтруем - показываем ВСЕ партнёры из БД
+                });
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Всего партнёров из БД: {list.Count}");
 #if ANDROID
@@ -821,35 +869,41 @@ namespace YessGoFront.ViewModels
                     return;
                 }
 
-                // === ДЕЛИМ НА 3 РЯДА ===
-                int count = list.Count;
-                int perRow = Math.Max(1, count / 3);
-                
-                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Разделение на ряды: всего={count}, на ряд={perRow}");
+                // Разделение на ряды также выполняем в фоне
+                var rows = await Task.Run(() =>
+                {
+                    // === ДЕЛИМ НА 3 РЯДА ===
+                    int count = list.Count;
+                    int perRow = Math.Max(1, count / 3);
+                    
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Разделение на ряды: всего={count}, на ряд={perRow}");
 
-                var row1 = list.Take(perRow).ToList();
-                var row2 = list.Skip(perRow).Take(perRow).ToList();
-                var row3 = list.Skip(perRow * 2).ToList();
+                    var row1 = list.Take(perRow).ToList();
+                    var row2 = list.Skip(perRow).Take(perRow).ToList();
+                    var row3 = list.Skip(perRow * 2).ToList();
 
-                if (row2.Count == 0) row2 = row1.ToList();
-                if (row3.Count == 0) row3 = row2.ToList();
+                    if (row2.Count == 0) row2 = row1.ToList();
+                    if (row3.Count == 0) row3 = row2.ToList();
 
-                // === ДУБЛИРУЕМ КАЖДЫЙ РЯД (обязательно для бесшовного скролла) ===
-                row1 = row1.Concat(row1).ToList();
-                row2 = row2.Concat(row2).ToList();
-                row3 = row3.Concat(row3).ToList();
+                    // === ДУБЛИРУЕМ КАЖДЫЙ РЯД (обязательно для бесшовного скролла) ===
+                    row1 = row1.Concat(row1).ToList();
+                    row2 = row2.Concat(row2).ToList();
+                    row3 = row3.Concat(row3).ToList();
 
-                // === ДЕЛАЕМ ВСЕ РЯДЫ ОДИНАКОВЫМИ ПО ДЛИНЕ ===
-                row1 = EnsureEnough(row1);
-                row2 = EnsureEnough(row2);
-                row3 = EnsureEnough(row3);
+                    // === ДЕЛАЕМ ВСЕ РЯДЫ ОДИНАКОВЫМИ ПО ДЛИНЕ ===
+                    row1 = EnsureEnough(row1);
+                    row2 = EnsureEnough(row2);
+                    row3 = EnsureEnough(row3);
+
+                    return (row1, row2, row3);
+                });
 
                 // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI НА ГЛАВНОМ ПОТОКЕ ===
                 await MainThread.InvokeOnMainThreadAsync(() =>
                 {
-                    foreach (var p in row1) PartnersRow1.Add(p);
-                    foreach (var p in row2) PartnersRow2.Add(p);
-                    foreach (var p in row3) PartnersRow3.Add(p);
+                    foreach (var p in rows.row1) PartnersRow1.Add(p);
+                    foreach (var p in rows.row2) PartnersRow2.Add(p);
+                    foreach (var p in rows.row3) PartnersRow3.Add(p);
                 });
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] PARTNERS READY: row1={PartnersRow1.Count}, row2={PartnersRow2.Count}, row3={PartnersRow3.Count}");
@@ -866,6 +920,10 @@ namespace YessGoFront.ViewModels
                 Android.Util.Log.Error("MainPageViewModel", $"[LoadPartnersAsync] StackTrace: {ex.StackTrace}");
 #endif
                 await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
+            }
+            finally
+            {
+                _loadPartnersLock.Release();
             }
         }
 

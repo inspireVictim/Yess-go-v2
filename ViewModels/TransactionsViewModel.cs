@@ -43,6 +43,9 @@ public partial class TransactionsViewModel : ObservableObject
     private const int PageSize = 20;
     private List<PurchaseDto> _allLoadedTransactions = new(); // Храним все загруженные транзакции
 
+    // Оптимизация: защита от повторных вызовов
+    private readonly SemaphoreSlim _loadTransactionsLock = new(1, 1);
+
     public IAsyncRelayCommand LoadTransactionsCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
@@ -158,30 +161,42 @@ public partial class TransactionsViewModel : ObservableObject
 
     private async Task LoadPageAsync(int page, bool reset)
     {
-        var items = await _walletService.GetTransactionHistoryAsync(page, PageSize, CancellationToken.None);
+        if (!await _loadTransactionsLock.WaitAsync(0))
+            return; // Уже выполняется
 
-        // Если нет данных, проверяем, есть ли еще страницы
-        if (!items.Any())
+        try
         {
-            HasMoreItems = false;
-            return;
-        }
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var items = await _walletService.GetTransactionHistoryAsync(page, PageSize, cts.Token);
 
-        // Сохраняем все загруженные транзакции
-        if (reset)
+            // Если нет данных, проверяем, есть ли еще страницы
+            if (!items.Any())
+            {
+                HasMoreItems = false;
+                return;
+            }
+
+            // Сохраняем все загруженные транзакции
+            if (reset)
+            {
+                _allLoadedTransactions.Clear();
+            }
+            _allLoadedTransactions.AddRange(items);
+
+            // Если загрузили меньше чем pageSize, значит это последняя страница
+            if (items.Count < PageSize)
+            {
+                HasMoreItems = false;
+            }
+
+            // Пересобираем группы из всех загруженных транзакций с учетом текущего фильтра
+            // Выполняем группировку в фоне для оптимизации
+            await Task.Run(() => RebuildGroupsFromLoadedTransactions());
+        }
+        finally
         {
-            _allLoadedTransactions.Clear();
+            _loadTransactionsLock.Release();
         }
-        _allLoadedTransactions.AddRange(items);
-
-        // Если загрузили меньше чем pageSize, значит это последняя страница
-        if (items.Count < PageSize)
-        {
-            HasMoreItems = false;
-        }
-
-        // Пересобираем группы из всех загруженных транзакций с учетом текущего фильтра
-        RebuildGroupsFromLoadedTransactions();
     }
 
     private void RebuildGroupsFromLoadedTransactions()

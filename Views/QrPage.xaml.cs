@@ -7,6 +7,7 @@ using Microsoft.Maui.ApplicationModel;
 using System.Text.Json;
 using System.Reflection;
 using System.Linq;
+using System.Threading;
 #if ANDROID
 using AndroidX.Camera.View;
 using Microsoft.Maui.Platform;
@@ -26,6 +27,12 @@ public partial class QrPage : ContentPage
     private readonly ILogger<QrPage>? _logger;
     private bool _isProcessing = false;
     private bool _isInitialized = false;
+    
+    // Оптимизация: кэширование партнеров и защита от повторных вызовов
+    private List<PartnerDto>? _cachedPartners;
+    private DateTime _lastPartnersUpdate = DateTime.MinValue;
+    private const int PartnersCacheSeconds = 60;
+    private readonly SemaphoreSlim _processQrLock = new(1, 1);
 
     public QrPage()
     {
@@ -96,10 +103,10 @@ public partial class QrPage : ContentPage
                         BarCodeReader.IsDetecting = true;
                         System.Diagnostics.Debug.WriteLine("[QrPage] Камера активирована");
                         
-                        // Настраиваем камеру на высокое качество через небольшую задержку
-                        // чтобы камера успела инициализироваться
-                        Task.Delay(500).ContinueWith(async _ =>
+                        // Настраиваем камеру на высокое качество в фоне (fire-and-forget)
+                        _ = Task.Run(async () =>
                         {
+                            await Task.Delay(500);
                             await ConfigureCameraForHighQuality();
                         });
                     }
@@ -165,12 +172,13 @@ public partial class QrPage : ContentPage
     {
         try
         {
+            // Небольшая задержка для полной инициализации камеры ZXing (неблокирующая)
+            await Task.Delay(300);
+            
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 try
                 {
-                    // Небольшая задержка для полной инициализации камеры ZXing
-                    await Task.Delay(300);
                     
 #if ANDROID
                     await ConfigureCameraForHighQualityAndroid();
@@ -429,6 +437,9 @@ public partial class QrPage : ContentPage
         if (result == null || _isProcessing)
             return;
 
+        if (!await _processQrLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
         _isProcessing = true;
 
         try
@@ -485,8 +496,8 @@ public partial class QrPage : ContentPage
                         _logger?.LogWarning(parseEx, "Ошибка парсинга QR кода как JSON");
                     }
 
-                    // Получаем список всех партнёров
-                    var partners = await _partnersService.GetAllAsync();
+                    // Получаем список всех партнёров (используем кэш)
+                    var partners = await GetCachedPartnersAsync();
                     
                     // Если удалось извлечь partner_id из JSON, ищем по ID
                     if (partnerIdFromQr.HasValue)
@@ -541,6 +552,7 @@ public partial class QrPage : ContentPage
                 finally
                 {
                     _isProcessing = false;
+                    _processQrLock.Release();
                 }
             });
         }
@@ -548,6 +560,36 @@ public partial class QrPage : ContentPage
         {
             _logger?.LogError(ex, "Ошибка при сканировании QR");
             _isProcessing = false;
+            _processQrLock.Release();
         }
+    }
+
+    private async Task<List<PartnerDto>> GetCachedPartnersAsync()
+    {
+        if (_cachedPartners != null && 
+            (DateTime.Now - _lastPartnersUpdate).TotalSeconds < PartnersCacheSeconds)
+        {
+            return _cachedPartners;
+        }
+        
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var partners = await _partnersService.GetAllAsync();
+            // Преобразуем IReadOnlyList в List
+            _cachedPartners = partners?.ToList() ?? new List<PartnerDto>();
+            _lastPartnersUpdate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка загрузки партнеров для QR");
+            // Возвращаем старый кэш, если есть
+            if (_cachedPartners != null)
+                return _cachedPartners;
+            // Иначе возвращаем пустой список
+            return new List<PartnerDto>();
+        }
+        
+        return _cachedPartners;
     }
 }

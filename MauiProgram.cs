@@ -246,6 +246,9 @@ public static class MauiProgram
 
         services.AddScoped<IAuthService, AuthService>();
         
+        // Обработчик навигации после успешной аутентификации
+        services.AddSingleton<AuthNavigationHandler>();
+        
         // Глобальный сервис аутентификации (singleton для централизованного управления токенами)
         services.AddSingleton<YessGoFront.Services.GlobalAuthService>(sp =>
         {

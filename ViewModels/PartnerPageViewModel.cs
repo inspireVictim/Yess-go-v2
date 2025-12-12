@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Infrastructure.Ui;
@@ -9,14 +10,17 @@ using YessGoFront.Services.Domain;
 
 namespace YessGoFront.ViewModels;
 
-public partial class PartnerPageViewModel : ObservableObject
-{
-    private readonly IPartnersService _service;
-    private readonly ILogger<PartnerPageViewModel>? _logger;
+    public partial class PartnerPageViewModel : ObservableObject
+    {
+        private readonly IPartnersService _service;
+        private readonly ILogger<PartnerPageViewModel>? _logger;
 
-    // Используем DTO категорий, чтобы иметь Id
-    public ObservableCollection<CategoryDto> Categories { get; } = new();
-    public ObservableCollection<PartnerDto> Partners { get; } = new();
+        // Оптимизация: защита от повторных вызовов
+        private readonly SemaphoreSlim _loadPartnersLock = new(1, 1);
+
+        // Используем DTO категорий, чтобы иметь Id
+        public ObservableCollection<CategoryDto> Categories { get; } = new();
+        public ObservableCollection<PartnerDto> Partners { get; } = new();
 
     [ObservableProperty] private string? searchText;
     [ObservableProperty] private bool isBusy;
@@ -122,6 +126,9 @@ public partial class PartnerPageViewModel : ObservableObject
         if (categoryId == null)
             return;
 
+        if (!await _loadPartnersLock.WaitAsync(0))
+            return; // Уже выполняется
+
         SelectedCategoryId = categoryId;
         SelectedCategoryTitle = Categories.FirstOrDefault(c => c.Id == categoryId)?.Name;
         ErrorMessage = null;
@@ -129,6 +136,7 @@ public partial class PartnerPageViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Partners.Clear();
             var items = await _service.GetPartnersByCategoryAsync(categoryId.Value);
             foreach (var p in items)
@@ -167,6 +175,7 @@ public partial class PartnerPageViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _loadPartnersLock.Release();
         }
     }
 }

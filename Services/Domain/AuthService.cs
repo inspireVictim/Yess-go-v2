@@ -165,13 +165,18 @@ public class AuthService : IAuthService
             var savedRefreshToken = await _authService.GetRefreshTokenAsync();
             _logger?.LogInformation("Refresh token saved: {Saved}", !string.IsNullOrEmpty(savedRefreshToken));
 
+            // Сохраняем UserId в Preferences сразу (быстрая операция)
             if (response.UserId > 0)
             {
-                _logger?.LogInformation("[AuthService] Saving user data. UserId: {UserId}", response.UserId);
-                var startTime = DateTime.UtcNow;
-                
-                // Сначала сохраняем данные из response.User (если есть)
-                await SaveOrUpdateUserAsync(response.UserId, response.User, ct);
+                Preferences.Set("UserId", response.UserId);
+            }
+
+            // Сохранение пользователя в БД и получение профиля выполняем в фоне (fire-and-forget)
+            // чтобы не блокировать процесс входа
+            if (response.UserId > 0)
+            {
+                var userId = response.UserId;
+                var userDto = response.User;
                 
                     // Затем пытаемся получить полный профиль пользователя через API /me
                     // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
@@ -206,7 +211,6 @@ public class AuthService : IAuthService
             }
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
-            Preferences.Set("UserId", response.UserId);
             return response;
         }
         catch (ApiException) { throw; }
@@ -299,30 +303,48 @@ public class AuthService : IAuthService
             await _authService.SaveTokensAsync(response.AccessToken, response.RefreshToken);
 
             var userId = response.UserId > 0 ? response.UserId : registeredUser.Id;
-            if (userId > 0)
-                await SaveOrUpdateUserAsync(userId, registeredUser, ct);
-
             response.User = registeredUser;
 
-            // Create welcome notification for the new user
+            // Сохранение пользователя в БД и создание welcome notification выполняем в фоне (fire-and-forget)
+            // чтобы не блокировать процесс регистрации
             if (userId > 0)
             {
-                var welcomeNotification = new Notification
-                {
-                    UserId = userId, // Уведомление для нового пользователя
-                    Title = "Добро пожаловать в YESS!GO",
-                    Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
-                    NotificationType = NotificationType.InApp,
-                    Priority = NotificationPriority.Normal,
-                    Status = NotificationStatus.Delivered,
-                    CreatedAt = DateTime.UtcNow,
-                    DeliveredAt = DateTime.UtcNow
-                };
-
-                await _dbContext.Notifications.AddAsync(welcomeNotification, ct);
-                await _dbContext.SaveChangesAsync(ct);
+                var userIdCopy = userId;
+                var registeredUserCopy = registeredUser;
                 
-                _logger?.LogInformation("Welcome notification created for user {UserId}", userId);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Сохраняем данные пользователя в БД
+                        _logger?.LogInformation("[AuthService] Saving user data to local DB in background. UserId: {UserId}", userIdCopy);
+                        await SaveOrUpdateUserAsync(userIdCopy, registeredUserCopy, CancellationToken.None);
+                        _logger?.LogInformation("[AuthService] User data saved to local DB successfully in background. UserId: {UserId}", userIdCopy);
+                        
+                        // Create welcome notification for the new user
+                        var welcomeNotification = new Notification
+                        {
+                            UserId = userIdCopy,
+                            Title = "Добро пожаловать в YESS!GO",
+                            Message = "Спасибо за регистрацию в приложении YESS!GO. Желаем приятного пользования!",
+                            NotificationType = NotificationType.InApp,
+                            Priority = NotificationPriority.Normal,
+                            Status = NotificationStatus.Delivered,
+                            CreatedAt = DateTime.UtcNow,
+                            DeliveredAt = DateTime.UtcNow
+                        };
+
+                        await _dbContext.Notifications.AddAsync(welcomeNotification, CancellationToken.None);
+                        await _dbContext.SaveChangesAsync(CancellationToken.None);
+                        
+                        _logger?.LogInformation("Welcome notification created for user {UserId} in background", userIdCopy);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Не критично - пользователь зарегистрирован, данные обновятся позже
+                        _logger?.LogWarning(ex, "[AuthService] Error saving user or creating notification in background: {Message}", ex.Message);
+                    }
+                });
             }
 
             _logger?.LogInformation("User registered with verification: {Phone}, UserId: {UserId}", request.phone_number, userId);

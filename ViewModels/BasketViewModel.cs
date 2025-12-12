@@ -1,12 +1,14 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
 using YessGoFront.Models;
 using YessGoFront.Services.Domain;
 
@@ -18,6 +20,7 @@ namespace YessGoFront.ViewModels;
 public partial class BasketViewModel : ObservableObject
 {
     private readonly ICartService _cartService;
+    private readonly IPartnersService _partnersService;
     private readonly ILogger<BasketViewModel>? _logger;
 
     [ObservableProperty]
@@ -29,9 +32,10 @@ public partial class BasketViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<PartnerCartGroup> partnerGroups = new();
 
-    public BasketViewModel(ICartService cartService, ILogger<BasketViewModel>? logger = null)
+    public BasketViewModel(ICartService cartService, IPartnersService partnersService, ILogger<BasketViewModel>? logger = null)
     {
         _cartService = cartService ?? throw new ArgumentNullException(nameof(cartService));
+        _partnersService = partnersService ?? throw new ArgumentNullException(nameof(partnersService));
         _logger = logger;
     }
 
@@ -188,14 +192,174 @@ public partial class BasketViewModel : ObservableObject
     [RelayCommand]
     private async Task ProceedToOrderAsync(int partnerId)
     {
-        // TODO: Реализовать переход на страницу оформления заказа
-        if (Application.Current?.MainPage != null)
+        try
         {
-            await Application.Current.MainPage.DisplayAlert(
-                "Информация",
-                "Функция оформления заказа будет реализована позже",
-                "OK");
+            IsBusy = true;
+
+            // Получаем информацию о партнёре
+            PartnerDetailDto? partner = null;
+            try
+            {
+                partner = await _partnersService.GetPartnerByIdAsync(partnerId.ToString());
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error loading partner {PartnerId}", partnerId);
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Не удалось загрузить информацию о партнёре",
+                        "OK");
+                }
+                return;
+            }
+
+            if (partner == null)
+            {
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Партнёр не найден",
+                        "OK");
+                }
+                return;
+            }
+
+            // Проверяем наличие номера телефона
+            if (string.IsNullOrWhiteSpace(partner.Phone))
+            {
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "У партнёра не указан номер телефона",
+                        "OK");
+                }
+                return;
+            }
+
+            // Получаем товары партнёра из корзины
+            var partnerGroup = PartnerGroups.FirstOrDefault(g => g.PartnerId == partnerId);
+            if (partnerGroup == null || !partnerGroup.Items.Any())
+            {
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Корзина пуста для данного партнёра",
+                        "OK");
+                }
+                return;
+            }
+
+            // Формируем сообщение заказа
+            var orderMessage = FormatOrderMessage(partnerGroup);
+
+            // Создаём WhatsApp URL
+            var whatsappUrl = CreateWhatsAppUrl(partner.Phone, orderMessage);
+
+            // Открываем WhatsApp
+            try
+            {
+                await Launcher.OpenAsync(new Uri(whatsappUrl));
+                _logger?.LogInformation("Successfully opened WhatsApp for partner {PartnerId}", partnerId);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error opening WhatsApp for partner {PartnerId}", partnerId);
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        $"Не удалось открыть WhatsApp: {ex.Message}",
+                        "OK");
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error proceeding to order for partner {PartnerId}", partnerId);
+            if (Application.Current?.MainPage != null)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Ошибка",
+                    "Не удалось оформить заказ",
+                    "OK");
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Форматирует сообщение заказа с деталями товаров
+    /// </summary>
+    private string FormatOrderMessage(PartnerCartGroup partnerGroup)
+    {
+        var message = new StringBuilder();
+        
+        // Заголовок
+        message.AppendLine($"Заказ для: {partnerGroup.PartnerName}");
+        message.AppendLine();
+
+        // Список товаров
+        message.AppendLine("Товары:");
+        int itemNumber = 1;
+        foreach (var item in partnerGroup.Items)
+        {
+            message.AppendLine($"{itemNumber}. {item.ProductName} (x{item.Quantity}) - {item.TotalPrice:F0} сом");
+            
+            if (!string.IsNullOrWhiteSpace(item.ProductDescription))
+            {
+                message.AppendLine($"   {item.ProductDescription}");
+            }
+            
+            message.AppendLine();
+            itemNumber++;
+        }
+
+        // Итоговая информация
+        message.AppendLine($"Итого: {partnerGroup.TotalPrice:F0} сом");
+        
+        if (partnerGroup.TotalYessCoins > 0)
+        {
+            message.AppendLine($"+ {partnerGroup.TotalYessCoins:F0} Yess!Coins");
+        }
+        
+        if (partnerGroup.DiscountPercent > 0)
+        {
+            message.AppendLine($"Скидка: {partnerGroup.DiscountPercent:F0}%");
+        }
+
+        return message.ToString();
+    }
+
+    /// <summary>
+    /// Создаёт WhatsApp URL с предзаполненным сообщением
+    /// </summary>
+    private string CreateWhatsAppUrl(string phoneNumber, string message)
+    {
+        // Очищаем номер телефона от пробелов, дефисов, скобок и других символов
+        var cleanPhone = new StringBuilder();
+        foreach (char c in phoneNumber)
+        {
+            if (char.IsDigit(c))
+            {
+                cleanPhone.Append(c);
+            }
+        }
+
+        var phone = cleanPhone.ToString();
+        
+        // Кодируем сообщение для URL
+        var encodedMessage = Uri.EscapeDataString(message);
+        
+        // Формируем WhatsApp URL
+        return $"https://wa.me/{phone}?text={encodedMessage}";
     }
 }
 

@@ -2,7 +2,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YessGoFront.Services.Domain;
@@ -23,6 +22,7 @@ namespace YessGoFront.Views
             // Получаем сервисы через DI
             var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
             var logger = MauiProgram.Services.GetService<ILogger<LoginViewModel>>();
+            _authNavigationHandler = MauiProgram.Services.GetRequiredService<AuthNavigationHandler>();
 
             _viewModel = new LoginViewModel(authService, logger);
             BindingContext = _viewModel;
@@ -53,6 +53,11 @@ namespace YessGoFront.Views
                         System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing: User not authenticated, clearing fields");
                         _viewModel.ClearFields();
                     }
+                }
+                else
+                {
+                    // Если сервис недоступен - очищаем поля для безопасности
+                    _viewModel.ClearFields();
                 }
             }
             catch (Exception ex)

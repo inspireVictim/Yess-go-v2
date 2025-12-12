@@ -12,6 +12,7 @@ namespace YessGoFront.Views
     public partial class RegisterPage : ContentPage
     {
         private readonly RegisterViewModel _viewModel;
+        private readonly AuthNavigationHandler _authNavigationHandler;
         private bool _acknowledged;
         private string? _pendingReferralCode; // Временное хранение реферального кода до инициализации ViewModel
         private bool _isNavigating = false; // Защита от повторных вызовов навигации
@@ -56,6 +57,7 @@ namespace YessGoFront.Views
             // Получаем сервисы через DI
             var authService = MauiProgram.Services.GetRequiredService<IAuthService>();
             var logger = MauiProgram.Services.GetService<Microsoft.Extensions.Logging.ILogger<RegisterViewModel>>();
+            _authNavigationHandler = MauiProgram.Services.GetRequiredService<AuthNavigationHandler>();
 
             _viewModel = new RegisterViewModel(authService, logger);
             BindingContext = _viewModel;
@@ -221,19 +223,19 @@ namespace YessGoFront.Views
 
         private void TogglePassword_Tapped(object? sender, EventArgs e)
         {
-            var passwordEntry = this.FindByName<Entry>("PasswordEntry");
-            if (passwordEntry != null)
+            // Оптимизировано: используем прямое обращение к элементу через x:Name
+            if (PasswordEntry != null)
             {
-                passwordEntry.IsPassword = !passwordEntry.IsPassword;
+                PasswordEntry.IsPassword = !PasswordEntry.IsPassword;
             }
         }
 
         private void ToggleConfirmPassword_Tapped(object? sender, EventArgs e)
         {
-            var confirmPasswordEntry = this.FindByName<Entry>("ConfirmPasswordEntry");
-            if (confirmPasswordEntry != null)
+            // Оптимизировано: используем прямое обращение к элементу через x:Name
+            if (ConfirmPasswordEntry != null)
             {
-                confirmPasswordEntry.IsPassword = !confirmPasswordEntry.IsPassword;
+                ConfirmPasswordEntry.IsPassword = !ConfirmPasswordEntry.IsPassword;
             }
         }
 

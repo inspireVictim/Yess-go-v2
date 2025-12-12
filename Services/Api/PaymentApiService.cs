@@ -5,7 +5,7 @@ using YessGoFront.Infrastructure.Http;
 namespace YessGoFront.Services.Api;
 
 /// <summary>
-/// Реализация API сервиса для работы с платежами через Finik SDK (через backend)
+/// Реализация API сервиса для работы с платежами через Finik Web SDK (через backend)
 /// </summary>
 public class PaymentApiService : ApiClient, IPaymentApiService
 {
@@ -16,23 +16,44 @@ public class PaymentApiService : ApiClient, IPaymentApiService
     {
     }
 
-    public async Task<CreateFinikPaymentResponse> CreateFinikPaymentAsync(
-        CreateFinikPaymentRequest request,
+    public async Task<CreatePaymentResponse> CreatePaymentAsync(
+        decimal amount,
         CancellationToken ct = default)
     {
-        Logger?.LogInformation(
-            "Создание платежа через Finik SDK: Amount={Amount}, Description={Description}, RequestId={RequestId}",
-            request.Amount, request.Description, request.RequestId);
+        Logger?.LogInformation("Создание платежа через Finik Web SDK: Amount={Amount}", amount);
 
-        var endpoint = ApiEndpoints.PaymentEndpoints.CreateFinikPayment;
-        var response = await PostAsync<CreateFinikPaymentRequest, CreateFinikPaymentResponse>(
-            endpoint, request, ct);
+        try
+        {
+            // Округляем сумму до 2 знаков после запятой для корректной отправки
+            var roundedAmount = Math.Round(amount, 2);
+            
+            // Создаем запрос с правильным форматом
+            var request = new { amount = roundedAmount };
+            
+            Logger?.LogDebug("Отправка запроса на создание платежа: Amount={Amount}, Endpoint={Endpoint}", 
+                roundedAmount, ApiEndpoints.PaymentEndpoints.Create);
+            
+            var endpoint = ApiEndpoints.PaymentEndpoints.Create;
+            var response = await PostAsync<object, CreatePaymentResponse>(
+                endpoint, request, ct);
 
-        Logger?.LogInformation(
-            "Платеж создан: PaymentId={PaymentId}, Status={Status}, TransactionId={TransactionId}",
-            response.PaymentId, response.Status, response.TransactionId);
+            if (response == null)
+            {
+                Logger?.LogError("Получен пустой ответ от сервера при создании платежа");
+                throw new InvalidOperationException("Получен пустой ответ от сервера");
+            }
 
-        return response;
+            Logger?.LogInformation("Платеж создан успешно: PaymentUrl={PaymentUrl}, RedirectUrl={RedirectUrl}", 
+                response.PaymentUrl, response.RedirectUrl ?? "не указан");
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Ошибка при создании платежа: Amount={Amount}, Error={Error}", 
+                amount, ex.Message);
+            throw;
+        }
     }
 
     public async Task<PaymentStatusResponse> GetPaymentStatusAsync(

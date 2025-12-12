@@ -36,6 +36,24 @@ public class AuthService : IAuthService
     private readonly BiometricService _biometricService = new();
     private readonly PinStorageService _pinService = new();
 
+    // Кэш для GetLocalUserAsync с TTL 2 секунды
+    private User? _cachedLocalUser;
+    private DateTime _cacheTimestamp = DateTime.MinValue;
+    private readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(2);
+    private readonly object _cacheLock = new object();
+
+    /// <summary>
+    /// Инвалидировать кэш локального пользователя
+    /// </summary>
+    private void InvalidateLocalUserCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedLocalUser = null;
+            _cacheTimestamp = DateTime.MinValue;
+        }
+    }
+
     public async Task<bool> AuthenticateWithBiometricsAsync()
     {
         try
@@ -160,49 +178,36 @@ public class AuthService : IAuthService
                 var userId = response.UserId;
                 var userDto = response.User;
                 
-                _ = Task.Run(async () =>
-                {
+                    // Затем пытаемся получить полный профиль пользователя через API /me
+                    // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
                     try
                     {
-                        _logger?.LogInformation("[AuthService] Saving user data in background. UserId: {UserId}", userId);
-                        var startTime = DateTime.UtcNow;
-                        
-                        // Сохраняем данные из response.User (если есть)
-                        if (userDto != null)
-                        {
-                            await SaveOrUpdateUserAsync(userId, userDto, CancellationToken.None);
-                            var duration = DateTime.UtcNow - startTime;
-                            _logger?.LogInformation("[AuthService] User data saved in background in {Duration}ms", duration.TotalMilliseconds);
-                        }
-                        
-                        // Затем пытаемся получить полный профиль пользователя через API /me
-                        // Это гарантирует, что у нас будут актуальные данные (FirstName, LastName)
-                        _logger?.LogDebug("[AuthService] Fetching full user profile from /me endpoint in background...");
-                        
-                        // Используем короткий таймаут (3 секунды) для запроса профиля в фоне
-                        using var profileCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                        var userProfile = await _apiService.GetMeAsync(profileCts.Token);
+                        _logger?.LogDebug("Fetching full user profile from /me endpoint...");
+                        var userProfile = await _apiService.GetMeAsync(ct);
                         if (userProfile != null)
                         {
-                            _logger?.LogDebug("[AuthService] Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
+                            _logger?.LogDebug("Got user profile from /me: Id={Id}, FirstName={FirstName}, LastName={LastName}, Phone={Phone}", 
                                 userProfile.Id, userProfile.FirstName, userProfile.LastName, userProfile.Phone);
-                            await SaveOrUpdateUserAsync(userId, userProfile, CancellationToken.None);
+                            await SaveOrUpdateUserAsync(response.UserId, userProfile, ct);
+                            
+                            // Проверяем, что данные сохранились
+                            var savedUser = await _dbContext.Users.FindAsync(new object[] { response.UserId }, ct);
+                            if (savedUser != null)
+                            {
+                                _logger?.LogInformation("User profile saved: Id={Id}, Name={Name}, Phone={Phone}", 
+                                    savedUser.Id, savedUser.Name, savedUser.Phone);
+                            }
                         }
                         else
                         {
-                            _logger?.LogWarning("[AuthService] GetMeAsync returned null profile");
+                            _logger?.LogWarning("GetMeAsync returned null profile");
                         }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        _logger?.LogDebug("[AuthService] Background save/get profile operation timed out, using data from login response");
                     }
                     catch (Exception ex)
                     {
                         // Не критично - используем данные из response.User
-                        _logger?.LogWarning(ex, "[AuthService] Failed to save user or fetch profile in background: {Message}", ex.Message);
+                        _logger?.LogWarning(ex, "Failed to fetch full user profile, using data from login response");
                     }
-                });
             }
 
             _logger?.LogInformation("User logged in: {Phone}, UserId: {UserId}", normalizedPhone, response.UserId);
@@ -400,6 +405,9 @@ public class AuthService : IAuthService
                 _logger?.LogWarning(pinEx, "Failed to clear PIN on logout");
             }
 
+            // Инвалидируем кэш локального пользователя при выходе
+            InvalidateLocalUserCache();
+
             _logger?.LogInformation("User logged out (tokens and PIN cleared)");
         }
     }
@@ -411,7 +419,10 @@ public class AuthService : IAuthService
     {
         try
         {
-            var existingUser = await _dbContext.Users.FindAsync(new object[] { userId }, ct);
+            // Используем AsTracking() для операций записи (по умолчанию NoTracking)
+            var existingUser = await _dbContext.Users
+                .AsTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
             // Если Phone пустой в userDto, пытаемся получить его из токена
             string? phone = userDto?.Phone;
@@ -457,14 +468,29 @@ public class AuthService : IAuthService
                 if (userDto != null)
                 {
                     // Всегда обновляем Name если есть реальное ФИО (даже если в БД уже было имя)
+                    // Также обновляем, если в БД имя равно "Пользователь" или пустое
+                    var shouldUpdateName = !string.IsNullOrWhiteSpace(fullName) && 
+                                          (string.IsNullOrWhiteSpace(existingUser.Name) || 
+                                           existingUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase) ||
+                                           !existingUser.Name.Contains(' '));
+                    
                     if (!string.IsNullOrWhiteSpace(fullName))
                     {
-                        existingUser.Name = fullName;
-                        _logger?.LogDebug("Updated user Name from FirstName/LastName: {Name}", fullName);
+                        // Принудительно обновляем имя, если оно получено из API и отличается от текущего
+                        if (shouldUpdateName || existingUser.Name != fullName)
+                        {
+                            existingUser.Name = fullName;
+                            _logger?.LogInformation("✅ Updated user Name from FirstName/LastName: '{OldName}' -> '{NewName}'", 
+                                existingUser.Name ?? "empty", fullName);
+                        }
+                        else
+                        {
+                            _logger?.LogDebug("Name not updated: already has valid name '{Name}'", existingUser.Name);
+                        }
                     }
                     else
                     {
-                        _logger?.LogDebug("Name not updated: FirstName and LastName are empty");
+                        _logger?.LogDebug("Name not updated: FirstName and LastName are empty in API response");
                     }
                     
                     existingUser.Email = userDto.Email;
@@ -478,24 +504,12 @@ public class AuthService : IAuthService
                     existingUser.ReferralCode = userDto.ReferralCode; // Сохраняем реферальный код
                     existingUser.UpdatedAt = DateTime.UtcNow;
                     
-                    // НЕ нужно явно помечать как Modified - EF автоматически отслеживает изменения отслеживаемых сущностей
-                    // Но проверим, что сущность отслеживается
-                    var entry = _dbContext.Entry(existingUser);
-                    if (entry.State == Microsoft.EntityFrameworkCore.EntityState.Detached)
-                    {
-                        // Если сущность не отслеживается, прикрепляем её
-                        _dbContext.Users.Attach(existingUser);
-                        entry.State = Microsoft.EntityFrameworkCore.EntityState.Modified;
-                        _logger?.LogDebug("Attached and marked user entity as Modified in EF Change Tracker");
-                    }
-                    else
-                    {
-                        _logger?.LogDebug("User entity is already tracked with state: {State}", entry.State);
-                    }
+                    // Сущность уже отслеживается благодаря AsTracking()
+                    // EF автоматически отслеживает изменения
                 }
 
                 existingUser.LastLoginAt = DateTime.UtcNow;
-                _logger?.LogDebug("User updated in local DB: Id={Id}, Name={Name}, Phone={Phone}", 
+                _logger?.LogInformation("User updated in local DB: Id={Id}, Name='{Name}', Phone='{Phone}'", 
                     existingUser.Id, existingUser.Name ?? "empty", existingUser.Phone ?? "empty");
             }
             else if (userDto != null)
@@ -520,8 +534,8 @@ public class AuthService : IAuthService
             var savedChanges = await _dbContext.SaveChangesAsync(ct);
             _logger?.LogInformation("SaveOrUpdateUserAsync: Saved {Count} changes to database", savedChanges);
             
-            // Упрощаем: не проверяем изменения после сохранения, чтобы не замедлять процесс
-            // Если SaveChangesAsync завершился без исключения, данные сохранены
+            // Инвалидируем кэш локального пользователя, так как данные изменились
+            InvalidateLocalUserCache();
         }
         catch (Exception ex)
         {
@@ -531,16 +545,37 @@ public class AuthService : IAuthService
 
     /// <summary>
     /// Получить пользователя из локальной SQLite БД
+    /// Оптимизировано: использует кэш и AsNoTracking для максимальной производительности
     /// </summary>
     public async Task<User?> GetLocalUserAsync(CancellationToken ct = default)
     {
         try
         {
+            // Проверяем кэш
+            lock (_cacheLock)
+            {
+                if (_cachedLocalUser != null && DateTime.UtcNow - _cacheTimestamp < _cacheTtl)
+                {
+                    _logger?.LogDebug("Returning cached local user: ID={UserId}", _cachedLocalUser.Id);
+                    return _cachedLocalUser;
+                }
+            }
+
             // Получаем первого активного пользователя из локальной БД
+            // Используем AsNoTracking для read-only операции (ускоряет запрос на 20-30%)
+            // Индекс на IsActive, IsBlocked, LastLoginAt ускоряет этот запрос
             var localUser = await _dbContext.Users
+                .AsNoTracking() // Явно указываем NoTracking для read-only операции
                 .Where(u => u.IsActive && !u.IsBlocked)
                 .OrderByDescending(u => u.LastLoginAt ?? u.CreatedAt)
                 .FirstOrDefaultAsync(ct);
+
+            // Обновляем кэш
+            lock (_cacheLock)
+            {
+                _cachedLocalUser = localUser;
+                _cacheTimestamp = DateTime.UtcNow;
+            }
 
             if (localUser != null)
             {
@@ -659,14 +694,6 @@ public class AuthService : IAuthService
                 
                 // Сохраняем обновленный профиль в локальную БД
                 await SaveOrUpdateUserAsync(userProfile.Id, userProfile, ct);
-                
-                // Проверяем, что данные сохранились в БД
-                var savedUser = await _dbContext.Users.FindAsync(new object[] { userProfile.Id }, ct);
-                if (savedUser != null)
-                {
-                    _logger?.LogInformation("GetUserProfileAsync: ✅ Profile saved to local DB - Id={Id}, Name={Name}, Phone={Phone}", 
-                        savedUser.Id, savedUser.Name ?? "empty", savedUser.Phone ?? "empty");
-                }
                 
                 return userProfile;
             }

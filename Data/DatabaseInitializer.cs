@@ -15,7 +15,7 @@ public class DatabaseInitializer
 {
     private readonly AppDbContext _context;
     private readonly ILogger<DatabaseInitializer>? _logger;
-    private const int DatabaseInitTimeoutSeconds = 10;
+    private const int DatabaseInitTimeoutSeconds = 30;
 
     public DatabaseInitializer(
         AppDbContext context,
@@ -35,38 +35,13 @@ public class DatabaseInitializer
         {
             _logger?.LogInformation("Initializing database...");
             
-            // ОПТИМИЗАЦИЯ: проверяем существование файла БД перед EnsureCreatedAsync
-            // Это ускоряет запуск, если БД уже существует
-            var connectionString = _context.ConnectionString;
-            var dbPath = ExtractDbPathFromConnectionString(connectionString);
-            
-            if (!string.IsNullOrEmpty(dbPath) && File.Exists(dbPath))
-            {
-                _logger?.LogDebug("Database file already exists, skipping EnsureCreatedAsync");
-                // БД уже существует, но проверяем что схема актуальна
-                // Используем таймаут для операции
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(DatabaseInitTimeoutSeconds));
-                try
-                {
-                    // Быстрая проверка: пытаемся выполнить простой запрос
-                    await _context.Database.CanConnectAsync(cts.Token);
-                    _logger?.LogInformation("Database already exists and is accessible");
-                    return;
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger?.LogWarning("Database connection check timed out, proceeding with EnsureCreatedAsync");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Database connection check failed, proceeding with EnsureCreatedAsync");
-                }
-            }
-            
             // Для SQLite в мобильном приложении используем EnsureCreatedAsync
             // Это создаст таблицы если их нет, или ничего не сделает если они уже есть
             using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(DatabaseInitTimeoutSeconds));
             await _context.Database.EnsureCreatedAsync(initCts.Token);
+            
+            // Настраиваем PRAGMA команды для оптимизации производительности
+            await _context.ConfigureSqlitePragmasAsync(initCts.Token);
             
             _logger?.LogInformation("Database initialized successfully");
         }
@@ -84,6 +59,7 @@ public class DatabaseInitializer
                 _logger?.LogWarning("Retrying database initialization...");
                 using var retryCts = new CancellationTokenSource(TimeSpan.FromSeconds(DatabaseInitTimeoutSeconds));
                 await _context.Database.EnsureCreatedAsync(retryCts.Token);
+                await _context.ConfigureSqlitePragmasAsync(retryCts.Token);
                 _logger?.LogInformation("Database created successfully using retry");
             }
             catch (Exception fallbackEx)
@@ -125,19 +101,27 @@ public class DatabaseInitializer
         {
             _logger?.LogInformation("Seeding database...");
             
+            // Используем общий таймаут для всего seeding (60 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            
             // 1. Заполняем города
-            await SeedCitiesAsync();
+            await SeedCitiesAsync(cts.Token);
             
             // 2. Заполняем тестового пользователя
-            await SeedTestUserAsync();
+            await SeedTestUserAsync(cts.Token);
             
             // 3. Заполняем уведомления
-            await SeedNotificationsAsync();
+            await SeedNotificationsAsync(cts.Token);
             
             // 4. Заполняем транзакции
-            await SeedTransactionsAsync();
+            await SeedTransactionsAsync(cts.Token);
             
             _logger?.LogInformation("Database seeded successfully");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogError("Database seeding timed out after 60 seconds");
+            throw new TimeoutException("Database seeding timed out after 60 seconds");
         }
         catch (Exception ex)
         {
@@ -146,9 +130,12 @@ public class DatabaseInitializer
         }
     }
 
-    private async Task SeedCitiesAsync()
+    private async Task SeedCitiesAsync(CancellationToken ct = default)
     {
-        if (await _context.Cities.AnyAsync())
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+        
+        if (await _context.Cities.AnyAsync(cts.Token))
         {
             _logger?.LogDebug("Cities already exist, skipping seed");
             return;
@@ -198,17 +185,20 @@ public class DatabaseInitializer
             }
         };
 
-        await _context.Cities.AddRangeAsync(cities);
-        await _context.SaveChangesAsync();
+        await _context.Cities.AddRangeAsync(cities, cts.Token);
+        await _context.SaveChangesAsync(cts.Token);
         _logger?.LogInformation("Seeded {Count} cities", cities.Count);
     }
 
-    private async Task SeedTestUserAsync()
+    private async Task SeedTestUserAsync(CancellationToken ct = default)
     {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(15));
+        
         // Проверяем, есть ли уже пользователь с тестовым телефоном
         var testPhone = "+996504876087";
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Phone == testPhone || u.Phone == "996504876087" || u.Phone == "0504876087");
+                .FirstOrDefaultAsync(u => u.Phone == testPhone || u.Phone == "996504876087" || u.Phone == "0504876087", cts.Token);
 
         if (existingUser != null)
         {
@@ -216,7 +206,7 @@ public class DatabaseInitializer
             
             // Проверяем наличие приветственного уведомления
             var hasWelcomeNotification = await _context.Notifications
-                .AnyAsync(n => n.UserId == existingUser.Id && n.Title == "Добро пожаловать в YESS!GO");
+                .AnyAsync(n => n.UserId == existingUser.Id && n.Title == "Добро пожаловать в YESS!GO", cts.Token);
             
             if (!hasWelcomeNotification)
             {
@@ -232,8 +222,8 @@ public class DatabaseInitializer
                     DeliveredAt = DateTime.UtcNow
                 };
                 
-                await _context.Notifications.AddAsync(existingUserWelcomeNotification);
-                await _context.SaveChangesAsync();
+                await _context.Notifications.AddAsync(existingUserWelcomeNotification, cts.Token);
+                await _context.SaveChangesAsync(cts.Token);
                 _logger?.LogInformation("Created welcome notification for existing user");
             }
             
@@ -241,7 +231,7 @@ public class DatabaseInitializer
         }
 
         // Получаем Бишкек для тестового пользователя
-        var bishkek = await _context.Cities.FirstOrDefaultAsync(c => c.Name == "Бишкек");
+        var bishkek = await _context.Cities.FirstOrDefaultAsync(c => c.Name == "Бишкек", cts.Token);
         
         var testUser = new User
         {
@@ -260,8 +250,8 @@ public class DatabaseInitializer
             UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Users.AddAsync(testUser);
-        await _context.SaveChangesAsync();
+        await _context.Users.AddAsync(testUser, cts.Token);
+        await _context.SaveChangesAsync(cts.Token);
         
         _logger?.LogInformation("Created test user with ID: {UserId}", testUser.Id);
 
@@ -273,8 +263,8 @@ public class DatabaseInitializer
             LastUpdated = DateTime.UtcNow
         };
 
-        await _context.Wallets.AddAsync(wallet);
-        await _context.SaveChangesAsync();
+        await _context.Wallets.AddAsync(wallet, cts.Token);
+        await _context.SaveChangesAsync(cts.Token);
         
         _logger?.LogInformation("Created wallet for test user with balance: {Balance}", wallet.Balance);
 
@@ -291,16 +281,19 @@ public class DatabaseInitializer
             DeliveredAt = DateTime.UtcNow
         };
 
-        await _context.Notifications.AddAsync(welcomeNotification);
-        await _context.SaveChangesAsync();
+        await _context.Notifications.AddAsync(welcomeNotification, cts.Token);
+        await _context.SaveChangesAsync(cts.Token);
         
         _logger?.LogInformation("Created welcome notification for test user");
     }
 
-    private async Task SeedNotificationsAsync()
+    private async Task SeedNotificationsAsync(CancellationToken ct = default)
     {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        
         // Получаем всех пользователей
-        var users = await _context.Users.ToListAsync();
+        var users = await _context.Users.ToListAsync(cts.Token);
         if (!users.Any())
         {
             _logger?.LogDebug("No users found, skipping notifications seed");
@@ -404,8 +397,8 @@ public class DatabaseInitializer
         // ОПТИМИЗАЦИЯ: batch insert всех уведомлений одним запросом
         if (notifications.Any())
         {
-            await _context.Notifications.AddRangeAsync(notifications);
-            await _context.SaveChangesAsync();
+            await _context.Notifications.AddRangeAsync(notifications, cts.Token);
+            await _context.SaveChangesAsync(cts.Token);
             _logger?.LogInformation("Seeded {Count} notifications for {UserCount} users", notifications.Count, users.Count);
         }
         else
@@ -423,10 +416,16 @@ public class DatabaseInitializer
         {
             _logger?.LogWarning("Resetting database...");
             
-            await _context.Database.EnsureDeletedAsync();
-            await _context.Database.EnsureCreatedAsync();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _context.Database.EnsureDeletedAsync(cts.Token);
+            await _context.Database.EnsureCreatedAsync(cts.Token);
             
             _logger?.LogInformation("Database reset successfully");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogError("Database reset timed out after 30 seconds");
+            throw new TimeoutException("Database reset timed out after 30 seconds");
         }
         catch (Exception ex)
         {
@@ -435,10 +434,13 @@ public class DatabaseInitializer
         }
     }
 
-    private async Task SeedTransactionsAsync()
+    private async Task SeedTransactionsAsync(CancellationToken ct = default)
     {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        
         // Получаем всех пользователей
-        var users = await _context.Users.ToListAsync();
+        var users = await _context.Users.ToListAsync(cts.Token);
         if (!users.Any())
         {
             _logger?.LogDebug("No users found, skipping transactions seed");
@@ -446,10 +448,10 @@ public class DatabaseInitializer
         }
 
         // Получаем партнёров для транзакций
-        var partners = await _context.Partners.ToListAsync();
+        var partners = await _context.Partners.ToListAsync(cts.Token);
         
         // Получаем кошельки пользователей
-        var wallets = await _context.Wallets.ToListAsync();
+        var wallets = await _context.Wallets.ToListAsync(cts.Token);
         var walletDict = wallets.ToDictionary(w => w.UserId);
 
         // ОПТИМИЗАЦИЯ: получаем количество транзакций для всех пользователей одним запросом
@@ -566,8 +568,8 @@ public class DatabaseInitializer
         // ОПТИМИЗАЦИЯ: batch insert всех транзакций одним запросом
         if (transactions.Any())
         {
-            await _context.Transactions.AddRangeAsync(transactions);
-            await _context.SaveChangesAsync();
+            await _context.Transactions.AddRangeAsync(transactions, cts.Token);
+            await _context.SaveChangesAsync(cts.Token);
             _logger?.LogInformation("Seeded {Count} transactions for {UserCount} users", transactions.Count, users.Count);
         }
         else

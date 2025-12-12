@@ -1,8 +1,11 @@
 using System;
+using System.Threading;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Internals;
 using YessGoFront.Services;
+using YessGoFront.Services.Api;
 using YessGoFront.Config;
+using YessGoFront.Infrastructure.Exceptions;
 using System.Diagnostics;
 
 namespace YessGoFront.Views;
@@ -12,7 +15,7 @@ public partial class Acquiring : ContentPage
 {
     private string? _amountString;
     private decimal _amount;
-    private readonly IFinikPaymentService? _finikPaymentService;
+    private readonly IPaymentApiService? _paymentApiService;
     private bool _isProcessingPayment = false;
 
     public string? AmountString
@@ -40,11 +43,11 @@ public partial class Acquiring : ContentPage
         // Получаем сервис из DI
         try
         {
-            _finikPaymentService = MauiProgram.Services?.GetService<IFinikPaymentService>();
+            _paymentApiService = MauiProgram.Services?.GetService<IPaymentApiService>();
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Acquiring] Error getting FinikPaymentService: {ex.Message}");
+            Debug.WriteLine($"[Acquiring] Error getting PaymentApiService: {ex.Message}");
         }
     }
 
@@ -90,7 +93,7 @@ public partial class Acquiring : ContentPage
         
         if (payButton != null)
         {
-            payButton.IsEnabled = !_isProcessingPayment && _amount > 0 && _finikPaymentService != null;
+            payButton.IsEnabled = !_isProcessingPayment && _amount > 0 && _paymentApiService != null;
         }
         
         if (loadingIndicator != null)
@@ -102,7 +105,7 @@ public partial class Acquiring : ContentPage
 
     private async void OnPayButtonClicked(object? sender, EventArgs e)
     {
-        if (_isProcessingPayment || _amount <= 0 || _finikPaymentService == null)
+        if (_isProcessingPayment || _amount <= 0 || _paymentApiService == null)
         {
             return;
         }
@@ -114,55 +117,61 @@ public partial class Acquiring : ContentPage
 
             Debug.WriteLine($"[Acquiring] Starting payment for amount: {_amount} KGS");
 
-            // Создаем запрос на оплату
-            var paymentRequest = new PaymentRequest
-            {
-                Amount = _amount,
-                NameEn = "Balance Replenishment",
-                Description = $"Пополнение баланса YessGo на сумму {_amount:0.##} KGS",
-                RequestId = Guid.NewGuid().ToString(),
-                MaxAvailableQuantity = 1,
-                RequiredFields = new Dictionary<string, string>
-                {
-                    { "amount", _amount.ToString("F2") },
-                    { "requestId", Guid.NewGuid().ToString() }
-                }
-            };
-
-            // Вызываем Finik SDK
-            var result = await _finikPaymentService.ProcessPaymentAsync(paymentRequest);
+            // Используем таймаут для создания платежа (15 секунд)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            
+            // Вызываем backend для создания платежа
+            var response = await _paymentApiService.CreatePaymentAsync(_amount, cts.Token);
 
             _isProcessingPayment = false;
             UpdatePaymentButtonState();
 
-            // Обрабатываем результат
-            if (result.IsCancelled)
+            // Проверяем, что получили paymentUrl
+            if (string.IsNullOrWhiteSpace(response?.PaymentUrl))
             {
-                Debug.WriteLine("[Acquiring] Payment was cancelled by user");
-                await DisplayAlert("Отмена", "Оплата отменена", "OK");
+                Debug.WriteLine("[Acquiring] PaymentUrl is empty in response");
+                await DisplayAlert("Ошибка", "Не удалось получить ссылку на оплату. Попробуйте снова.", "OK");
+                return;
             }
-            else if (result.IsSuccess)
-            {
-                Debug.WriteLine($"[Acquiring] Payment successful. Transaction ID: {result.TransactionId}");
-                
-                // Обновляем баланс после успешного пополнения
-                await RefreshBalanceAsync();
-                
-                await DisplayAlert(
-                    "Успешно",
-                    $"Оплата выполнена успешно!\nТранзакция: {result.TransactionId}",
-                    "OK");
-                
-                await GoBackAsync();
-            }
-            else
-            {
-                Debug.WriteLine($"[Acquiring] Payment failed: {result.ErrorMessage}");
-                await DisplayAlert(
-                    "Ошибка",
-                    $"Не удалось выполнить оплату: {result.ErrorMessage ?? "Неизвестная ошибка"}",
-                    "OK");
-            }
+
+            Debug.WriteLine($"[Acquiring] Payment created, opening WebView with URL: {response.PaymentUrl}");
+
+            // Открываем FinikPaymentPage с paymentUrl и redirectUrl
+            var paymentUrlEncoded = Uri.EscapeDataString(response.PaymentUrl);
+            var redirectUrlEncoded = !string.IsNullOrWhiteSpace(response.RedirectUrl) 
+                ? Uri.EscapeDataString(response.RedirectUrl) 
+                : string.Empty;
+            
+            // Используем полное имя маршрута для навигации
+            var navigationPath = !string.IsNullOrWhiteSpace(redirectUrlEncoded)
+                ? $"{nameof(Views.FinikPaymentPage)}?paymentUrl={paymentUrlEncoded}&redirectUrl={redirectUrlEncoded}"
+                : $"{nameof(Views.FinikPaymentPage)}?paymentUrl={paymentUrlEncoded}";
+            
+            Debug.WriteLine($"[Acquiring] Navigating to: {navigationPath}");
+            await Shell.Current.GoToAsync(navigationPath, animate: true);
+        }
+        catch (OperationCanceledException)
+        {
+            _isProcessingPayment = false;
+            UpdatePaymentButtonState();
+            
+            Debug.WriteLine("[Acquiring] Payment creation timed out");
+            await DisplayAlert("Ошибка", "Операция создания платежа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.", "OK");
+        }
+        catch (BadRequestException badRequestEx)
+        {
+            _isProcessingPayment = false;
+            UpdatePaymentButtonState();
+            
+            Debug.WriteLine($"[Acquiring] BadRequest error: {badRequestEx.Message}");
+            Debug.WriteLine($"[Acquiring] Full exception: {badRequestEx}");
+            
+            // Показываем понятное сообщение пользователю
+            var userMessage = badRequestEx.Message.Contains("подпись") || badRequestEx.Message.Contains("signature")
+                ? "Ошибка на сервере при создании платежа. Пожалуйста, попробуйте позже или обратитесь в поддержку."
+                : badRequestEx.Message;
+            
+            await DisplayAlert("Ошибка создания платежа", userMessage, "OK");
         }
         catch (Exception ex)
         {
@@ -170,7 +179,12 @@ public partial class Acquiring : ContentPage
             UpdatePaymentButtonState();
             
             Debug.WriteLine($"[Acquiring] Error processing payment: {ex.Message}");
-            await DisplayAlert("Ошибка", $"Произошла ошибка при обработке платежа: {ex.Message}", "OK");
+            Debug.WriteLine($"[Acquiring] Exception type: {ex.GetType().Name}");
+            Debug.WriteLine($"[Acquiring] StackTrace: {ex.StackTrace}");
+            
+            // Показываем общее сообщение об ошибке
+            var userMessage = "Произошла ошибка при создании платежа. Пожалуйста, проверьте подключение к интернету и попробуйте снова.";
+            await DisplayAlert("Ошибка", userMessage, "OK");
         }
     }
 

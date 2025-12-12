@@ -21,6 +21,7 @@ namespace YessGoFront.Views
         // Навигация
         // ============================
         private bool _isNavigating;
+        private bool _isRefreshingUser;
         private const string WalletRoute = "///wallet";
         private const string TransactionsRoute = "///TransactionsPage";
 
@@ -130,8 +131,65 @@ namespace YessGoFront.Views
                         viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
                 }
 
-                // Выполняем RefreshUserAsync в фоне без ожидания
-                _ = viewModel.RefreshUserAsync();
+                // Принудительно обновляем данные пользователя и баланс при каждом появлении страницы
+                // Запускаем в фоне, чтобы не блокировать UI
+                if (!_isRefreshingUser)
+                {
+                    _isRefreshingUser = true;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Debug.WriteLine("[MainPage] OnAppearing: Refreshing user data and balance...");
+                            
+                            // Используем таймаут для обновления (15 секунд)
+                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                            
+                            await MainThread.InvokeOnMainThreadAsync(async () =>
+                            {
+                                try
+                                {
+                                    await viewModel.RefreshUserAsync();
+                                    Debug.WriteLine($"[MainPage] OnAppearing: User data refreshed - DisplayName={viewModel.DisplayName}, Phone={viewModel.Phone}, Balance={viewModel.Balance}");
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    Debug.WriteLine("[MainPage] OnAppearing: RefreshUserAsync timed out");
+                                    // Пытаемся загрузить хотя бы баланс при таймауте
+                                    try
+                                    {
+                                        await viewModel.LoadBalanceAsync();
+                                    }
+                                    catch (Exception ex2)
+                                    {
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance after timeout: {ex2.Message}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing user data: {ex.Message}");
+                                    // Пытаемся загрузить хотя бы баланс, если обновление пользователя не удалось
+                                    try
+                                    {
+                                        await viewModel.LoadBalanceAsync();
+                                    }
+                                    catch (Exception ex2)
+                                    {
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance: {ex2.Message}");
+                                    }
+                                }
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[MainPage] OnAppearing: Unexpected error in background refresh: {ex.Message}");
+                        }
+                        finally
+                        {
+                            _isRefreshingUser = false;
+                        }
+                    });
+                }
             }
         }
 
@@ -191,58 +249,72 @@ namespace YessGoFront.Views
         // ============================
         private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (BindingContext is not MainPageViewModel vm)
-                return;
-
-            if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
-            {
-                if (vm.IsStoryOpen)
-                {
-                    await Task.Delay(50);
-                    var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
-                    if (progressContainer != null && progressContainer.Width > 0)
-                        vm.ProgressTimelineContainerWidth = progressContainer.Width;
-                }
-                return;
-            }
-
-            if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
-                return;
-
-            var nextSrc = vm.CurrentPageImage;
-            if (string.IsNullOrWhiteSpace(nextSrc))
-                return;
-
-            _imgA ??= FindByName("StoryImageA") as Image;
-            _imgB ??= FindByName("StoryImageB") as Image;
-
-            if (_imgA == null || _imgB == null)
-                return;
-
-            _swapCts?.Cancel();
-            _swapCts = new CancellationTokenSource();
-            var ct = _swapCts.Token;
-
             try
             {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
+                if (BindingContext is not MainPageViewModel vm)
+                    return;
+
+                if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
                 {
-                    var top = _topIsA ? _imgA : _imgB;
-                    var bottom = _topIsA ? _imgB : _imgA;
+                    if (vm.IsStoryOpen)
+                    {
+                        await Task.Delay(50);
+                        var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
+                        if (progressContainer != null && progressContainer.Width > 0)
+                            vm.ProgressTimelineContainerWidth = progressContainer.Width;
+                    }
+                    return;
+                }
 
-                    bottom.Opacity = 0;
-                    bottom.Source = nextSrc;
+                if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
+                    return;
 
-                    await Task.Delay(50, ct);
-                    await bottom.FadeTo(1, 250, Easing.Linear);
+                var nextSrc = vm.CurrentPageImage;
+                if (string.IsNullOrWhiteSpace(nextSrc))
+                    return;
 
-                    _topIsA = !_topIsA;
+                _imgA ??= FindByName("StoryImageA") as Image;
+                _imgB ??= FindByName("StoryImageB") as Image;
 
-                    top.Source = null;
-                    top.Opacity = 0;
-                });
+                if (_imgA == null || _imgB == null)
+                    return;
+
+                _swapCts?.Cancel();
+                _swapCts = new CancellationTokenSource();
+                var ct = _swapCts.Token;
+
+                try
+                {
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        var top = _topIsA ? _imgA : _imgB;
+                        var bottom = _topIsA ? _imgB : _imgA;
+
+                        bottom.Opacity = 0;
+                        bottom.Source = nextSrc;
+
+                        await Task.Delay(50, ct);
+                        await bottom.FadeTo(1, 250, Easing.Linear);
+
+                        _topIsA = !_topIsA;
+
+                        top.Source = null;
+                        top.Opacity = 0;
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    // Игнорируем отмену операции
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainPage] OnVmPropertyChanged: Error updating story image: {ex.Message}");
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] OnVmPropertyChanged: Unexpected error: {ex.Message}");
+            }
         }
 
 
@@ -412,9 +484,17 @@ namespace YessGoFront.Views
             {
                 await Shell.Current.GoToAsync(WalletRoute);
             }
-            catch
+            catch (Exception ex)
             {
-                try { await Shell.Current.GoToAsync("//wallet"); } catch { }
+                Debug.WriteLine($"[MainPage] OnWalletTapped: Error navigating: {ex.Message}");
+                try 
+                { 
+                    await Shell.Current.GoToAsync("//wallet"); 
+                } 
+                catch (Exception ex2)
+                {
+                    Debug.WriteLine($"[MainPage] OnWalletTapped: Fallback navigation failed: {ex2.Message}");
+                }
             }
             finally
             {
@@ -431,9 +511,17 @@ namespace YessGoFront.Views
             {
                 await Shell.Current.GoToAsync(TransactionsRoute);
             }
-            catch
+            catch (Exception ex)
             {
-                try { await Shell.Current.GoToAsync("//TransactionsPage"); } catch { }
+                Debug.WriteLine($"[MainPage] OnHistoryClicked: Error navigating: {ex.Message}");
+                try 
+                { 
+                    await Shell.Current.GoToAsync("//TransactionsPage"); 
+                } 
+                catch (Exception ex2)
+                {
+                    Debug.WriteLine($"[MainPage] OnHistoryClicked: Fallback navigation failed: {ex2.Message}");
+                }
             }
             finally
             {
@@ -491,7 +579,14 @@ namespace YessGoFront.Views
 
         private async void OnMoreTapped(object sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("//main/partner");
+            try
+            {
+                await Shell.Current.GoToAsync("//main/partner");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] OnMoreTapped: Error navigating: {ex.Message}");
+            }
         }
 
 
@@ -565,6 +660,10 @@ namespace YessGoFront.Views
 
                     await Shell.Current.GoToAsync(route);
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] OnCategoryTapped: Error navigating: {ex.Message}");
             }
             finally
             {
@@ -651,25 +750,37 @@ namespace YessGoFront.Views
         // ============================
         private async void OnInfoButtonTapped(object? sender, TappedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[MainPage] ===== OnInfoButtonTapped EVENT FIRED =====");
-            
-            if (e.Parameter is InfoButtonModel infoButton)
+            try
             {
-                System.Diagnostics.Debug.WriteLine($"[MainPage] InfoButton tapped: Title='{infoButton.Title}', ActionType='{infoButton.ActionType}'");
+                System.Diagnostics.Debug.WriteLine("[MainPage] ===== OnInfoButtonTapped EVENT FIRED =====");
                 
-                if (BindingContext is MainPageViewModel vm)
+                if (e.Parameter is InfoButtonModel infoButton)
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainPage] Calling OpenInfoButtonAsyncCommand from ViewModel");
-                    await vm.OpenInfoButtonAsyncCommand.ExecuteAsync(infoButton);
+                    System.Diagnostics.Debug.WriteLine($"[MainPage] InfoButton tapped: Title='{infoButton.Title}', ActionType='{infoButton.ActionType}'");
+                    
+                    if (BindingContext is MainPageViewModel vm)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MainPage] Calling OpenInfoButtonAsyncCommand from ViewModel");
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        await vm.OpenInfoButtonAsyncCommand.ExecuteAsync(infoButton);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MainPage] ERROR: BindingContext is not MainPageViewModel");
+                    }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainPage] ERROR: BindingContext is not MainPageViewModel");
+                    System.Diagnostics.Debug.WriteLine($"[MainPage] OnInfoButtonTapped: Parameter type={e.Parameter?.GetType()?.Name ?? "NULL"}");
                 }
             }
-            else
+            catch (OperationCanceledException)
             {
-                System.Diagnostics.Debug.WriteLine($"[MainPage] OnInfoButtonTapped: Parameter type={e.Parameter?.GetType()?.Name ?? "NULL"}");
+                Debug.WriteLine("[MainPage] OnInfoButtonTapped: Operation timed out");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] OnInfoButtonTapped: Error: {ex.Message}");
             }
         }
     }

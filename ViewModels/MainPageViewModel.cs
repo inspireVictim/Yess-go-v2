@@ -76,6 +76,11 @@ namespace YessGoFront.ViewModels
         private readonly IWalletService? _walletService;
         private readonly IAuthService? _authService;
         private readonly Infrastructure.Auth.IAuthenticationService? _authenticationService;
+        
+        // Кэш для партнёров
+        private static IReadOnlyList<PartnerDto>? _cachedPartners;
+        private static DateTime _partnersCacheTimestamp = DateTime.MinValue;
+        private static readonly TimeSpan PartnersCacheExpiry = TimeSpan.FromMinutes(5);
 
         // Флаг паузы для удержания пальца
         [ObservableProperty] private bool isStoryPaused;
@@ -235,6 +240,7 @@ namespace YessGoFront.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading wallet balance: {ex.Message}");
+                // Не обновляем баланс при ошибке, оставляем старое значение
             }
             finally
             {
@@ -541,7 +547,78 @@ namespace YessGoFront.ViewModels
         /// </summary>
         public async Task RefreshUserAsync()
         {
-            await LoadUserAsync();
+            try
+            {
+                // Используем таймаут для всех операций (15 секунд)
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                
+                // Загружаем данные пользователя и баланс параллельно для ускорения
+                await Task.WhenAll(
+                    LoadUserAsyncWithTimeout(cts.Token),
+                    LoadBalanceAsyncWithTimeout(cts.Token)
+                );
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] RefreshUserAsync completed: DisplayName={DisplayName}, Phone={Phone}, Balance={Balance}");
+            }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] RefreshUserAsync timed out");
+                // Пытаемся загрузить хотя бы пользователя, если операция не завершилась
+                try
+                {
+                    await LoadUserAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading user after timeout: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error in RefreshUserAsync: {ex.Message}");
+                // Пытаемся загрузить хотя бы пользователя, если баланс не загрузился
+                try
+                {
+                    await LoadUserAsync();
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading user after error: {ex2.Message}");
+                }
+            }
+        }
+
+        private async Task LoadUserAsyncWithTimeout(CancellationToken ct)
+        {
+            try
+            {
+                await LoadUserAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error in LoadUserAsyncWithTimeout: {ex.Message}");
+                throw;
+            }
+        }
+
+        private async Task LoadBalanceAsyncWithTimeout(CancellationToken ct)
+        {
+            try
+            {
+                // Используем таймаут для запроса баланса (10 секунд)
+                using var balanceCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                balanceCts.CancelAfter(TimeSpan.FromSeconds(10));
+                await LoadBalanceAsync(balanceCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBalanceAsync timed out");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error in LoadBalanceAsyncWithTimeout: {ex.Message}");
+                throw;
+            }
         }
 
         // ====== ДАННЫЕ Партнёров======

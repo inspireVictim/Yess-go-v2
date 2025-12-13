@@ -63,4 +63,29 @@ public class ProductDto
 
     [JsonPropertyName("category")]
     public string? Category { get; set; }
+
+    /// <summary>
+    /// Эффективное количество Yess!Coins для отображения
+    /// Использует значение из БД, если оно задано и > 0,
+    /// иначе рассчитывает как разницу между OriginalPrice и Price
+    /// </summary>
+    public decimal EffectiveYessCoins
+    {
+        get
+        {
+            // Если YessCoins из БД задан и > 0, используем его
+            if (YessCoins.HasValue && YessCoins.Value > 0)
+            {
+                return YessCoins.Value;
+            }
+
+            // Иначе рассчитываем как разницу между OriginalPrice и Price
+            if (OriginalPrice.HasValue && OriginalPrice.Value > Price)
+            {
+                return OriginalPrice.Value - Price;
+            }
+
+            return 0;
+        }
+    }
 }

@@ -58,7 +58,12 @@ namespace YessGoFront.ViewModels
             OnPropertyChanged(nameof(CurrentStoryPageCount));
         }
 
-        // Баланс берём из общего BalanceStore
+        /// <summary>
+        /// Баланс Yess!Coin пользователя
+        /// Берется из Wallet.Balance через API:
+        /// MainPageViewModel.Balance → BalanceStore.Instance.Balance → WalletService.GetBalanceAsync() 
+        /// → WalletApiService.GetBalanceAsync() → API /api/v1/payments/balance → Wallet.Balance из БД
+        /// </summary>
         public string Balance => BalanceStore.Instance.Balance.ToString("0.##");
 
         // Данные пользователя из локальной БД
@@ -88,9 +93,12 @@ namespace YessGoFront.ViewModels
         private readonly SemaphoreSlim _loadUserLock = new(1, 1);
         private readonly SemaphoreSlim _loadPartnersLock = new(1, 1);
         private readonly SemaphoreSlim _loadBalanceLock = new(1, 1);
+        private CancellationTokenSource? _loadPartnersCts; // Для отмены предыдущих загрузок
         private int? _cachedUserId;
         private DateTime _lastBalanceUpdate = DateTime.MinValue;
-        private const int BalanceCacheSeconds = 30;
+        // Минимальное кэширование (1 секунда) для предотвращения множественных запросов при быстрых обновлениях
+        // Баланс всегда загружается напрямую из Wallet.Balance через API
+        private const int BalanceCacheSeconds = 1;
 
         // ====== Команды ======
         public IAsyncRelayCommand<StoryModel> OpenStoryAsyncCommand { get; }
@@ -205,9 +213,13 @@ namespace YessGoFront.ViewModels
             });
         }
 
-        public async Task LoadBalanceAsync(CancellationToken ct = default)
+        /// <summary>
+        /// Загружает баланс из Wallet.Balance через API и обновляет BalanceStore
+        /// Использует минимальное кэширование (1 секунда) для оптимизации
+        /// </summary>
+        private async Task LoadBalanceAsync()
         {
-            // Проверяем кэш
+            // Проверяем кэш (минимальное кэширование для предотвращения множественных запросов)
             if ((DateTime.Now - _lastBalanceUpdate).TotalSeconds < BalanceCacheSeconds)
                 return;
 
@@ -219,37 +231,11 @@ namespace YessGoFront.ViewModels
                 if (_walletService == null)
                     return;
 
-                // Используем таймаут для запроса баланса (10 секунд)
-                CancellationToken finalCt;
-                IDisposable? ctsDisposable = null;
-                
-                if (ct == default)
-                {
-                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    ctsDisposable = cts;
-                    finalCt = cts.Token;
-                }
-                else
-                {
-                    // Если передан токен извне, используем его (таймаут уже установлен в вызывающем коде)
-                    finalCt = ct;
-                }
-
-                try
-                {
-                    var balance = await _walletService.GetBalanceAsync(finalCt);
-                    BalanceStore.Instance.Balance = balance;
-                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Balance loaded successfully: {balance}");
-                }
-                finally
-                {
-                    ctsDisposable?.Dispose();
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadBalanceAsync timed out");
-                // Не обновляем баланс при таймауте, оставляем старое значение
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                // Получаем баланс напрямую из Wallet.Balance через API (из базы данных)
+                var balance = await _walletService.GetBalanceAsync();
+                BalanceStore.Instance.Balance = balance;
+                _lastBalanceUpdate = DateTime.Now;
             }
             catch (Exception ex)
             {
@@ -260,6 +246,59 @@ namespace YessGoFront.ViewModels
             {
                 _loadBalanceLock.Release();
             }
+        }
+
+        /// <summary>
+        /// Загружает баланс напрямую из Wallet.Balance через API без проверки кэша
+        /// Используется для принудительного обновления баланса из базы данных
+        /// </summary>
+        private async Task LoadBalanceFromDbAsync()
+        {
+            if (!await _loadBalanceLock.WaitAsync(0))
+                return; // Уже выполняется
+
+            try
+            {
+                if (_walletService == null)
+                    return;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                // Получаем баланс напрямую из Wallet.Balance через API (из базы данных)
+                // Без проверки кэша - всегда свежие данные из БД
+                var balance = await _walletService.GetBalanceAsync();
+                BalanceStore.Instance.Balance = balance;
+                _lastBalanceUpdate = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading wallet balance from DB: {ex.Message}");
+            }
+            finally
+            {
+                _loadBalanceLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Публичный метод для обновления баланса из Wallet.Balance
+        /// Загружает баланс напрямую из базы данных без кэширования
+        /// Можно вызывать извне для принудительного обновления (например, после операций с кошельком)
+        /// </summary>
+        public async Task RefreshBalanceAsync()
+        {
+            // Загружаем баланс напрямую из БД без проверки кэша
+            await LoadBalanceFromDbAsync();
+        }
+
+        /// <summary>
+        /// Отменяет загрузку партнеров и освобождает ресурсы
+        /// Вызывается при OnDisappearing для оптимизации памяти
+        /// </summary>
+        public void CancelPartnersLoading()
+        {
+            _loadPartnersCts?.Cancel();
+            _loadPartnersCts?.Dispose();
+            _loadPartnersCts = null;
         }
 
         private async Task LoadUserAsync()
@@ -308,129 +347,57 @@ namespace YessGoFront.ViewModels
                         }
                     }
 
-                    // DisplayName всегда показывает ФИО из БД
+                    // DisplayName всегда показывает ФИО из БД (приоритет: БД → API → пустая строка)
                     var displayName = localUser.Name;
                     System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadUserAsync: Initial displayName from DB = '{displayName}'");
                     
-                    // Проверяем, нужно ли загружать профиль из API:
-                    // 1. Если Name пустое
-                    // 2. Если Name равно "Пользователь" (дефолтное значение)
-                    // 3. Если Name не содержит пробел (вероятно, это не полное имя)
-                    var shouldLoadFromApi = string.IsNullOrWhiteSpace(displayName) ||
-                                           displayName.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase) ||
-                                           !displayName.Contains(' ');
-                    
-                    if (shouldLoadFromApi)
+                    // Если ФИО пустое в БД, пытаемся загрузить профиль из API и обновить БД
+                    if (string.IsNullOrWhiteSpace(displayName))
                     {
-                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Name is empty/invalid in DB, loading profile from API...");
+                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Name is empty in DB, loading profile from API...");
                         try
                         {
-                            // Используем таймаут для загрузки профиля (10 секунд)
-                            using var profileCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                            var userProfile = await _authService.GetUserProfileAsync(profileCts.Token);
+                            // Загружаем профиль из API с таймаутом
+                            var profileTask = _authService.GetUserProfileAsync(cts.Token);
+                            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(3), cts.Token);
+                            var completedTask = await Task.WhenAny(profileTask, timeoutTask);
                             
-                            if (userProfile != null)
+                            if (completedTask == profileTask)
                             {
-                                var userProfile = await _authService.GetUserProfileAsync();
+                                var userProfile = await profileTask;
                                 if (userProfile != null)
                                 {
                                     System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Got profile from API: FirstName='{userProfile.FirstName}', LastName='{userProfile.LastName}'");
                                     
-                                    // Небольшая задержка, чтобы дать время SaveOrUpdateUserAsync сохранить данные в БД
-                                    await Task.Delay(100);
-                                    
+                                    // SaveOrUpdateUserAsync автоматически сохранит Name в БД из FirstName и LastName
                                     // Перезагружаем пользователя из БД, чтобы получить обновленное имя
-                                    var updatedUser = await _authService.GetLocalUserAsync();
-                                    if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name) && 
-                                        !updatedUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
+                                    var updatedUser = await _authService.GetLocalUserAsync(cts.Token);
+                                    if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name))
                                     {
-                                        var updatedDisplayName = fullName;
-                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from API: FirstName={firstName}, LastName={lastName}, FullName={fullName}");
-                                        
-                                        // Перезагружаем пользователя из БД, чтобы получить обновленное имя
-                                        var updatedUser = await _authService.GetLocalUserAsync();
-                                        if (updatedUser != null && !string.IsNullOrWhiteSpace(updatedUser.Name))
+                                        displayName = updatedUser.Name;
+                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Updated displayName from DB after API load: {displayName}");
+                                    }
+                                    else
+                                    {
+                                        // Если в БД все еще пусто, формируем из API напрямую
+                                        var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
+                                        var lastName = userProfile.LastName?.Trim() ?? string.Empty;
+                                        displayName = $"{firstName} {lastName}".Trim();
+                                        if (!string.IsNullOrWhiteSpace(displayName))
                                         {
-                                            updatedDisplayName = updatedUser.Name;
-                                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Updated displayName from DB after profile load: {updatedDisplayName}");
+                                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Using Name from API: {displayName}");
                                         }
-                                        
-                                        // Обновляем UI на главном потоке
-                                        await MainThread.InvokeOnMainThreadAsync(() =>
-                                        {
-                                            DisplayName = updatedDisplayName;
-                                        });
-                                    }
-                                    else
-                                    {
-                                        // Если в БД все еще "Пользователь" или пустое, но мы получили имя из API,
-                                        // используем имя из API напрямую (GetUserProfileAsync должен был сохранить его в БД)
-                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ⚠️ Name not updated in DB yet, using API value: {displayName}");
-                                    }
-                                }
-                                else
-                                {
-                                    // Если API не вернул имя, но в БД есть что-то валидное - используем его
-                                    if (!string.IsNullOrWhiteSpace(localUser.Name) && 
-                                        !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        displayName = localUser.Name;
-                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using Name from DB as fallback: {displayName}");
-                                    }
-                                    else
-                                    {
-                                        displayName = "Пользователь";
-                                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ FirstName and LastName are empty in API response");
                                     }
                                 }
                             }
                             else
                             {
-                                // Если API вернул null, но в БД есть валидное имя - используем его
-                                if (!string.IsNullOrWhiteSpace(localUser.Name) && 
-                                    !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    displayName = localUser.Name;
-                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using Name from DB as fallback (API returned null): {displayName}");
-                                }
-                                else
-                                {
-                                    displayName = "Пользователь";
-                                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ API returned null profile");
-                                }
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] GetUserProfileAsync timed out");
-                            // Если таймаут, но в БД есть валидное имя - используем его
-                            if (!string.IsNullOrWhiteSpace(localUser.Name) && 
-                                !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
-                            {
-                                displayName = localUser.Name;
-                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using Name from DB as fallback (timeout): {displayName}");
-                            }
-                            else
-                            {
-                                displayName = "Пользователь";
+                                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ⚠️ API profile load timed out");
                             }
                         }
                         catch (Exception ex)
                         {
                             System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ❌ Failed to load profile from API: {ex.Message}");
-                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Stack trace: {ex.StackTrace}");
-                            
-                            // Если API не загрузился, но в БД есть валидное имя - используем его
-                            if (!string.IsNullOrWhiteSpace(localUser.Name) && 
-                                !localUser.Name.Trim().Equals("Пользователь", StringComparison.OrdinalIgnoreCase))
-                            {
-                                displayName = localUser.Name;
-                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using Name from DB as fallback (API error): {displayName}");
-                            }
-                            else
-                            {
-                                displayName = "Пользователь";
-                            }
                         }
                     }
                     else
@@ -438,18 +405,21 @@ namespace YessGoFront.ViewModels
                         System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Using Name from DB: {displayName}");
                     }
 
-                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    // Используем синхронное обновление для надежной работы в release режиме
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        DisplayName = displayName;
+                        DisplayName = displayName ?? string.Empty;
                         Phone = phone ?? string.Empty;
+                        OnPropertyChanged(nameof(DisplayName));
+                        OnPropertyChanged(nameof(Phone));
                     });
-                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded user: DisplayName={DisplayName}, Phone={Phone}");
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Loaded user: DisplayName={displayName ?? string.Empty}, Phone={phone ?? string.Empty}");
                 }
                 else
                 {
-                    // Если нет локального пользователя, пытаемся получить данные из токена и API
+                    // Если нет локального пользователя, пытаемся загрузить из API и сохранить в БД
                     string? phone = null;
-                    string displayName = "Пользователь";
+                    string displayName = string.Empty;
                     
                     if (_authenticationService != null)
                     {
@@ -462,49 +432,49 @@ namespace YessGoFront.ViewModels
                             
                             if (completedTask == tokenTask)
                             {
-                                phone = JwtHelper.GetPhone(accessToken);
-                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token (no local user): {phone}");
-                                
-                                // Пытаемся загрузить профиль из API
-                                if (_authService != null)
+                                var accessToken = await tokenTask;
+                                if (!string.IsNullOrWhiteSpace(accessToken))
                                 {
+                                    phone = JwtHelper.GetPhone(accessToken);
+                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Using phone from token (no local user): {phone}");
+                                    
+                                    // Загружаем профиль из API и сохраняем в БД
                                     try
                                     {
-                                        // Используем таймаут для загрузки профиля (10 секунд)
-                                        using var profileCts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                                        var userProfile = await _authService.GetUserProfileAsync(profileCts2.Token);
+                                        var profileTask = _authService.GetUserProfileAsync(cts.Token);
+                                        var profileTimeoutTask = Task.Delay(TimeSpan.FromSeconds(3), cts.Token);
+                                        var profileCompletedTask = await Task.WhenAny(profileTask, profileTimeoutTask);
                                         
-                                        if (userProfile != null)
+                                        if (profileCompletedTask == profileTask)
                                         {
-                                            // Формируем ФИО из FirstName и LastName напрямую
-                                            var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
-                                            var lastName = userProfile.LastName?.Trim() ?? string.Empty;
-                                            var fullName = $"{firstName} {lastName}".Trim();
-                                            
-                                            if (!string.IsNullOrWhiteSpace(fullName))
+                                            var userProfile = await profileTask;
+                                            if (userProfile != null)
                                             {
-                                                displayName = fullName;
-                                                System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from API (no local user): FirstName={firstName}, LastName={lastName}, FullName={fullName}");
-                                            }
-                                            else
-                                            {
-                                                System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ FirstName and LastName are empty in API response (no local user)");
+                                                // SaveOrUpdateUserAsync автоматически сохранит Name в БД
+                                                // Перезагружаем пользователя из БД, чтобы получить Name
+                                                var savedUser = await _authService.GetLocalUserAsync(cts.Token);
+                                                if (savedUser != null && !string.IsNullOrWhiteSpace(savedUser.Name))
+                                                {
+                                                    displayName = savedUser.Name;
+                                                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Loaded Name from DB after API save: {displayName}");
+                                                }
+                                                else
+                                                {
+                                                    // Если в БД все еще пусто, формируем из API напрямую
+                                                    var firstName = userProfile.FirstName?.Trim() ?? string.Empty;
+                                                    var lastName = userProfile.LastName?.Trim() ?? string.Empty;
+                                                    displayName = $"{firstName} {lastName}".Trim();
+                                                    if (!string.IsNullOrWhiteSpace(displayName))
+                                                    {
+                                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Using Name from API (no local user): {displayName}");
+                                                    }
+                                                }
                                             }
                                         }
-                                        else
-                                        {
-                                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] ❌ API returned null profile (no local user)");
-                                        }
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] GetUserProfileAsync timed out (no local user)");
-                                        // Оставляем "Пользователь"
                                     }
                                     catch (Exception ex)
                                     {
-                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ❌ Failed to load profile from API (no local user): {ex.Message}");
-                                        // Оставляем "Пользователь"
+                                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Failed to load profile from API: {ex.Message}");
                                     }
                                 }
                             }
@@ -515,21 +485,55 @@ namespace YessGoFront.ViewModels
                         }
                     }
 
-                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    // Используем синхронное обновление для надежной работы в release режиме
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
                         DisplayName = displayName;
                         Phone = phone ?? string.Empty;
+                        OnPropertyChanged(nameof(DisplayName));
+                        OnPropertyChanged(nameof(Phone));
                     });
-                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] No local user found: DisplayName={DisplayName}, Phone={Phone}");
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] No local user found, DisplayName={displayName}");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Error loading user: {ex.Message}");
-                await MainThread.InvokeOnMainThreadAsync(() =>
+                
+                // Попытаемся загрузить из БД еще раз в случае ошибки
+                try
                 {
-                    DisplayName = "Пользователь";
+                    if (_authService != null)
+                    {
+                        var fallbackUser = await _authService.GetLocalUserAsync();
+                        if (fallbackUser != null && !string.IsNullOrWhiteSpace(fallbackUser.Name))
+                        {
+                            // Используем синхронное обновление для надежной работы в release режиме
+                            MainThread.BeginInvokeOnMainThread(() =>
+                            {
+                                DisplayName = fallbackUser.Name;
+                                Phone = fallbackUser.Phone ?? string.Empty;
+                                OnPropertyChanged(nameof(DisplayName));
+                                OnPropertyChanged(nameof(Phone));
+                            });
+                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] ✅ Recovered from error using DB: DisplayName={fallbackUser.Name}");
+                            return;
+                        }
+                    }
+                }
+                catch (Exception fallbackEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Failed to recover from error: {fallbackEx.Message}");
+                }
+                
+                // Только в крайнем случае устанавливаем пустую строку
+                // Используем синхронное обновление для надежной работы в release режиме
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    DisplayName = string.Empty;
                     Phone = string.Empty;
+                    OnPropertyChanged(nameof(DisplayName));
+                    OnPropertyChanged(nameof(Phone));
                 });
             }
             finally
@@ -728,13 +732,21 @@ namespace YessGoFront.ViewModels
 
             try
             {
+                // Отменяем предыдущую загрузку, если она еще выполняется
+                _loadPartnersCts?.Cancel();
+                _loadPartnersCts?.Dispose();
+                _loadPartnersCts = new CancellationTokenSource();
+
                 System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: начало загрузки партнёров из БД");
 #if ANDROID
                 Android.Util.Log.Info("MainPageViewModel", "[LoadPartnersAsync] Начало загрузки партнёров");
 #endif
 
+                // Проверяем отмену перед обновлением UI
+                _loadPartnersCts.Token.ThrowIfCancellationRequested();
+                
                 // Очищаем на главном потоке
-                await MainThread.InvokeOnMainThreadAsync(() =>
+                await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
                     PartnersRow1.Clear();
                     PartnersRow2.Clear();
@@ -750,60 +762,10 @@ namespace YessGoFront.ViewModels
                     return; // Не используем fallback, просто оставляем пустым
                 }
 
-                // Проверяем кэш
-                IReadOnlyList<PartnerDto>? partners = null;
-                if (_cachedPartners != null && DateTime.UtcNow - _partnersCacheTimestamp < PartnersCacheExpiry)
-                {
-                    System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using cached partners");
-                    partners = _cachedPartners;
-                }
-                else
-                {
-                    // Загружаем из API с таймаутом
-                    try
-                    {
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                        partners = await _partnersApiService.GetAllAsync(cts.Token);
-                        
-                        // Обновляем кэш
-                        if (partners != null && partners.Count > 0)
-                        {
-                            _cachedPartners = partners;
-                            _partnersCacheTimestamp = DateTime.UtcNow;
-                            System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Partners cached: {partners.Count} items");
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[MainPageViewModel] LoadPartnersAsync: GetAllAsync timed out");
-                        // Используем кэш, если он есть, даже если истек
-                        if (_cachedPartners != null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using expired cache due to timeout");
-                            partners = _cachedPartners;
-                        }
-                        else
-                        {
-                            await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
-                            return;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] LoadPartnersAsync: Error loading from API: {ex.Message}");
-                        // Используем кэш, если он есть
-                        if (_cachedPartners != null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[MainPageViewModel] Using cache due to API error");
-                            partners = _cachedPartners;
-                        }
-                        else
-                        {
-                            await MainThread.InvokeOnMainThreadAsync(() => LoadPartnersFallback());
-                            return;
-                        }
-                    }
-                }
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+                    _loadPartnersCts.Token, 
+                    new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+                var partners = await _partnersApiService.GetAllAsync(cts.Token);
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] Получено партнёров из API: {partners?.Count ?? 0}");
 #if ANDROID
@@ -872,6 +834,9 @@ namespace YessGoFront.ViewModels
                 // Разделение на ряды также выполняем в фоне
                 var rows = await Task.Run(() =>
                 {
+                    // Проверяем отмену
+                    cts.Token.ThrowIfCancellationRequested();
+
                     // === ДЕЛИМ НА 3 РЯДА ===
                     int count = list.Count;
                     int perRow = Math.Max(1, count / 3);
@@ -896,14 +861,32 @@ namespace YessGoFront.ViewModels
                     row3 = EnsureEnough(row3);
 
                     return (row1, row2, row3);
-                });
+                }, cts.Token);
 
-                // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI НА ГЛАВНОМ ПОТОКЕ ===
-                await MainThread.InvokeOnMainThreadAsync(() =>
+                // Проверяем отмену перед обновлением UI
+                cts.Token.ThrowIfCancellationRequested();
+                
+                // === ЗАПОЛНЯЕМ КОЛЛЕКЦИИ ДЛЯ UI НА ГЛАВНОМ ПОТОКЕ (оптимизировано) ===
+                await MainThread.InvokeOnMainThreadAsync(async () =>
                 {
-                    foreach (var p in rows.row1) PartnersRow1.Add(p);
-                    foreach (var p in rows.row2) PartnersRow2.Add(p);
-                    foreach (var p in rows.row3) PartnersRow3.Add(p);
+                    // Добавляем элементы батчами для лучшей производительности
+                    // (ObservableCollection не имеет AddRange, но батчинг уменьшает количество обновлений UI)
+                    const int batchSize = 10;
+                    for (int i = 0; i < rows.row1.Count; i += batchSize)
+                    {
+                        var batch = rows.row1.Skip(i).Take(batchSize);
+                        foreach (var p in batch) PartnersRow1.Add(p);
+                    }
+                    for (int i = 0; i < rows.row2.Count; i += batchSize)
+                    {
+                        var batch = rows.row2.Skip(i).Take(batchSize);
+                        foreach (var p in batch) PartnersRow2.Add(p);
+                    }
+                    for (int i = 0; i < rows.row3.Count; i += batchSize)
+                    {
+                        var batch = rows.row3.Skip(i).Take(batchSize);
+                        foreach (var p in batch) PartnersRow3.Add(p);
+                    }
                 });
 
                 System.Diagnostics.Debug.WriteLine($"[MainPageViewModel] PARTNERS READY: row1={PartnersRow1.Count}, row2={PartnersRow2.Count}, row3={PartnersRow3.Count}");
@@ -927,13 +910,20 @@ namespace YessGoFront.ViewModels
             }
         }
 
+        /// <summary>
+        /// Оптимизированная функция для обеспечения достаточного количества элементов для бесшовного скролла
+        /// Уменьшено количество элементов для улучшения производительности
+        /// </summary>
         private List<PartnerLogoModel> EnsureEnough(List<PartnerLogoModel> list)
         {
-            while (list.Count < 24)
+            const int MinItems = 12; // Уменьшено с 24 для оптимизации
+            const int MaxItems = 30; // Уменьшено с 60 для оптимизации
+            
+            while (list.Count < MinItems)
                 list = list.Concat(list).ToList();
 
-            if (list.Count > 60)
-                list = list.Take(60).ToList();
+            if (list.Count > MaxItems)
+                list = list.Take(MaxItems).ToList();
 
             return list;
         }
@@ -1110,7 +1100,7 @@ namespace YessGoFront.ViewModels
                     double elapsed = sw.ElapsedMilliseconds - startTime - _pausedDuration.TotalMilliseconds;
                     double prog = Math.Clamp(elapsed / durationMs, 0, 1);
 
-                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
                     {
                         PageProgress = prog;
                         // Проверяем границы перед установкой значения

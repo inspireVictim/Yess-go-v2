@@ -102,9 +102,26 @@ namespace YessGoFront
                     return;
                 }
 
-                // БЫСТРАЯ ПРОВЕРКА: используем кэш или Preferences для мгновенного показа UI
-                var userId = await authService.GetCurrentUserIdAsync();
-                var hasCachedUser = userId.HasValue && userId.Value > 0;
+                // БЫСТРАЯ ПРОВЕРКА: используем токены из SecureStorage для мгновенного показа UI
+                // Токены - единственный источник истины для проверки аутентификации при запуске
+                var authenticationService = MauiProgram.Services.GetService<YessGoFront.Infrastructure.Auth.IAuthenticationService>();
+                var hasRefreshToken = false;
+                
+                if (authenticationService != null)
+                {
+                    try
+                    {
+                        // Проверяем наличие refresh token (быстро, через SecureStorage)
+                        var refreshToken = await authenticationService.GetRefreshTokenAsync();
+                        hasRefreshToken = !string.IsNullOrWhiteSpace(refreshToken);
+                        Debug.WriteLine($"[AppShell] Fast path: refresh token check = {hasRefreshToken}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[AppShell] Fast path: error checking refresh token: {ex.Message}");
+                        hasRefreshToken = false;
+                    }
+                }
                 
                 // Проверяем кэш PIN (быстро, без БД)
                 var hasCachedPin = _cachedHasPin ?? false;
@@ -125,20 +142,21 @@ namespace YessGoFront
                     }
                 }
 
-                // ПОКАЗЫВАЕМ UI СРАЗУ на основе кэша
-                if (hasCachedUser && hasCachedPin)
+                // ПОКАЗЫВАЕМ UI СРАЗУ на основе токенов и PIN
+                // Если есть refresh token, значит пользователь залогинен
+                if (hasRefreshToken && hasCachedPin)
                 {
-                    Debug.WriteLine("[AppShell] Fast path: cached user and PIN → navigating to PIN login");
+                    Debug.WriteLine("[AppShell] Fast path: refresh token and PIN → navigating to PIN login");
                     await Shell.Current.GoToAsync("///pinlogin", animate: false);
                 }
-                else if (hasCachedUser && !hasCachedPin)
+                else if (hasRefreshToken && !hasCachedPin)
                 {
-                    Debug.WriteLine("[AppShell] Fast path: cached user but NO PIN → navigating to PIN creation");
+                    Debug.WriteLine("[AppShell] Fast path: refresh token but NO PIN → navigating to PIN creation");
                     await Shell.Current.GoToAsync("///pinlogin?isCreatingPin=true", animate: false);
                 }
                 else
                 {
-                    Debug.WriteLine("[AppShell] Fast path: no cached user → navigating to login");
+                    Debug.WriteLine("[AppShell] Fast path: no refresh token → navigating to login");
                     await Shell.Current.GoToAsync("///login", animate: false);
                 }
 

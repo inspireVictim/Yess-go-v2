@@ -355,6 +355,14 @@
                                                          Grid.ColumnSpan="2"
                                                          Spacing="4"
                                                          Margin="16,0,16,8">
+                                        <!-- Процент скидки (показываем только если есть) -->
+                                        <Label Text="{Binding DiscountPercent, StringFormat='Скидка: {0:F0}%'}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="#10B981"
+                                               HorizontalOptions="Center"
+                                               IsVisible="{Binding DiscountPercent, Converter={StaticResource IsNotNullConverter}}"/>
+                                        
                                         <!-- Старая цена (зачеркнутая, показываем только если есть) -->
                                         <Label Text="{Binding OriginalPrice, StringFormat='Старая цена: {0:F0} сом'}"
                                                FontSize="14"
@@ -370,10 +378,10 @@
                                                    FontAttributes="Bold"
                                                    TextColor="Black"/>
                                             <!-- Yess!Coins (показываем только если есть) -->
-                                            <Label Text="{Binding YessCoins, StringFormat='+ {0:F0} Yess!Coins'}"
+                                            <Label Text="{Binding EffectiveYessCoins, StringFormat='+ {0:F0} Yess!Coins'}"
                                                    FontSize="14"
                                                    TextColor="#DC2626"
-                                                   IsVisible="{Binding YessCoins, Converter={StaticResource IsNotNullConverter}}"/>
+                                                   IsVisible="{Binding EffectiveYessCoins, Converter={StaticResource IsNotNullConverter}}"/>
                                         </HorizontalStackLayout>
                                     </VerticalStackLayout>
 

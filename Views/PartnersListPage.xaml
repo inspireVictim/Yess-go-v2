@@ -124,7 +124,8 @@
 		<Frame Grid.Row="1" BackgroundColor="White" CornerRadius="16" Padding="0" HasShadow="True">
 			<CollectionView x:Name="PartnersListView"
                             ItemsSource="{Binding Partners}"
-                            SelectionMode="None">
+                            SelectionMode="None"
+                            ItemSizingStrategy="MeasureFirstItem">
 				<CollectionView.ItemsLayout>
 					<LinearItemsLayout Orientation="Vertical" ItemSpacing="12"/>
 				</CollectionView.ItemsLayout>

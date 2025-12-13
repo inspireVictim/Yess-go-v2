@@ -217,13 +217,13 @@ namespace YessGoFront.ViewModels
         /// Загружает баланс из Wallet.Balance через API и обновляет BalanceStore
         /// Использует минимальное кэширование (1 секунда) для оптимизации
         /// </summary>
-        private async Task LoadBalanceAsync()
+        public async Task LoadBalanceAsync(CancellationToken ct = default)
         {
             // Проверяем кэш (минимальное кэширование для предотвращения множественных запросов)
             if ((DateTime.Now - _lastBalanceUpdate).TotalSeconds < BalanceCacheSeconds)
                 return;
 
-            if (!await _loadBalanceLock.WaitAsync(0))
+            if (!await _loadBalanceLock.WaitAsync(0, ct))
                 return; // Уже выполняется
 
             try
@@ -231,7 +231,8 @@ namespace YessGoFront.ViewModels
                 if (_walletService == null)
                     return;
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(3));
                 // Получаем баланс напрямую из Wallet.Balance через API (из базы данных)
                 var balance = await _walletService.GetBalanceAsync();
                 BalanceStore.Instance.Balance = balance;

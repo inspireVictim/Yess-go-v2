@@ -193,11 +193,6 @@ public partial class RegisterViewModel : ObservableObject
             IsBusy = false;
             _registerLock.Release();
         }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogWarning("[RegisterViewModel] Send verification code operation timed out after 15 seconds");
-            ShowError("Операция отправки кода заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
-        }
         catch (NetworkException ex)
         {
             var errorMessage = ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
@@ -385,11 +380,6 @@ public partial class RegisterViewModel : ObservableObject
             _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds. IsBusy set to false, lock released.");
             IsBusy = false;
             _registerLock.Release();
-        }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogWarning("[RegisterViewModel] Registration operation timed out after 15 seconds");
-            ShowError("Операция регистрации заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
         }
         catch (NetworkException ex)
         {

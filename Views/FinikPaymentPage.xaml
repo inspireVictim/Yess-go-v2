@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="YessGoFront.Views.FinikPaymentPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Заголовок -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Кнопка назад -->
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <!-- Заголовок -->
+                <Label Grid.Column="1"
+                       Text="Оплата через Finik"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+                
+                <!-- Пустое место справа для балансировки -->
+                <BoxView Grid.Column="2" 
+                         WidthRequest="30"
+                         Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <!-- WebView для отображения платежа -->
+        <Grid Grid.Row="1">
+            <ActivityIndicator x:Name="LoadingIndicator"
+                              IsRunning="True"
+                              IsVisible="True"
+                              Color="#0B4A3B"
+                              HorizontalOptions="Center"
+                              VerticalOptions="Center"/>
+            
+            <WebView x:Name="PaymentWebView"
+                    Navigating="OnWebViewNavigating"
+                    Navigated="OnWebViewNavigated"
+                    IsVisible="False"/>
+        </Grid>
+    </Grid>
+</ContentPage>
+

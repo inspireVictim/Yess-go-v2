@@ -62,6 +62,18 @@
                        IsVisible="{Binding IsEmpty}"
                        Margin="0,50,0,0"/>
 
+                <!-- Кнопка пополнения баланса -->
+                <Button Text="Пополнить баланс"
+                        BackgroundColor="#0B4A3B"
+                        TextColor="White"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        CornerRadius="12"
+                        Padding="0,14"
+                        Margin="0,16,0,0"
+                        Clicked="OnTopUpButtonClicked"
+                        IsVisible="{Binding IsEmpty}"/>
+
                 <!-- Секции по партнёрам -->
                 <CollectionView ItemsSource="{Binding PartnerGroups}"
                                 IsVisible="{Binding IsEmpty, Converter={StaticResource InverseBoolConverter}}">

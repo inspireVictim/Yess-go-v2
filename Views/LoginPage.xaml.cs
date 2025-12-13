@@ -13,6 +13,7 @@ namespace YessGoFront.Views
     public partial class LoginPage : ContentPage
     {
         private readonly LoginViewModel _viewModel;
+        private readonly AuthNavigationHandler _authNavigationHandler;
         private bool _isNavigating = false; // Защита от повторных вызовов навигации
 
         public LoginPage()

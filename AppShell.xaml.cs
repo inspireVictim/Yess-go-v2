@@ -14,8 +14,9 @@ namespace YessGoFront
         
         // Cache fields for background initialization
         private User? _cachedLocalUser;
-        private bool _cachedHasPin;
+        private bool? _cachedHasPin;
         private DateTime _cacheTimestamp = DateTime.MinValue;
+        private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
 
         public AppShell()
         {
@@ -53,7 +54,7 @@ namespace YessGoFront
             Routing.RegisterRoute(nameof(Views.DeliveryTermsPage), typeof(Views.DeliveryTermsPage));
             Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
             Routing.RegisterRoute("receipt", typeof(Views.ReceiptPage));
-            Routing.RegisterRoute(nameof(Views.FinikPaymentPage), typeof(Views.FinikPaymentPage));
+            Routing.RegisterRoute("FinikPaymentPage", typeof(FinikPaymentPage));
 
 
         }

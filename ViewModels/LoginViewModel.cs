@@ -79,11 +79,6 @@ public partial class LoginViewModel : ObservableObject
             ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
             _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
         }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogWarning("[LoginViewModel] Login operation timed out after 15 seconds");
-            ShowError("Операция входа заняла слишком много времени. Проверьте подключение к интернету и попробуйте снова.");
-        }
         catch (NetworkException ex)
         {
             var errorMessage = ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)

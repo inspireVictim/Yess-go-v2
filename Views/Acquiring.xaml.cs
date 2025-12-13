@@ -144,8 +144,8 @@ public partial class Acquiring : ContentPage
             
             // Используем полное имя маршрута для навигации
             var navigationPath = !string.IsNullOrWhiteSpace(redirectUrlEncoded)
-                ? $"{nameof(Views.FinikPaymentPage)}?paymentUrl={paymentUrlEncoded}&redirectUrl={redirectUrlEncoded}"
-                : $"{nameof(Views.FinikPaymentPage)}?paymentUrl={paymentUrlEncoded}";
+                ? $"FinikPaymentPage?paymentUrl={paymentUrlEncoded}&redirectUrl={redirectUrlEncoded}"
+                : $"FinikPaymentPage?paymentUrl={paymentUrlEncoded}";
             
             Debug.WriteLine($"[Acquiring] Navigating to: {navigationPath}");
             await Shell.Current.GoToAsync(navigationPath, animate: true);

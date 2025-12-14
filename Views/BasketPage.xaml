@@ -75,7 +75,8 @@
                         IsVisible="{Binding IsEmpty}"/>
 
                 <!-- Секции по партнёрам -->
-                <CollectionView ItemsSource="{Binding PartnerGroups}"
+                <CollectionView x:Name="PartnerGroupsCollectionView"
+                                ItemsSource="{Binding PartnerGroups}"
                                 IsVisible="{Binding IsEmpty, Converter={StaticResource InverseBoolConverter}}">
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
@@ -261,6 +262,60 @@
                                                IsVisible="{Binding TotalYessCoins, Converter={StaticResource IsNotNullConverter}}"/>
                                     </HorizontalStackLayout>
 
+                                    <!-- Мини-карта для выбора местоположения -->
+                                    <VerticalStackLayout Spacing="8" Margin="0,12,0,0">
+                                        <Label Text="Выберите адрес доставки:"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="Black"/>
+                                        
+                                        <Border x:Name="MapContainerBorder"
+                                                StrokeThickness="2"
+                                                Stroke="#DC2626"
+                                                StrokeShape="RoundRectangle 8"
+                                                BackgroundColor="White"
+                                                Padding="0"
+                                                HeightRequest="220">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" 
+                                                           Binding="{Binding IsLocationSelected}" 
+                                                           Value="True">
+                                                    <Setter Property="Stroke" Value="#0B4A3B" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Grid x:Name="MapContainerGrid"
+                                                  Loaded="OnMapContainerGridLoaded">
+                                                <!-- Контейнер для карты (MapView будет добавлен программно) -->
+                                                <Grid x:Name="MapContainer" 
+                                                      BackgroundColor="#E0E0E0"/>
+                                                
+                                                <!-- Центральный маркер для выбора местоположения -->
+                                                <Image Source="icon_location.png"
+                                                       WidthRequest="32"
+                                                       HeightRequest="32"
+                                                       HorizontalOptions="Center"
+                                                       VerticalOptions="Center"
+                                                       Aspect="AspectFit"/>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <!-- Адрес выбранного местоположения -->
+                                        <Label Text="{Binding SelectedAddress}"
+                                               FontSize="12"
+                                               TextColor="#666"
+                                               LineBreakMode="WordWrap"
+                                               Margin="0,4,0,0"
+                                               IsVisible="{Binding SelectedAddress, Converter={StaticResource IsNotNullConverter}}"/>
+                                        
+                                        <!-- Сообщение о необходимости выбора -->
+                                        <Label Text="Переместите карту, чтобы выбрать адрес доставки"
+                                               FontSize="11"
+                                               TextColor="#DC2626"
+                                               FontAttributes="Italic"
+                                               IsVisible="{Binding IsLocationSelected, Converter={StaticResource InverseBoolConverter}}"
+                                               Margin="0,4,0,0"/>
+                                    </VerticalStackLayout>
+
                                     <!-- Кнопка заказа -->
                                     <Button Text="Перейти к заказу"
                                             BackgroundColor="#0B4A3B"
@@ -271,7 +326,8 @@
                                             Padding="0,12"
                                             Margin="0,8,0,0"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ProceedToOrderCommand}"
-                                            CommandParameter="{Binding PartnerId}"/>
+                                            CommandParameter="{Binding PartnerId}"
+                                            IsEnabled="{Binding IsLocationSelected}"/>
                                     
                                     <!-- Процент скидки -->
                                     <Label FontSize="12"

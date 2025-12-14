@@ -87,6 +87,22 @@ public partial class BasketViewModel : ObservableObject
                     group.DiscountPercent = (group.TotalDiscount / totalOriginalPrice) * 100;
                 }
 
+                // Загружаем координаты партнёра
+                try
+                {
+                    var partner = await _partnersService.GetPartnerByIdAsync(partnerId.ToString());
+                    if (partner != null)
+                    {
+                        group.PartnerLatitude = partner.Latitude;
+                        group.PartnerLongitude = partner.Longitude;
+                        group.PartnerAddress = partner.Address;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to load partner coordinates for partner {PartnerId}", partnerId);
+                }
+
                 PartnerGroups.Add(group);
             }
 
@@ -254,6 +270,19 @@ public partial class BasketViewModel : ObservableObject
                 return;
             }
 
+            // Проверяем, что местоположение выбрано
+            if (!partnerGroup.IsLocationSelected || string.IsNullOrWhiteSpace(partnerGroup.SelectedAddress))
+            {
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Внимание",
+                        "Пожалуйста, выберите адрес доставки на карте",
+                        "OK");
+                }
+                return;
+            }
+
             // Формируем сообщение заказа
             var orderMessage = FormatOrderMessage(partnerGroup);
 
@@ -344,6 +373,18 @@ public partial class BasketViewModel : ObservableObject
             message.AppendLine($"Скидка: {partnerGroup.DiscountPercent:F0}%");
         }
 
+        // Адрес доставки
+        message.AppendLine();
+        message.AppendLine("Адрес доставки:");
+        if (!string.IsNullOrWhiteSpace(partnerGroup.SelectedAddress))
+        {
+            message.AppendLine(partnerGroup.SelectedAddress);
+        }
+        else
+        {
+            message.AppendLine("Не указан");
+        }
+
         return message.ToString();
     }
 
@@ -386,5 +427,28 @@ public partial class PartnerCartGroup : ObservableObject
     public decimal TotalYessCoins { get; set; }
     public decimal TotalDiscount { get; set; }
     public decimal DiscountPercent { get; set; }
+    
+    // Координаты партнёра
+    [ObservableProperty]
+    private double? partnerLatitude;
+    
+    [ObservableProperty]
+    private double? partnerLongitude;
+    
+    [ObservableProperty]
+    private string? partnerAddress;
+    
+    // Выбранное местоположение заказчика
+    [ObservableProperty]
+    private double? selectedLatitude;
+    
+    [ObservableProperty]
+    private double? selectedLongitude;
+    
+    [ObservableProperty]
+    private string? selectedAddress;
+    
+    [ObservableProperty]
+    private bool isLocationSelected;
 }
 

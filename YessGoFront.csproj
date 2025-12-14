@@ -9,7 +9,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
-		<ApplicationTitle>YESS Go Front</ApplicationTitle>
+		<ApplicationTitle>Yess!Go</ApplicationTitle>
 		<ApplicationId>com.yessgo.front</ApplicationId>
 		<ApplicationIdGuid>5F4C77F0-AC7A-4C4E-9E8B-32B6B1C9F22F</ApplicationIdGuid>
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
@@ -147,6 +148,52 @@ public partial class PartnerDetailViewPage : ContentPage
                 _viewModel.SelectCategoryCommand.Execute(categoryName);
                 UpdateCategoryButtonsStyle();
             }
+        }
+    }
+
+    private async void OnProductTapped(object? sender, EventArgs e)
+    {
+        try
+        {
+            ProductDto? product = null;
+
+            // Пытаемся получить товар из BindingContext элемента
+            if (sender is BindableObject bindable && bindable.BindingContext is ProductDto productFromContext)
+            {
+                product = productFromContext;
+            }
+            // Или из TapGestureRecognizer через IGestureRecognizers
+            else if (sender is IGestureRecognizers gestureContainer)
+            {
+                var tapGesture = gestureContainer.GestureRecognizers
+                    .OfType<TapGestureRecognizer>()
+                    .FirstOrDefault();
+                
+                if (tapGesture?.CommandParameter is ProductDto productFromGesture)
+                {
+                    product = productFromGesture;
+                }
+            }
+            // Или из BindingContext визуального элемента
+            else if (sender is VisualElement element && element.BindingContext is ProductDto productFromElement)
+            {
+                product = productFromElement;
+            }
+
+            if (product != null && Shell.Current != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Navigating to ProductDetailPage with productId={product.Id}, partnerId={product.PartnerId}");
+                await Shell.Current.GoToAsync($"ProductDetailPage?productId={product.Id}&partnerId={product.PartnerId}", animate: true);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] OnProductTapped: Could not get product from sender. Sender type: {sender?.GetType().Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] OnProductTapped error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] StackTrace: {ex.StackTrace}");
         }
     }
 }

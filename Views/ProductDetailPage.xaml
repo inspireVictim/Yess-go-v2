@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:YessGoFront.Converters"
+             xmlns:helpers="clr-namespace:YessGoFront.Helpers"
+             x:Class="YessGoFront.Views.ProductDetailPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringToImageSourceConverter x:Key="StringToImageSourceConverter" />
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter" />
+            <converters:IsNullConverter x:Key="IsNullConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Зеленая панель с иконкой назад -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*">
+                <!-- Иконка назад слева -->
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <!-- Пустое пространство -->
+                <BoxView Grid.Column="1" Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="0">
+                <!-- Основной контент -->
+                <VerticalStackLayout Spacing="16" Padding="20" BackgroundColor="#F9F9F9">
+                    <!-- Изображение товара -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="12"
+                           Padding="0"
+                           HasShadow="True"
+                           IsVisible="{Binding ImageUrl, Converter={StaticResource IsNotNullConverter}}">
+                        <Image Source="{Binding ImageUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                               Aspect="AspectFill"
+                               HeightRequest="300"
+                               HorizontalOptions="Fill">
+                            <Image.Behaviors>
+                                <helpers:ImageLoadingBehavior />
+                            </Image.Behaviors>
+                        </Image>
+                    </Frame>
+
+                    <!-- Бейдж скидки (если есть) -->
+                    <Border BackgroundColor="#10B981"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="12,6"
+                            HorizontalOptions="Start"
+                            IsVisible="{Binding DiscountPercent, Converter={StaticResource IsNotNullConverter}}">
+                        <Label Text="{Binding DiscountPercent, StringFormat='Скидка {0:F0}%'}"
+                               FontSize="14"
+                               FontAttributes="Bold"
+                               TextColor="White"/>
+                    </Border>
+
+                    <!-- Название товара -->
+                    <Label Text="{Binding Name}"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           TextColor="Black"
+                           LineBreakMode="WordWrap"/>
+
+                    <!-- Категория товара (если есть) -->
+                    <Label Text="{Binding Category, StringFormat='Категория: {0}'}"
+                           FontSize="14"
+                           TextColor="#0B4A3B"
+                           FontAttributes="Italic"
+                           IsVisible="{Binding Category, Converter={StaticResource IsNotNullConverter}}"/>
+
+                    <!-- Вес товара (если есть) -->
+                    <Label Text="{Binding Weight, StringFormat='Вес: {0}'}"
+                           FontSize="14"
+                           TextColor="#666"
+                           IsVisible="{Binding Weight, Converter={StaticResource IsNotNullConverter}}"/>
+
+                    <!-- Описание товара (если есть) -->
+                    <Label Text="{Binding Description}"
+                           FontSize="16"
+                           TextColor="#666"
+                           LineBreakMode="WordWrap"
+                           Margin="0,8,0,0"
+                           IsVisible="{Binding Description, Converter={StaticResource IsNotNullConverter}}"/>
+
+                    <!-- Ингредиенты (если есть) -->
+                    <VerticalStackLayout Spacing="4" Margin="0,8,0,0"
+                                         IsVisible="{Binding Ingredients, Converter={StaticResource IsNotNullConverter}}">
+                        <Label Text="Ингредиенты:"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="Black"/>
+                        <Label Text="{Binding Ingredients}"
+                               FontSize="14"
+                               TextColor="#666"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+
+                    <!-- Цена -->
+                    <VerticalStackLayout Spacing="8" Margin="0,16,0,0">
+                        <!-- Старая цена (зачеркнутая, если есть) -->
+                        <Label Text="{Binding OriginalPrice, StringFormat='Старая цена: {0:F0} сом'}"
+                               FontSize="16"
+                               TextColor="#999"
+                               TextDecorations="Strikethrough"
+                               IsVisible="{Binding OriginalPrice, Converter={StaticResource IsNotNullConverter}}"/>
+                        
+                        <!-- Новая цена и монеты -->
+                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding Price, StringFormat='{0:F0} сом'}"
+                                   FontSize="32"
+                                   FontAttributes="Bold"
+                                   TextColor="Black"/>
+                            <!-- Yess!Coins (если есть) -->
+                            <Label Text="{Binding EffectiveYessCoins, StringFormat='+ {0:F0} Yess!Coins'}"
+                                   FontSize="18"
+                                   TextColor="#DC2626"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding EffectiveYessCoins, Converter={StaticResource IsNotNullConverter}}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+
+                    <!-- Кнопка "В корзину" -->
+                    <Button Text="В корзину"
+                            BackgroundColor="#FF9800"
+                            TextColor="White"
+                            FontSize="18"
+                            FontAttributes="Bold"
+                            CornerRadius="12"
+                            Padding="20,16"
+                            Margin="0,24,0,0"
+                            HorizontalOptions="Fill"
+                            Clicked="OnAddToCartClicked"/>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
+

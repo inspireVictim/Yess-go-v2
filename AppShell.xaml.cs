@@ -36,6 +36,7 @@ namespace YessGoFront
             // Подстраницы, которые работают через стек навигации:
             Routing.RegisterRoute(nameof(Views.PartnersListPage), typeof(Views.PartnersListPage));
             Routing.RegisterRoute("PartnerDetailViewPage", typeof(Views.PartnerDetailViewPage));
+            Routing.RegisterRoute("ProductDetailPage", typeof(Views.ProductDetailPage));
             Routing.RegisterRoute(nameof(Views.BasketPage), typeof(Views.BasketPage));
             Routing.RegisterRoute(nameof(Views.Acquiring), typeof(Views.Acquiring));
             Routing.RegisterRoute(nameof(Views.Profile), typeof(Views.Profile));

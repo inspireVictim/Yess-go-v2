@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Internals;
@@ -15,6 +17,8 @@ public partial class Profile : ContentPage
     private readonly IAuthService? _authService;
     private readonly IAuthApiService? _authApiService;
     private UserDto? _currentUser;
+    private bool _isAppearing = false;
+    private readonly SemaphoreSlim _actionLock = new(1, 1);
 
     public Profile()
     {
@@ -27,6 +31,27 @@ public partial class Profile : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        if (_isAppearing)
+            return;
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Profile] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
         await LoadProfileAsync();
     }
 
@@ -140,6 +165,30 @@ public partial class Profile : ContentPage
 
     private async void OnSaveClicked(object? sender, EventArgs e)
     {
+        if (!await _actionLock.WaitAsync(0))
+            return;
+
+        try
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = false;
+
+            await OnSaveClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Profile] Error in OnSaveClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnSaveClickedAsync()
+    {
         try
         {
             if (_authApiService == null)
@@ -237,6 +286,30 @@ public partial class Profile : ContentPage
     }
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
+    {
+        if (!await _actionLock.WaitAsync(0))
+            return;
+
+        try
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Profile] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
     {
         try
         {

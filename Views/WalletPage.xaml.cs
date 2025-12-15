@@ -11,8 +11,10 @@ namespace YessGoFront.Views
     public partial class WalletPage : ContentPage
     {
         private readonly SemaphoreSlim _loadBalanceLock = new(1, 1);
+        private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
         private DateTime _lastBalanceLoad = DateTime.MinValue;
         private const int BalanceCacheSeconds = 30;
+        private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
 
         public WalletPage()
         {
@@ -27,6 +29,27 @@ namespace YessGoFront.Views
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+            
+            if (_isAppearing)
+                return; // Уже выполняется
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WalletPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // Обновляем баланс при каждом появлении страницы
             _ = LoadBalanceAsync();
         }
@@ -63,6 +86,32 @@ namespace YessGoFront.Views
         }
 
         private async void OnBackClicked(object? sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnBackClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WalletPage] Error in OnBackClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackClickedAsync()
         {
             System.Diagnostics.Debug.WriteLine("[WalletPage] Кнопка 'Назад' нажата");
             
@@ -135,10 +184,56 @@ namespace YessGoFront.Views
 
         private async void OnAboutCoinsClicked(object? sender, EventArgs e)
         {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                await OnAboutCoinsClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WalletPage] Error in OnAboutCoinsClicked: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnAboutCoinsClickedAsync()
+        {
             await DisplayAlert("Yess!Coin", "Йесскоины — внутренняя валюта, накапливается за покупки у партнёров.", "OK");
         }
 
         private async void OnTopUpClicked(object? sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnTopUpClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WalletPage] Error in OnTopUpClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnTopUpClickedAsync()
         {
             try
             {

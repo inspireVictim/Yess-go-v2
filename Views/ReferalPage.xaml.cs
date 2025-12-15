@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Http.Json;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
@@ -21,6 +22,8 @@ namespace YessGoFront.Views
         private Label? _activeReferredLabel;
         private Border? _progressBar;
         private Label? _progressLabel;
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public ReferalPage()
         {
@@ -39,6 +42,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return;
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // Обновляем нижний навбар
             if (this.FindByName<BottomNavBar>("BottomBar") is { } bottom)
                 bottom.UpdateSelectedTab("More");
@@ -299,66 +322,139 @@ namespace YessGoFront.Views
 
         public async void OnBackTapped(object sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnBackTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Error in OnBackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackTappedAsync()
+        {
             await Shell.Current.GoToAsync("///more");
         }
 
         private async void OnCopyCodeClicked(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
             try
             {
-                if (_referralCodeLabel == null) return;
-                
-                var code = _referralCodeLabel.Text;
-                if (!string.IsNullOrWhiteSpace(code) && code != "Загрузка..." && code != "Не доступно" && code != "Ошибка загрузки")
-                {
-                    await Clipboard.SetTextAsync(code);
-                    await DisplayAlert("Успешно", "Реферальный код скопирован в буфер обмена", "OK");
-                }
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnCopyCodeClickedAsync();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Error in OnCopyCodeClicked: {ex.Message}");
                 await DisplayAlert("Ошибка", $"Не удалось скопировать код: {ex.Message}", "OK");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCopyCodeClickedAsync()
+        {
+            if (_referralCodeLabel == null) return;
+            
+            var code = _referralCodeLabel.Text;
+            if (!string.IsNullOrWhiteSpace(code) && code != "Загрузка..." && code != "Не доступно" && code != "Ошибка загрузки")
+            {
+                await Clipboard.SetTextAsync(code);
+                await DisplayAlert("Успешно", "Реферальный код скопирован в буфер обмена", "OK");
             }
         }
 
         private async void OnCopyLinkClicked(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
             try
             {
-                if (_referralLinkLabel == null) return;
-                
-                var link = _referralLinkLabel.Text;
-                if (!string.IsNullOrWhiteSpace(link) && link != "Загрузка..." && link != "Не доступно" && link != "Ошибка загрузки")
-                {
-                    await Clipboard.SetTextAsync(link);
-                    await DisplayAlert("Успешно", "Реферальная ссылка скопирована в буфер обмена", "OK");
-                }
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnCopyLinkClickedAsync();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Error in OnCopyLinkClicked: {ex.Message}");
                 await DisplayAlert("Ошибка", $"Не удалось скопировать ссылку: {ex.Message}", "OK");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCopyLinkClickedAsync()
+        {
+            if (_referralLinkLabel == null) return;
+            
+            var link = _referralLinkLabel.Text;
+            if (!string.IsNullOrWhiteSpace(link) && link != "Загрузка..." && link != "Не доступно" && link != "Ошибка загрузки")
+            {
+                await Clipboard.SetTextAsync(link);
+                await DisplayAlert("Успешно", "Реферальная ссылка скопирована в буфер обмена", "OK");
             }
         }
 
         private async void OnShareClicked(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
             try
             {
-                if (_referralLinkLabel == null) return;
-                
-                var link = _referralLinkLabel.Text;
-                if (!string.IsNullOrWhiteSpace(link) && link != "Загрузка..." && link != "Не доступно" && link != "Ошибка загрузки")
-                {
-                    await Share.RequestAsync(new ShareTextRequest
-                    {
-                        Text = $"Присоединяйся к YessGo! Используй мою реферальную ссылку: {link}",
-                        Title = "Реферальная ссылка YessGo"
-                    });
-                }
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnShareClickedAsync();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ReferalPage] Error in OnShareClicked: {ex.Message}");
                 await DisplayAlert("Ошибка", $"Не удалось поделиться: {ex.Message}", "OK");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnShareClickedAsync()
+        {
+            if (_referralLinkLabel == null) return;
+            
+            var link = _referralLinkLabel.Text;
+            if (!string.IsNullOrWhiteSpace(link) && link != "Загрузка..." && link != "Не доступно" && link != "Ошибка загрузки")
+            {
+                await Share.RequestAsync(new ShareTextRequest
+                {
+                    Text = $"Присоединяйся к YessGo! Используй мою реферальную ссылку: {link}",
+                    Title = "Реферальная ссылка YessGo"
+                });
             }
         }
     }

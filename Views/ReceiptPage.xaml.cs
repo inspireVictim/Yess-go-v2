@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 
 namespace YessGoFront.Views;
@@ -18,6 +20,7 @@ public partial class ReceiptPage : ContentPage
     private string? _userFirstName;
     private string? _userLastName;
     private string? _dateStr;
+    private readonly SemaphoreSlim _actionLock = new(1, 1);
 
     public string? TransactionId
     {
@@ -141,6 +144,30 @@ public partial class ReceiptPage : ContentPage
     }
 
     private async void OnCloseButtonClicked(object? sender, EventArgs e)
+    {
+        if (!await _actionLock.WaitAsync(0))
+            return;
+
+        try
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = false;
+
+            await OnCloseButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReceiptPage] Error in OnCloseButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnCloseButtonClickedAsync()
     {
         // Возвращаемся на предыдущую страницу
         if (Shell.Current != null)

@@ -31,6 +31,8 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
     private bool _hasPartners = false;
     private bool _hasValidAmount = false;
     private List<PartnerDto> _allPartners = new(); // Кэш всех партнеров
+    private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
 
     public ObservableCollection<PartnerDto> Partners { get; } = new();
     
@@ -84,6 +86,26 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
     {
         base.OnAppearing();
         
+        if (_isAppearing)
+            return; // Уже выполняется
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SearchPartnersPay] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
         // Загружаем баланс пользователя
         await LoadUserBalanceAsync();
         
@@ -176,6 +198,32 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SearchPartnersPay] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
+    {
         if (_isNavigating) return;
         _isNavigating = true;
 
@@ -207,6 +255,18 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
 
     private async void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
+        try
+        {
+            await OnSearchTextChangedAsync(e);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SearchPartnersPay] Error in OnSearchTextChanged: {ex.Message}");
+        }
+    }
+
+    private async Task OnSearchTextChangedAsync(TextChangedEventArgs e)
+    {
         var query = e.NewTextValue?.Trim() ?? string.Empty;
 
         // Отменяем предыдущий поиск
@@ -235,8 +295,8 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
 
         try
         {
-            // Дебаунс: ждем 400мс после последнего ввода
-            await Task.Delay(400, ct);
+            // Debounce: ждем 500мс после последнего ввода (увеличено с 400мс для лучшей оптимизации)
+            await Task.Delay(500, ct);
 
             if (ct.IsCancellationRequested)
                 return;
@@ -293,6 +353,18 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
     }
 
     private async void ShowPaymentForm()
+    {
+        try
+        {
+            await ShowPaymentFormAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SearchPartnersPay] Error in ShowPaymentForm: {ex.Message}");
+        }
+    }
+
+    private async Task ShowPaymentFormAsync()
     {
         if (_selectedPartner == null) return;
 
@@ -383,6 +455,32 @@ public partial class SearchPartnersPay : ContentPage, INotifyPropertyChanged
     }
 
     private async void OnPayButtonClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnPayButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SearchPartnersPay] Error in OnPayButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnPayButtonClickedAsync()
     {
         if (_amount <= 0 || _selectedPartner == null)
         {

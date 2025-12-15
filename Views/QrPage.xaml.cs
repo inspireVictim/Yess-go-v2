@@ -7,6 +7,8 @@ using Microsoft.Maui.ApplicationModel;
 using System.Text.Json;
 using System.Reflection;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 #if ANDROID
 using AndroidX.Camera.View;
 using Microsoft.Maui.Platform;
@@ -27,6 +29,9 @@ public partial class QrPage : ContentPage
     private readonly ILogger<QrPage>? _logger;
     private bool _isProcessing = false;
     private bool _isInitialized = false;
+    private bool _isAppearing = false;
+    private readonly SemaphoreSlim _actionLock = new(1, 1);
+    private readonly SemaphoreSlim _processQrLock = new(1, 1);
 
     public QrPage()
     {
@@ -86,6 +91,26 @@ public partial class QrPage : ContentPage
     {
         base.OnAppearing();
 
+        if (_isAppearing)
+            return;
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QrPage] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
         if (_isInitialized)
             return;
 
@@ -446,11 +471,29 @@ public partial class QrPage : ContentPage
     private async void BarCodeReader_BarcodesDetected(object sender, ZXing.Net.Maui.BarcodeDetectionEventArgs e)
     {
         var result = e.Results?.FirstOrDefault();
-        if (result == null || _isProcessing)
+        if (result == null)
             return;
 
-        _isProcessing = true;
+        if (!await _processQrLock.WaitAsync(0))
+            return;
 
+        try
+        {
+            await BarCodeReader_BarcodesDetectedAsync(result);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QrPage] Error in BarCodeReader_BarcodesDetected: {ex.Message}");
+            _logger?.LogError(ex, "Ошибка при сканировании QR");
+        }
+        finally
+        {
+            _processQrLock.Release();
+        }
+    }
+
+    private async Task BarCodeReader_BarcodesDetectedAsync(ZXing.Net.Maui.BarcodeResult result)
+    {
         try
         {
             var scannedQrCode = result.Value;
@@ -558,16 +601,11 @@ public partial class QrPage : ContentPage
                     await DisplayAlert("Ошибка",
                         "Не удалось обработать QR код. Попробуйте ещё раз.", "OK");
                 }
-                finally
-                {
-                    _isProcessing = false;
-                }
             });
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Ошибка при сканировании QR");
-            _isProcessing = false;
         }
     }
 }

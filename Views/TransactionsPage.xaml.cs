@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using YessGoFront.Services.Domain;
@@ -9,6 +11,7 @@ namespace YessGoFront.Views
     public partial class TransactionsPage : ContentPage
     {
         private TransactionsViewModel? _viewModel;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public TransactionsPage()
         {
@@ -56,10 +59,53 @@ namespace YessGoFront.Views
 
         private async void OnBackClicked(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnBackClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TransactionsPage] Error in OnBackClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackClickedAsync()
+        {
             await Shell.Current.GoToAsync("//main");
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnBackTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TransactionsPage] Error in OnBackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackTappedAsync()
         {
             await Shell.Current.GoToAsync("//main");
         }
@@ -98,6 +144,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnTransactionTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnTransactionTappedAsync(sender, e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TransactionsPage] Error in OnTransactionTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnTransactionTappedAsync(object? sender, EventArgs e)
         {
             if (sender is not VisualElement element)
                 return;

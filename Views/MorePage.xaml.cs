@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
@@ -17,6 +18,8 @@ namespace YessGoFront.Views
             InitializeComponent();
         }*/
         private UserProfileViewModel? _userProfileViewModel;
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public MorePage()
         {
@@ -29,6 +32,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return;
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // ✅ Используем новый метод из BottomNavBar
             if (this.FindByName<BottomNavBar>("BottomBar") is { } bottom)
                 bottom.UpdateSelectedTab("More");
@@ -42,6 +65,25 @@ namespace YessGoFront.Views
 
         // ✅ Обработчик тапа по карточке профиля
         private async void OnProfileTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnProfileTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnProfileTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnProfileTappedAsync()
         {
             try
             {
@@ -64,6 +106,25 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "История операции"
         private async void OnHistoryTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnHistoryTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnHistoryTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnHistoryTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync("///TransactionsPage", animate: true);
@@ -85,29 +146,104 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Обратная связь"
         private async void OnFeedbackTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///FeedbackPage");
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await Shell.Current.GoToAsync("///FeedbackPage");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnFeedbackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
         }
 
         // ✅ Обработчик тапа по "Сертификат"
         private async void OnCertificateTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///CertificatePage");
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await Shell.Current.GoToAsync("///CertificatePage");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnCertificateTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
         }
 
         // ✅ Обработчик тапа по "Ввести промокод"
         private async void OnPromocodeTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///PromocodePage");
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await Shell.Current.GoToAsync("///PromocodePage");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnPromocodeTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
         }
 
         // ✅ Обработчик тапа по "Реферальная ссылка"
         private async void OnReferalTapped(object? sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync("///referal");
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await Shell.Current.GoToAsync("///referal");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnReferalTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
         }
 
         // ✅ Обработчик тапа по "Политика конфиденциальности"
         private async void OnPolicyTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnPolicyTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnPolicyTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPolicyTappedAsync()
         {
             try
             {
@@ -131,6 +267,25 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Условия использования"
         private async void OnConditionsTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnConditionsTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnConditionsTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnConditionsTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync(nameof(ConditionsPage), animate: true);
@@ -153,6 +308,25 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Публичная оферта"
         private async void OnPublicOfferTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnPublicOfferTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnPublicOfferTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPublicOfferTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync(nameof(PublicOfferPage), animate: true);
@@ -173,6 +347,25 @@ namespace YessGoFront.Views
 
         // ✅ Обработчик тапа по "Политика возврата"
         private async void OnRefundPolicyTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnRefundPolicyTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnRefundPolicyTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnRefundPolicyTappedAsync()
         {
             try
             {
@@ -195,6 +388,25 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Безопасность платежей"
         private async void OnPaymentSecurityTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnPaymentSecurityTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnPaymentSecurityTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPaymentSecurityTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync(nameof(PaymentSecurityPage), animate: true);
@@ -215,6 +427,25 @@ namespace YessGoFront.Views
 
         // ✅ Обработчик тапа по "Условия доставки"
         private async void OnDeliveryTermsTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnDeliveryTermsTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnDeliveryTermsTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnDeliveryTermsTappedAsync()
         {
             try
             {
@@ -237,6 +468,25 @@ namespace YessGoFront.Views
         // ✅ Обработчик тапа по "Контакты"
         private async void OnContactsTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnContactsTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnContactsTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnContactsTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync(nameof(ContactsPage), animate: true);
@@ -258,6 +508,25 @@ namespace YessGoFront.Views
 
         // ✅ Обработчик тапа по "Выйти"
         private async void OnLogoutTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnLogoutTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MorePage] Error in OnLogoutTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnLogoutTappedAsync()
         {
             try
             {

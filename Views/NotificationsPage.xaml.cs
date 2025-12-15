@@ -1,4 +1,7 @@
-﻿using YessGoFront.Views.Controls;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using YessGoFront.Views.Controls;
 using YessGoFront.ViewModels;
 using YessGoFront.Services.Domain;
 using YessGoFront.Data;
@@ -14,6 +17,7 @@ public partial class NotificationsPage : ContentPage
     private readonly IAuthService _authService;
     private readonly AppDbContext _dbContext;
     private bool _isInitialized = false;
+    private bool _isAppearing = false;
 
     public NotificationsPage(NotificationsViewModel viewModel, INotificationService notificationService, IAuthService authService, AppDbContext dbContext)
     {
@@ -27,7 +31,27 @@ public partial class NotificationsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        
+
+        if (_isAppearing)
+            return;
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NotificationsPage] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
         // Обновляем навигацию сразу
         if (this.FindByName<BottomNavBar>("BottomBar") is BottomNavBar bottomBar)
         {

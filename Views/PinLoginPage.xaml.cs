@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.ApplicationModel;
 using System.ComponentModel;
+using System.Threading;
 using YessGoFront.Services.Domain;
 using YessGoFront.Services;
 
@@ -24,6 +25,15 @@ namespace YessGoFront.Views
         private bool _isCreatingPin = false; // true - создание PIN, false - ввод PIN
         private string? _confirmPin = null; // Для подтверждения при создании
         private string _subtitleText = string.Empty;
+
+        // Кэширование HasPinAsync для оптимизации
+        private bool? _cachedHasPin;
+        private DateTime _cacheTimestamp;
+        private const int PinCacheSeconds = 5;
+
+        // Защита от повторных вызовов
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _forgotPinLock = new(1, 1);
 
         // Bindable свойства
         public string TitleText => _isCreatingPin ? "Создайте PIN-код" : "Введите PIN-код";
@@ -118,6 +128,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
             
+            if (_isAppearing)
+                return; // Уже выполняется
+            
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // Если уже начали процесс создания (есть _confirmPin), не меняем режим
             if (_confirmPin != null)
             {
@@ -157,12 +187,12 @@ namespace YessGoFront.Views
             // Не показываем предупреждения, если токены будут обновлены автоматически
             await UpdateTokenStatusAsync();
 
-            // Дополнительная проверка: если параметра нет, проверяем наличие PIN-кода
+            // Дополнительная проверка: если параметра нет, проверяем наличие PIN-кода (с кэшированием)
             if (!hasQueryParam && _authService != null)
             {
                 try
                 {
-                    var hasPin = await _authService.HasPinAsync();
+                    var hasPin = await HasPinCachedAsync();
                     _isCreatingPin = !hasPin;
                     System.Diagnostics.Debug.WriteLine($"[PinLoginPage] OnAppearing: Checking PIN existence. hasPin={hasPin}, setting isCreatingPin={_isCreatingPin}");
                 }
@@ -196,6 +226,25 @@ namespace YessGoFront.Views
             {
                 await TryBiometricFirstAsync();
             }
+        }
+
+        private async Task<bool> HasPinCachedAsync()
+        {
+            // Проверяем кэш
+            if (_cachedHasPin.HasValue && DateTime.UtcNow - _cacheTimestamp < TimeSpan.FromSeconds(PinCacheSeconds))
+            {
+                return _cachedHasPin.Value;
+            }
+
+            // Обновляем кэш
+            if (_authService != null)
+            {
+                _cachedHasPin = await _authService.HasPinAsync();
+                _cacheTimestamp = DateTime.UtcNow;
+                return _cachedHasPin.Value;
+            }
+
+            return false;
         }
 
         private async Task UpdateTokenStatusAsync()
@@ -522,13 +571,13 @@ namespace YessGoFront.Views
             }
             else
             {
-                // Первый ввод - проверяем наличие PIN в хранилище
+                // Первый ввод - проверяем наличие PIN в хранилище (с кэшированием)
                 bool hasPinInStorage = false;
                 if (_authService != null)
                 {
                     try
                     {
-                        hasPinInStorage = await _authService.HasPinAsync();
+                        hasPinInStorage = await HasPinCachedAsync();
                         System.Diagnostics.Debug.WriteLine($"[PinLoginPage] ProcessPinAsync: hasPinInStorage={hasPinInStorage}");
                     }
                     catch (Exception ex)
@@ -558,7 +607,7 @@ namespace YessGoFront.Views
 
             try
             {
-                await Task.Delay(300); // Небольшая задержка для UX
+                // Убрана задержка Task.Delay(300) для улучшения UX
 
                 if (isActuallyCreating)
                 {
@@ -919,39 +968,61 @@ namespace YessGoFront.Views
 
         private async void OnForgotPinClicked(object? sender, EventArgs e)
         {
+            // Защита от повторных нажатий
+            if (!await _forgotPinLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
             try
             {
-                // Показываем подтверждение
-                var confirmed = await DisplayAlert(
-                    "Забыли PIN?",
-                    "Вы будете перенаправлены на страницу входа. PIN-код будет удалён.",
-                    "Продолжить",
-                    "Отмена");
+                // Отключаем кнопку визуально
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
 
-                if (!confirmed)
-                    return;
-
-                // Удаляем PIN
-                var pinService = new Services.PinStorageService();
-                await pinService.ClearPinAsync();
-                System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN cleared after 'Forgot PIN'");
-
-                // Очищаем токен и данные аккаунта
-                var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
-                if (authService != null)
-                {
-                    await authService.ClearTokensAsync();
-                }
-                AccountStore.Instance.SignOut();
-
-                // Переходим на страницу входа
-                await Shell.Current.GoToAsync("///login", animate: true);
+                await OnForgotPinClickedAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[PinLoginPage] Error in OnForgotPinClicked: {ex.Message}");
                 await DisplayAlert("Ошибка", "Не удалось выполнить операцию", "OK");
             }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _forgotPinLock.Release();
+            }
+        }
+
+        private async Task OnForgotPinClickedAsync()
+        {
+            // Показываем подтверждение
+            var confirmed = await DisplayAlert(
+                "Забыли PIN?",
+                "Вы будете перенаправлены на страницу входа. PIN-код будет удалён.",
+                "Продолжить",
+                "Отмена");
+
+            if (!confirmed)
+                return;
+
+            // Удаляем PIN
+            var pinService = new Services.PinStorageService();
+            await pinService.ClearPinAsync();
+            System.Diagnostics.Debug.WriteLine("[PinLoginPage] PIN cleared after 'Forgot PIN'");
+
+            // Очищаем кэш
+            _cachedHasPin = null;
+
+            // Очищаем токен и данные аккаунта
+            var authService = MauiProgram.Services?.GetService<Infrastructure.Auth.IAuthenticationService>();
+            if (authService != null)
+            {
+                await authService.ClearTokensAsync();
+            }
+            AccountStore.Instance.SignOut();
+
+            // Переходим на страницу входа
+            await Shell.Current.GoToAsync("///login", animate: true);
         }
     }
 }

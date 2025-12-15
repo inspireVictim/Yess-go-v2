@@ -10,6 +10,8 @@ using Microsoft.Maui.Devices.Sensors;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.ApplicationModel;
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using YessGoFront.Config;
 using YessGoFront.Infrastructure.Exceptions;
 using YessGoFront.Models;
@@ -52,6 +54,8 @@ namespace YessGoFront.Views
         private Mapsui.UI.Maui.MapView? MapView { get; set; }
 
         private bool _isInitialized = false;
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public MapPage()
         {
@@ -89,7 +93,27 @@ namespace YessGoFront.Views
         protected override async void OnAppearing()
         {
             base.OnAppearing();
-            
+
+            if (_isAppearing)
+                return;
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             try
             {
                 System.Diagnostics.Debug.WriteLine("[MapPage] === OnAppearing НАЧАЛО ===");
@@ -449,6 +473,25 @@ namespace YessGoFront.Views
 
         private async void OnCategoryClicked(CategoryFilter category)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnCategoryClickedAsync(category);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnCategoryClicked: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCategoryClickedAsync(CategoryFilter category)
+        {
             // Снимаем выделение с других категорий
             foreach (var cat in _categories)
             {
@@ -691,6 +734,25 @@ namespace YessGoFront.Views
 
         private async void OnMapInfo(object? sender, MapInfoEventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnMapInfoAsync(sender, e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnMapInfo: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnMapInfoAsync(object? sender, MapInfoEventArgs e)
+        {
             try
             {
                 if (e.MapInfo?.Feature == null) return;
@@ -788,6 +850,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnMyLocationTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnMyLocationTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnMyLocationTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnMyLocationTappedAsync()
         {
             try
             {
@@ -1173,11 +1254,49 @@ namespace YessGoFront.Views
 
         private async void OnSearchCompleted(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnSearchCompletedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnSearchCompleted: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnSearchCompletedAsync()
+        {
             _searchQuery = SearchEntry.Text;
             await LoadPartnersOnMap();
         }
 
         private async void OnClearSearchClicked(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnClearSearchClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnClearSearchClicked: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnClearSearchClickedAsync()
         {
             SearchEntry.Text = string.Empty;
             _searchQuery = null;
@@ -1186,6 +1305,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnBackTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error in OnBackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackTappedAsync()
         {
             try
             {

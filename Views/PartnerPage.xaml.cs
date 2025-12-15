@@ -18,6 +18,8 @@ namespace YessGoFront.Views
         public ObservableCollection<CategoryItem> Categories { get; set; }
         private string _searchQuery = string.Empty;
         private bool _categoriesLoaded = false;
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public PartnerPage()
         {
@@ -32,6 +34,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return;
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // Показываем дефолтные категории сразу
             if (!_categoriesLoaded)
             {
@@ -131,6 +153,25 @@ namespace YessGoFront.Views
 
         private async void OnBackTapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnBackTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerPage] Error in OnBackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackTappedAsync()
+        {
             try
             {
                 await Shell.Current.GoToAsync("..");
@@ -142,6 +183,31 @@ namespace YessGoFront.Views
         }
 
         private async void OnMapButtonClicked(object sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnMapButtonClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerPage] Error in OnMapButtonClicked: {ex.Message}");
+                await DisplayAlert("Ошибка", $"Не удалось перейти: {ex.Message}", "ОК");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnMapButtonClickedAsync()
         {
             try
             {
@@ -155,6 +221,25 @@ namespace YessGoFront.Views
         }
 
         private async void Category_Tapped(object sender, TappedEventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await Category_TappedAsync(sender, e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerPage] Error in Category_Tapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task Category_TappedAsync(object sender, TappedEventArgs e)
         {
             try
             {

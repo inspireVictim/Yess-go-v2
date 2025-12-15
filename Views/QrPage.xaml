@@ -33,7 +33,7 @@
                 HeightRequest="60"
                 Padding="16">
             <Grid ColumnDefinitions="Auto,*,Auto">
-                
+
                 <!-- Back button - Dark grey rounded -->
                 <Border Grid.Column="0"
                         BackgroundColor="#404040"
@@ -47,7 +47,7 @@
                                  BackgroundColor="Transparent"
                                  Command="{Binding ExitCommand}"/>
                 </Border>
-                
+
                 <Label Grid.Column="1"
                        Text="Сканирование QR"
                        FontSize="20"
@@ -55,7 +55,7 @@
                        VerticalOptions="Center"
                        HorizontalOptions="Center"
                        TextColor="White"/>
-                
+
                 <!-- Placeholder for symmetry -->
                 <BoxView Grid.Column="2"
                          WidthRequest="40"
@@ -70,7 +70,7 @@
                 StrokeShape="RoundRectangle 22,22,0,0"
                 Margin="16,0,16,20"
                 Padding="20">
-            
+
             <VerticalStackLayout Spacing="16">
 
                 <!-- Title section -->

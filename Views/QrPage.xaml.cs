@@ -7,7 +7,6 @@ using Microsoft.Maui.ApplicationModel;
 using System.Text.Json;
 using System.Reflection;
 using System.Linq;
-using System.Threading;
 #if ANDROID
 using AndroidX.Camera.View;
 using Microsoft.Maui.Platform;
@@ -23,76 +22,89 @@ namespace YessGoFront.Views;
 
 public partial class QrPage : ContentPage
 {
-    private readonly IPartnersApiService _partnersService;
+    // Может быть недоступен в случае проблем с DI или линкером, поэтому делаем nullable
+    private readonly IPartnersApiService? _partnersService;
     private readonly ILogger<QrPage>? _logger;
     private bool _isProcessing = false;
     private bool _isInitialized = false;
-    
-    // Оптимизация: кэширование партнеров и защита от повторных вызовов
-    private List<PartnerDto>? _cachedPartners;
-    private DateTime _lastPartnersUpdate = DateTime.MinValue;
-    private const int PartnersCacheSeconds = 60;
-    private readonly SemaphoreSlim _processQrLock = new(1, 1);
 
     public QrPage()
     {
+        // Значение по умолчанию, если DI не сработает
+        _partnersService = null;
+
         try
         {
             InitializeComponent();
-            
+
             // Безопасная инициализация сервисов
             if (MauiProgram.Services == null)
             {
-                throw new InvalidOperationException("MauiProgram.Services не инициализирован");
+                System.Diagnostics.Debug.WriteLine("[QrPage] MauiProgram.Services не инициализирован");
+                return;
             }
-            
+
             try
             {
-                BindingContext = MauiProgram.Services.GetRequiredService<QrViewModel>();
-                _partnersService = MauiProgram.Services.GetRequiredService<IPartnersApiService>();
-                _logger = MauiProgram.Services.GetService<ILogger<QrPage>>();
+                var services = MauiProgram.Services;
+
+                // ViewModel получаем через GetService, чтобы не падать при отсутствии регистрации
+                var vm = services.GetService<QrViewModel>();
+                if (vm != null)
+                {
+                    BindingContext = vm;
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[QrPage] QrViewModel не найден в DI");
+                }
+
+                _partnersService = services.GetService<IPartnersApiService>();
+                if (_partnersService == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[QrPage] IPartnersApiService не найден в DI");
+                }
+
+                _logger = services.GetService<ILogger<QrPage>>();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[QrPage] Ошибка при получении сервисов: {ex.Message}");
-                throw;
+                // НЕ пробрасываем исключение дальше – страница должна открыться даже при проблемах с DI
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[QrPage] КРИТИЧЕСКАЯ ОШИБКА В КОНСТРУКТОРЕ: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"[QrPage] Stack trace: {ex.StackTrace}");
-            _logger?.LogError(ex, "[QrPage] Ошибка в конструкторе");
-            throw;
+            // _logger может быть ещё не инициализирован, поэтому не используем его здесь
+            // Важно: не кидаем исключение, чтобы приложение не падало в Release
         }
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        
+
         if (_isInitialized)
             return;
 
         try
         {
             System.Diagnostics.Debug.WriteLine("[QrPage] === OnAppearing НАЧАЛО ===");
-            
+
             // Проверяем и запрашиваем разрешение на камеру
             var hasPermission = await RequestCameraPermissionAsync();
-            
+
             if (!hasPermission)
             {
                 _logger?.LogWarning("[QrPage] Разрешение на камеру не получено");
-                // Не закрываем страницу, а показываем сообщение
-                // Пользователь может предоставить разрешение через настройки
-                await DisplayAlert("Доступ к камере", 
-                    "Для сканирования QR-кодов необходимо разрешение на использование камеры. Пожалуйста, предоставьте разрешение в настройках приложения.", 
+                await DisplayAlert("Доступ к камере",
+                    "Для сканирования QR-кодов необходимо разрешение на использование камеры. Вы можете выдать разрешение позже в настройках приложения.",
                     "OK");
-                
-                // Не закрываем страницу - пользователь может вернуться назад сам
-                // Страница останется открытой, но камера не будет работать
-                _isInitialized = true; // Помечаем как инициализированную, чтобы не повторять запрос
+
+                // НЕ закрываем страницу – пользователь сам решит, что делать дальше
+                _isInitialized = true;
                 return;
             }
 
@@ -105,11 +117,11 @@ public partial class QrPage : ContentPage
                     {
                         BarCodeReader.IsDetecting = true;
                         System.Diagnostics.Debug.WriteLine("[QrPage] Камера активирована");
-                        
-                        // Настраиваем камеру на высокое качество в фоне (fire-and-forget)
-                        _ = Task.Run(async () =>
+
+                        // Настраиваем камеру на высокое качество через небольшую задержку
+                        // чтобы камера успела инициализироваться
+                        Task.Delay(500).ContinueWith(async _ =>
                         {
-                            await Task.Delay(500);
                             await ConfigureCameraForHighQuality();
                         });
                     }
@@ -124,7 +136,7 @@ public partial class QrPage : ContentPage
                     _logger?.LogError(ex, "[QrPage] Ошибка при активации камеры");
                 }
             });
-            
+
             _isInitialized = true;
             System.Diagnostics.Debug.WriteLine("[QrPage] === OnAppearing ЗАВЕРШЕНО ===");
         }
@@ -133,8 +145,8 @@ public partial class QrPage : ContentPage
             System.Diagnostics.Debug.WriteLine($"[QrPage] ОШИБКА В OnAppearing: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"[QrPage] Stack trace: {ex.StackTrace}");
             _logger?.LogError(ex, "[QrPage] Ошибка в OnAppearing");
-            
-            await DisplayAlert("Ошибка", 
+
+            await DisplayAlert("Ошибка",
                 "Не удалось инициализировать камеру. Попробуйте позже.", "OK");
         }
     }
@@ -142,11 +154,11 @@ public partial class QrPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
-        
+
         try
         {
             System.Diagnostics.Debug.WriteLine("[QrPage] OnDisappearing - останавливаем камеру");
-            
+
             // Останавливаем камеру при уходе со страницы
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -175,14 +187,13 @@ public partial class QrPage : ContentPage
     {
         try
         {
-            // Небольшая задержка для полной инициализации камеры ZXing (неблокирующая)
-            await Task.Delay(300);
-            
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 try
                 {
-                    
+                    // Небольшая задержка для полной инициализации камеры ZXing
+                    await Task.Delay(300);
+
 #if ANDROID
                     await ConfigureCameraForHighQualityAndroid();
 #elif IOS
@@ -211,11 +222,11 @@ public partial class QrPage : ContentPage
         {
             // Небольшая задержка для инициализации камеры ZXing
             await Task.Delay(500);
-            
+
             // Получаем platform view камеры через Handler
             var handler = BarCodeReader?.Handler;
             PreviewView? previewView = null;
-            
+
             for (int attempt = 0; attempt < 3; attempt++)
             {
                 if (handler?.PlatformView is PreviewView pv)
@@ -223,7 +234,7 @@ public partial class QrPage : ContentPage
                     previewView = pv;
                     break;
                 }
-                
+
                 if (attempt < 2)
                 {
                     System.Diagnostics.Debug.WriteLine($"[QrPage] Android: Попытка {attempt + 1}/3 получить PreviewView...");
@@ -254,7 +265,7 @@ public partial class QrPage : ContentPage
                         var fillCenterValue = Enum.GetValues(scaleTypeEnumType)
                             .Cast<object>()
                             .FirstOrDefault(v => v.ToString() == "FillCenter");
-                        
+
                         if (fillCenterValue != null)
                         {
                             scaleTypeProperty.SetValue(previewView, fillCenterValue);
@@ -266,25 +277,25 @@ public partial class QrPage : ContentPage
             catch (Exception propEx)
             {
                 System.Diagnostics.Debug.WriteLine($"[QrPage] Android: Установка ScaleType через свойство не сработала: {propEx.Message}");
-                
+
                 // Способ 2: Пробуем вызов метода SetScaleType через рефлексию
                 try
                 {
                     // Получаем тип ScaleType через пространство имен
                     var scaleTypeType = typeof(PreviewView).Assembly.GetType("AndroidX.Camera.View.ScaleType") ??
                                       Type.GetType("AndroidX.Camera.View.ScaleType, AndroidX.Camera.View");
-                    
+
                     if (scaleTypeType != null)
                     {
-                        var setScaleTypeMethod = typeof(PreviewView).GetMethod("SetScaleType", 
+                        var setScaleTypeMethod = typeof(PreviewView).GetMethod("SetScaleType",
                             new[] { scaleTypeType });
-                        
+
                         if (setScaleTypeMethod != null)
                         {
                             var fillCenterValue = Enum.GetValues(scaleTypeType)
                                 .Cast<object>()
                                 .FirstOrDefault(v => v.ToString() == "FillCenter");
-                            
+
                             if (fillCenterValue != null)
                             {
                                 setScaleTypeMethod.Invoke(previewView, new[] { fillCenterValue });
@@ -406,7 +417,7 @@ public partial class QrPage : ContentPage
         try
         {
             var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
-            
+
             if (status == PermissionStatus.Granted)
             {
                 System.Diagnostics.Debug.WriteLine("[QrPage] Разрешение на камеру уже предоставлено");
@@ -422,7 +433,7 @@ public partial class QrPage : ContentPage
             // Запрашиваем разрешение
             status = await Permissions.RequestAsync<Permissions.Camera>();
             var granted = status == PermissionStatus.Granted;
-            
+
             System.Diagnostics.Debug.WriteLine($"[QrPage] Результат запроса разрешения на камеру: {status} (granted: {granted})");
             return granted;
         }
@@ -439,9 +450,6 @@ public partial class QrPage : ContentPage
         var result = e.Results?.FirstOrDefault();
         if (result == null || _isProcessing)
             return;
-
-        if (!await _processQrLock.WaitAsync(0))
-            return; // Уже обрабатывается
 
         _isProcessing = true;
 
@@ -462,7 +470,7 @@ public partial class QrPage : ContentPage
                     try
                     {
                         var qrData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(scannedQrCode);
-                        
+
                         if (qrData != null && qrData.ContainsKey("partner_id"))
                         {
                             var partnerIdElement = qrData["partner_id"];
@@ -477,12 +485,12 @@ public partial class QrPage : ContentPage
                                     partnerIdFromQr = parsedId;
                                 }
                             }
-                            
+
                             if (qrData.ContainsKey("partner_name"))
                             {
                                 partnerNameFromQr = qrData["partner_name"].GetString();
                             }
-                            
+
                             _logger?.LogInformation("Извлечен partner_id из QR: {PartnerId}", partnerIdFromQr);
                         }
                         else
@@ -499,31 +507,31 @@ public partial class QrPage : ContentPage
                         _logger?.LogWarning(parseEx, "Ошибка парсинга QR кода как JSON");
                     }
 
-                    // Получаем список всех партнёров (используем кэш)
-                    var partners = await GetCachedPartnersAsync();
-                    
+                    // Получаем список всех партнёров
+                    var partners = await _partnersService.GetAllAsync();
+
                     // Если удалось извлечь partner_id из JSON, ищем по ID
                     if (partnerIdFromQr.HasValue)
                     {
                         matchedPartner = partners.FirstOrDefault(p => p.Id == partnerIdFromQr.Value);
-                        
+
                         if (matchedPartner != null)
                         {
-                            _logger?.LogInformation("Найден партнёр по ID из QR: {PartnerId} - {PartnerName}", 
+                            _logger?.LogInformation("Найден партнёр по ID из QR: {PartnerId} - {PartnerName}",
                                 matchedPartner.Id, matchedPartner.Name);
                         }
                     }
-                    
+
                     // Если не нашли по ID, пробуем найти по QrCodeUrl (обратная совместимость)
                     if (matchedPartner == null)
                     {
-                        matchedPartner = partners.FirstOrDefault(p => 
-                            !string.IsNullOrWhiteSpace(p.QrCodeUrl) && 
+                        matchedPartner = partners.FirstOrDefault(p =>
+                            !string.IsNullOrWhiteSpace(p.QrCodeUrl) &&
                             p.QrCodeUrl.Equals(scannedQrCode, StringComparison.OrdinalIgnoreCase));
-                        
+
                         if (matchedPartner != null)
                         {
-                            _logger?.LogInformation("Найден партнёр по QrCodeUrl: {PartnerId} - {PartnerName}", 
+                            _logger?.LogInformation("Найден партнёр по QrCodeUrl: {PartnerId} - {PartnerName}",
                                 matchedPartner.Id, matchedPartner.Name);
                         }
                     }
@@ -531,31 +539,30 @@ public partial class QrPage : ContentPage
                     if (matchedPartner != null)
                     {
                         _logger?.LogInformation("Найден партнёр: {PartnerId} - {PartnerName}", matchedPartner.Id, matchedPartner.Name);
-                        
+
                         // Переходим на страницу оплаты с параметрами партнёра
                         var partnerNameParam = Uri.EscapeDataString(matchedPartner.Name ?? "");
                         var qrCodeParam = Uri.EscapeDataString(scannedQrCode);
-                        
+
                         await Shell.Current.GoToAsync($"payment?partnerId={matchedPartner.Id}&partnerName={partnerNameParam}&qrCode={qrCodeParam}");
                     }
                     else
                     {
-                        _logger?.LogWarning("Партнёр с QR кодом не найден. PartnerId из QR: {PartnerId}, QrCode: {QrCode}", 
+                        _logger?.LogWarning("Партнёр с QR кодом не найден. PartnerId из QR: {PartnerId}, QrCode: {QrCode}",
                             partnerIdFromQr, scannedQrCode);
-                        await DisplayAlert("QR код не найден", 
+                        await DisplayAlert("QR код не найден",
                             "Данный QR код не соответствует ни одному партнёру.", "OK");
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Ошибка обработки QR кода");
-                    await DisplayAlert("Ошибка", 
+                    await DisplayAlert("Ошибка",
                         "Не удалось обработать QR код. Попробуйте ещё раз.", "OK");
                 }
                 finally
                 {
                     _isProcessing = false;
-                    _processQrLock.Release();
                 }
             });
         }
@@ -563,36 +570,6 @@ public partial class QrPage : ContentPage
         {
             _logger?.LogError(ex, "Ошибка при сканировании QR");
             _isProcessing = false;
-            _processQrLock.Release();
         }
-    }
-
-    private async Task<List<PartnerDto>> GetCachedPartnersAsync()
-    {
-        if (_cachedPartners != null && 
-            (DateTime.Now - _lastPartnersUpdate).TotalSeconds < PartnersCacheSeconds)
-        {
-            return _cachedPartners;
-        }
-        
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            var partners = await _partnersService.GetAllAsync();
-            // Преобразуем IReadOnlyList в List
-            _cachedPartners = partners?.ToList() ?? new List<PartnerDto>();
-            _lastPartnersUpdate = DateTime.Now;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Ошибка загрузки партнеров для QR");
-            // Возвращаем старый кэш, если есть
-            if (_cachedPartners != null)
-                return _cachedPartners;
-            // Иначе возвращаем пустой список
-            return new List<PartnerDto>();
-        }
-        
-        return _cachedPartners;
     }
 }

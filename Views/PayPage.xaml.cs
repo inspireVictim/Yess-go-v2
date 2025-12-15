@@ -45,7 +45,8 @@ public partial class PayPage : ContentPage
             Debug.WriteLine("[PayPage] Navigating to QrPage");
             if (Shell.Current != null)
             {
-                await Shell.Current.GoToAsync("///qr", animate: true);
+                // Используем единый и стабильный маршрут таба QR
+                await Shell.Current.GoToAsync("//main/qr", animate: true);
             }
         }
         catch (Exception ex)

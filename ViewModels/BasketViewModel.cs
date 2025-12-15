@@ -22,6 +22,7 @@ public partial class BasketViewModel : ObservableObject
     private readonly ICartService _cartService;
     private readonly IPartnersService _partnersService;
     private readonly ILogger<BasketViewModel>? _logger;
+    private readonly SemaphoreSlim _updateQuantityLock = new(1, 1);
 
     [ObservableProperty]
     private bool isBusy;
@@ -44,14 +45,28 @@ public partial class BasketViewModel : ObservableObject
     {
         try
         {
+            if (_cartService == null)
+            {
+                _logger?.LogError("CartService is null");
+                IsEmpty = true;
+                return;
+            }
+
             IsBusy = true;
             IsEmpty = false;
 
             var itemsByPartner = await _cartService.GetCartItemsByPartnerAsync();
             
+            if (PartnerGroups == null)
+            {
+                _logger?.LogError("PartnerGroups is null");
+                IsEmpty = true;
+                return;
+            }
+
             PartnerGroups.Clear();
 
-            if (!itemsByPartner.Any())
+            if (itemsByPartner == null || !itemsByPartner.Any())
             {
                 IsEmpty = true;
                 return;
@@ -59,6 +74,9 @@ public partial class BasketViewModel : ObservableObject
 
             foreach (var (partnerId, items) in itemsByPartner)
             {
+                if (items == null || !items.Any())
+                    continue;
+
                 var partnerName = items.FirstOrDefault()?.PartnerName ?? "Неизвестный партнёр";
                 var partnerLogoUrl = items.FirstOrDefault()?.PartnerLogoUrl;
                 
@@ -71,15 +89,15 @@ public partial class BasketViewModel : ObservableObject
                 };
 
                 // Вычисляем итоговые суммы для группы
-                group.TotalPrice = items.Sum(item => item.TotalPrice);
-                group.TotalYessCoins = items.Sum(item => item.TotalYessCoins);
+                group.TotalPrice = items.Sum(item => item?.TotalPrice ?? 0);
+                group.TotalYessCoins = items.Sum(item => item?.TotalYessCoins ?? 0);
                 group.TotalDiscount = items
-                    .Where(item => item.OriginalPrice.HasValue)
+                    .Where(item => item != null && item.OriginalPrice.HasValue)
                     .Sum(item => (item.OriginalPrice.Value - item.Price) * item.Quantity);
                 
                 // Вычисляем процент скидки
                 var totalOriginalPrice = items
-                    .Where(item => item.OriginalPrice.HasValue)
+                    .Where(item => item != null && item.OriginalPrice.HasValue)
                     .Sum(item => item.OriginalPrice.Value * item.Quantity);
                 
                 if (totalOriginalPrice > 0)
@@ -88,19 +106,22 @@ public partial class BasketViewModel : ObservableObject
                 }
 
                 // Загружаем координаты партнёра
-                try
+                if (_partnersService != null)
                 {
-                    var partner = await _partnersService.GetPartnerByIdAsync(partnerId.ToString());
-                    if (partner != null)
+                    try
                     {
-                        group.PartnerLatitude = partner.Latitude;
-                        group.PartnerLongitude = partner.Longitude;
-                        group.PartnerAddress = partner.Address;
+                        var partner = await _partnersService.GetPartnerByIdAsync(partnerId.ToString());
+                        if (partner != null)
+                        {
+                            group.PartnerLatitude = partner.Latitude;
+                            group.PartnerLongitude = partner.Longitude;
+                            group.PartnerAddress = partner.Address;
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Failed to load partner coordinates for partner {PartnerId}", partnerId);
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to load partner coordinates for partner {PartnerId}", partnerId);
+                    }
                 }
 
                 PartnerGroups.Add(group);
@@ -111,12 +132,20 @@ public partial class BasketViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error loading cart");
-            if (Application.Current?.MainPage != null)
+            IsEmpty = true;
+            try
             {
-                await Application.Current.MainPage.DisplayAlert(
-                    "Ошибка",
-                    "Не удалось загрузить корзину",
-                    "OK");
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Не удалось загрузить корзину",
+                        "OK");
+                }
+            }
+            catch (Exception alertEx)
+            {
+                _logger?.LogError(alertEx, "Error showing alert");
             }
         }
         finally
@@ -127,31 +156,37 @@ public partial class BasketViewModel : ObservableObject
 
     /// <summary>
     /// Обновляет количество товара в коллекции без перезагрузки всей корзины
+    /// Выполняется на главном потоке для безопасности
     /// </summary>
-    private void UpdateCartItemInCollection(int productId, int newQuantity)
+    private async void UpdateCartItemInCollection(int productId, int newQuantity)
     {
-        foreach (var group in PartnerGroups)
+        await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            var cartItem = group.Items.FirstOrDefault(i => i.ProductId == productId);
-            if (cartItem != null)
+            try
             {
-                // Обновляем количество
-                cartItem.Quantity = newQuantity;
-                
-                // Пересчитываем итоги группы
-                group.RecalculateTotals();
-                
-                // Уведомляем ObservableCollection об изменении элемента
-                // Для этого заменяем элемент на новый (это вызовет уведомление)
-                var index = group.Items.IndexOf(cartItem);
-                if (index >= 0)
+                foreach (var group in PartnerGroups)
                 {
-                    group.Items[index] = cartItem; // Это вызовет CollectionChanged
+                    var cartItem = group.Items.FirstOrDefault(i => i.ProductId == productId);
+                    if (cartItem != null)
+                    {
+                        // Обновляем количество (это автоматически вызовет OnPropertyChanged от CartItem)
+                        cartItem.Quantity = newQuantity;
+                        
+                        // Пересчитываем итоги группы
+                        group.RecalculateTotals();
+                        
+                        // НЕ заменяем элемент в коллекции - это нарушает привязки
+                        // Вместо этого полагаемся на OnPropertyChanged от CartItem
+                        
+                        break;
+                    }
                 }
-                
-                break;
             }
-        }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Ошибка обновления количества в коллекции");
+            }
+        });
     }
 
     [RelayCommand]
@@ -159,6 +194,12 @@ public partial class BasketViewModel : ObservableObject
     {
         if (item == null)
             return;
+
+        if (_cartService == null)
+        {
+            _logger?.LogError("CartService is null");
+            return;
+        }
 
         try
         {
@@ -168,12 +209,19 @@ public partial class BasketViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error removing item from cart");
-            if (Application.Current?.MainPage != null)
+            try
             {
-                await Application.Current.MainPage.DisplayAlert(
-                    "Ошибка",
-                    "Не удалось удалить товар из корзины",
-                    "OK");
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Не удалось удалить товар из корзины",
+                        "OK");
+                }
+            }
+            catch (Exception alertEx)
+            {
+                _logger?.LogError(alertEx, "Error showing alert");
             }
         }
     }
@@ -184,24 +232,44 @@ public partial class BasketViewModel : ObservableObject
         if (item == null)
             return;
 
+        if (_cartService == null)
+        {
+            _logger?.LogError("CartService is null");
+            return;
+        }
+
+        if (!await _updateQuantityLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
         try
         {
             var newQuantity = item.Quantity + 1;
             await _cartService.UpdateQuantityAsync(item.ProductId, newQuantity);
             
-            // Обновляем только изменённый элемент в коллекции без перезагрузки всей корзины
+            // Обновляем на главном потоке
             UpdateCartItemInCollection(item.ProductId, newQuantity);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error increasing quantity");
-            if (Application.Current?.MainPage != null)
+            try
             {
-                await Application.Current.MainPage.DisplayAlert(
-                    "Ошибка",
-                    "Не удалось изменить количество",
-                    "OK");
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Не удалось изменить количество",
+                        "OK");
+                }
             }
+            catch (Exception alertEx)
+            {
+                _logger?.LogError(alertEx, "Error showing alert");
+            }
+        }
+        finally
+        {
+            _updateQuantityLock.Release();
         }
     }
 
@@ -210,6 +278,15 @@ public partial class BasketViewModel : ObservableObject
     {
         if (item == null)
             return;
+
+        if (_cartService == null)
+        {
+            _logger?.LogError("CartService is null");
+            return;
+        }
+
+        if (!await _updateQuantityLock.WaitAsync(0))
+            return; // Уже обрабатывается
 
         try
         {
@@ -222,20 +299,31 @@ public partial class BasketViewModel : ObservableObject
             {
                 await _cartService.UpdateQuantityAsync(item.ProductId, newQuantity);
                 
-                // Обновляем только изменённый элемент в коллекции без перезагрузки всей корзины
+                // Обновляем на главном потоке
                 UpdateCartItemInCollection(item.ProductId, newQuantity);
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error decreasing quantity");
-            if (Application.Current?.MainPage != null)
+            try
             {
-                await Application.Current.MainPage.DisplayAlert(
-                    "Ошибка",
-                    "Не удалось изменить количество",
-                    "OK");
+                if (Application.Current?.MainPage != null)
+                {
+                    await Application.Current.MainPage.DisplayAlert(
+                        "Ошибка",
+                        "Не удалось изменить количество",
+                        "OK");
+                }
             }
+            catch (Exception alertEx)
+            {
+                _logger?.LogError(alertEx, "Error showing alert");
+            }
+        }
+        finally
+        {
+            _updateQuantityLock.Release();
         }
     }
 
@@ -244,6 +332,26 @@ public partial class BasketViewModel : ObservableObject
     {
         try
         {
+            if (_partnersService == null)
+            {
+                _logger?.LogError("PartnersService is null");
+                try
+                {
+                    if (Application.Current?.MainPage != null)
+                    {
+                        await Application.Current.MainPage.DisplayAlert(
+                            "Ошибка",
+                            "Сервис партнёров недоступен",
+                            "OK");
+                    }
+                }
+                catch (Exception alertEx)
+                {
+                    _logger?.LogError(alertEx, "Error showing alert");
+                }
+                return;
+            }
+
             IsBusy = true;
 
             // Получаем информацию о партнёре
@@ -255,12 +363,19 @@ public partial class BasketViewModel : ObservableObject
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error loading partner {PartnerId}", partnerId);
-                if (Application.Current?.MainPage != null)
+                try
                 {
-                    await Application.Current.MainPage.DisplayAlert(
-                        "Ошибка",
-                        "Не удалось загрузить информацию о партнёре",
-                        "OK");
+                    if (Application.Current?.MainPage != null)
+                    {
+                        await Application.Current.MainPage.DisplayAlert(
+                            "Ошибка",
+                            "Не удалось загрузить информацию о партнёре",
+                            "OK");
+                    }
+                }
+                catch (Exception alertEx)
+                {
+                    _logger?.LogError(alertEx, "Error showing alert");
                 }
                 return;
             }
@@ -291,8 +406,13 @@ public partial class BasketViewModel : ObservableObject
             }
 
             // Получаем товары партнёра из корзины
-            var partnerGroup = PartnerGroups.FirstOrDefault(g => g.PartnerId == partnerId);
-            if (partnerGroup == null || !partnerGroup.Items.Any())
+            if (PartnerGroups == null)
+            {
+                _logger?.LogError("PartnerGroups is null");
+                return;
+            }
+            var partnerGroup = PartnerGroups.FirstOrDefault(g => g?.PartnerId == partnerId);
+            if (partnerGroup == null || partnerGroup.Items == null || !partnerGroup.Items.Any())
             {
                 if (Application.Current?.MainPage != null)
                 {

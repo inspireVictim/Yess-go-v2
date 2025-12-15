@@ -207,6 +207,18 @@ public partial class BasketPage : ContentPage
     {
         try
         {
+            if (_viewModel == null)
+            {
+                _logger?.LogWarning("ViewModel is null, cannot initialize maps");
+                return;
+            }
+
+            if (_mapViews == null)
+            {
+                _logger?.LogWarning("MapViews dictionary is null");
+                return;
+            }
+
             // Находим CollectionView
             var collectionView = this.FindByName<CollectionView>("PartnerGroupsCollectionView");
             if (collectionView == null)
@@ -222,11 +234,14 @@ public partial class BasketPage : ContentPage
 
             // Инициализируем карты для каждой группы партнёров
             // Ищем все Grid контейнеры карт через визуальное дерево
-            foreach (var group in _viewModel.PartnerGroups)
+            if (_viewModel.PartnerGroups != null)
             {
-                if (!_mapViews.ContainsKey(group.PartnerId))
+                foreach (var group in _viewModel.PartnerGroups)
                 {
-                    FindAndInitializeMapForPartner(collectionView, group);
+                    if (group != null && !_mapViews.ContainsKey(group.PartnerId))
+                    {
+                        FindAndInitializeMapForPartner(collectionView, group);
+                    }
                 }
             }
         }
@@ -262,15 +277,21 @@ public partial class BasketPage : ContentPage
     {
         try
         {
+            if (group == null || _mapViews == null)
+            {
+                _logger?.LogWarning("Group or MapViews is null");
+                return;
+            }
+
             // Ищем Grid с именем MapContainerGrid, у которого BindingContext равен нашей группе
             var grids = FindAllVisualElements<Grid>(parent);
             foreach (var grid in grids)
             {
-                if (grid.BindingContext is PartnerCartGroup gridGroup && 
+                if (grid?.BindingContext is PartnerCartGroup gridGroup && 
                     gridGroup.PartnerId == group.PartnerId)
                 {
                     // Проверяем, есть ли внутри Grid с именем MapContainer
-                    var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
+                    var mapContainer = grid.Children?.OfType<Grid>().FirstOrDefault();
                     if (mapContainer != null && !_mapViews.ContainsKey(group.PartnerId))
                     {
                         InitializeMapView(mapContainer, group);
@@ -281,7 +302,7 @@ public partial class BasketPage : ContentPage
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error finding map container for partner {PartnerId}", group.PartnerId);
+            _logger?.LogError(ex, "Error finding map container for partner {PartnerId}", group?.PartnerId ?? 0);
         }
     }
 
@@ -590,13 +611,33 @@ public partial class BasketPage : ContentPage
     {
         try
         {
-            if (sender is not MapView mapView || mapView.Map == null)
+            if (sender is not MapView mapView || mapView.Map == null || group == null)
                 return;
 
-            // Получаем координаты центра карты
-            var viewport = mapView.Map.Navigator.Viewport;
+            if (_geocodingTimers == null)
+            {
+                _logger?.LogWarning("GeocodingTimers dictionary is null");
+                return;
+            }
+
+            // Получаем центр карты через Navigator и Viewport (API Mapsui 4/5)
+            var map = mapView.Map;
+            if (map == null)
+                return;
+
+            var navigator = map.Navigator;
+            if (navigator == null)
+                return;
+
+            var viewport = navigator.Viewport;
+            if (viewport == null)
+                return;
+
+            // В Mapsui Viewport хранит центр через координаты CenterX/CenterY (в проекции Spherical Mercator)
             var centerX = viewport.CenterX;
             var centerY = viewport.CenterY;
+
+            // Преобразуем из Spherical Mercator в долготу/широту
             (double lon, double lat) = SphericalMercator.ToLonLat(centerX, centerY);
 
             // Обновляем выбранные координаты
@@ -606,7 +647,14 @@ public partial class BasketPage : ContentPage
             // Отменяем предыдущий таймер для этого партнёра
             if (_geocodingTimers.TryGetValue(group.PartnerId, out var oldTimer))
             {
-                oldTimer?.Dispose();
+                try
+                {
+                    oldTimer?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error disposing old geocoding timer");
+                }
             }
 
             // Создаём новый таймер с debounce (500ms)
@@ -619,12 +667,22 @@ public partial class BasketPage : ContentPage
                     
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        group.SelectedAddress = address;
-                        group.IsLocationSelected = !string.IsNullOrWhiteSpace(address);
+                        try
+                        {
+                            if (group != null)
+                            {
+                                group.SelectedAddress = address;
+                                group.IsLocationSelected = !string.IsNullOrWhiteSpace(address);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Error updating group properties on main thread");
+                        }
                     });
 
                     _logger?.LogDebug("Map viewport changed for partner {PartnerId}: {Lat}, {Lon}, Address: {Address}",
-                        group.PartnerId, lat, lon, address);
+                        group?.PartnerId ?? 0, lat, lon, address);
                 }
                 catch (Exception ex)
                 {
@@ -721,18 +779,45 @@ public partial class BasketPage : ContentPage
     {
         base.OnDisappearing();
         
-        // Очищаем таймеры
-        foreach (var timer in _geocodingTimers.Values)
+        try
         {
-            timer?.Dispose();
+            // Очищаем таймеры
+            if (_geocodingTimers != null)
+            {
+                foreach (var timer in _geocodingTimers.Values)
+                {
+                    try
+                    {
+                        timer?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error disposing geocoding timer");
+                    }
+                }
+                _geocodingTimers.Clear();
+            }
+            
+            // Очищаем карты
+            if (_mapViews != null)
+            {
+                foreach (var mapView in _mapViews.Values)
+                {
+                    try
+                    {
+                        mapView?.Map?.Layers?.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error clearing map layers");
+                    }
+                }
+                _mapViews.Clear();
+            }
         }
-        _geocodingTimers.Clear();
-        
-        // Очищаем карты
-        foreach (var mapView in _mapViews.Values)
+        catch (Exception ex)
         {
-            mapView?.Map?.Layers.Clear();
+            _logger?.LogError(ex, "Error in OnDisappearing");
         }
-        _mapViews.Clear();
     }
 }

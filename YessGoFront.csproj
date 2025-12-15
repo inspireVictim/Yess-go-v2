@@ -48,6 +48,10 @@
 		<SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
 		<AndroidMinSdkVersion>23</AndroidMinSdkVersion>
 
+		<!-- Важное: в Release не трогаем наши сборки (особенно ZXing), только системные -->
+		<!-- Это предотвращает вырезание кода камеры линкером и падения в Release -->
+		<AndroidLinkMode>SdkOnly</AndroidLinkMode>
+
 		<AndroidEnableProguard>false</AndroidEnableProguard>
 
 		<!-- 🔥 Эти строки ОЧЕНЬ важны -->

@@ -118,13 +118,42 @@ public partial class PartnerDetailViewModel : ObservableObject
     
     public ObservableCollection<string> Categories { get; } = new();
     
+    private string? _selectedCategory;
+    
+    // Явное объявление свойства для совместимости
+    public string? SelectedCategory
+    {
+        get => _selectedCategory;
+        set => SetProperty(ref _selectedCategory, value);
+    }
+
+    // Отзывы
+    public ObservableCollection<ReviewDto> Reviews { get; } = new();
+    
     [ObservableProperty]
-    private string? selectedCategory;
+    private bool isReviewFormVisible;
+    
+    [ObservableProperty]
+    private int reviewRating = 5;
+    
+    [ObservableProperty]
+    private string reviewText = string.Empty;
+    
+    [ObservableProperty]
+    private string reviewAuthorName = string.Empty;
+
+    // Статическое хранилище отзывов (локально в памяти)
+    private static readonly Dictionary<int, List<ReviewDto>> _reviewsStorage = new();
+    private static int _nextReviewId = 1;
 
     public IAsyncRelayCommand<int> LoadPartnerCommand { get; }
     public IAsyncRelayCommand GoBackCommand { get; }
     public IAsyncRelayCommand<ProductDto> AddToCartCommand { get; }
     public IRelayCommand<string> SelectTabCommand { get; }
+    public IRelayCommand ShowReviewFormCommand { get; }
+    public IRelayCommand HideReviewFormCommand { get; }
+    public IAsyncRelayCommand SubmitReviewCommand { get; }
+    public IRelayCommand<string> SelectRatingCommand { get; }
 
     public PartnerDetailViewModel(
         IPartnersService partnersService,
@@ -140,6 +169,18 @@ public partial class PartnerDetailViewModel : ObservableObject
         AddToCartCommand = new AsyncRelayCommand<ProductDto>(AddToCartAsync);
         SelectTabCommand = new RelayCommand<string>(SelectTab);
         SelectCategoryCommand = new RelayCommand<string>(SelectCategory);
+        ShowReviewFormCommand = new RelayCommand(ShowReviewForm);
+        HideReviewFormCommand = new RelayCommand(HideReviewForm);
+        SubmitReviewCommand = new AsyncRelayCommand(SubmitReviewAsync);
+        SelectRatingCommand = new RelayCommand<string>(SelectRating);
+    }
+    
+    private void SelectRating(string? ratingStr)
+    {
+        if (int.TryParse(ratingStr, out int rating) && rating >= 1 && rating <= 5)
+        {
+            ReviewRating = rating;
+        }
     }
     
     public IRelayCommand<string> SelectCategoryCommand { get; }
@@ -209,9 +250,12 @@ public partial class PartnerDetailViewModel : ObservableObject
 
             // Загружаем продукты
             await LoadProductsAsync(partnerId);
+            
+            // Загружаем отзывы
+            LoadReviews(partnerId);
 
-            _logger?.LogDebug("Partner {PartnerId} loaded successfully. Products count: {Count}", 
-                partnerId, Products.Count);
+            _logger?.LogDebug("Partner {PartnerId} loaded successfully. Products count: {Count}, Reviews count: {ReviewsCount}", 
+                partnerId, Products.Count, Reviews.Count);
         }
         catch (Exception ex)
         {
@@ -487,6 +531,118 @@ public partial class PartnerDetailViewModel : ObservableObject
                 await Application.Current.MainPage.DisplayAlert(
                     "Ошибка", 
                     "Не удалось добавить продукт в корзину", 
+                    "OK");
+            }
+        }
+    }
+
+    private void LoadReviews(int partnerId)
+    {
+        Reviews.Clear();
+        
+        if (_reviewsStorage.TryGetValue(partnerId, out var partnerReviews))
+        {
+            foreach (var review in partnerReviews.OrderByDescending(r => r.CreatedAt))
+            {
+                Reviews.Add(review);
+            }
+        }
+        
+        _logger?.LogInformation("Loaded {Count} reviews for partner {PartnerId}", Reviews.Count, partnerId);
+    }
+
+    private void ShowReviewForm()
+    {
+        IsReviewFormVisible = true;
+        ReviewRating = 5;
+        ReviewText = string.Empty;
+        ReviewAuthorName = string.Empty;
+    }
+
+    private void HideReviewForm()
+    {
+        IsReviewFormVisible = false;
+        ReviewRating = 5;
+        ReviewText = string.Empty;
+        ReviewAuthorName = string.Empty;
+    }
+
+    private async Task SubmitReviewAsync()
+    {
+        if (Partner == null)
+            return;
+
+        // Валидация
+        if (ReviewRating < 1 || ReviewRating > 5)
+        {
+            if (Application.Current?.MainPage != null)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Ошибка",
+                    "Рейтинг должен быть от 1 до 5",
+                    "OK");
+            }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ReviewText))
+        {
+            if (Application.Current?.MainPage != null)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Ошибка",
+                    "Пожалуйста, введите текст отзыва",
+                    "OK");
+            }
+            return;
+        }
+
+        try
+        {
+            // Создаём новый отзыв
+            var review = new ReviewDto
+            {
+                Id = _nextReviewId++,
+                PartnerId = Partner.Id,
+                AuthorName = string.IsNullOrWhiteSpace(ReviewAuthorName) ? "Анонимный пользователь" : ReviewAuthorName.Trim(),
+                Rating = ReviewRating,
+                Text = ReviewText.Trim(),
+                CreatedAt = DateTime.Now
+            };
+
+            // Сохраняем в локальное хранилище
+            if (!_reviewsStorage.ContainsKey(Partner.Id))
+            {
+                _reviewsStorage[Partner.Id] = new List<ReviewDto>();
+            }
+            
+            _reviewsStorage[Partner.Id].Add(review);
+            
+            // Обновляем коллекцию отзывов
+            Reviews.Insert(0, review);
+            
+            // Закрываем форму
+            HideReviewForm();
+            
+            _logger?.LogInformation("Review submitted for partner {PartnerId}: Rating={Rating}, Text length={Length}", 
+                Partner.Id, ReviewRating, ReviewText.Length);
+            
+            if (Application.Current?.MainPage != null)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Спасибо!",
+                    "Ваш отзыв успешно добавлен",
+                    "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error submitting review for partner {PartnerId}", Partner.Id);
+            if (Application.Current?.MainPage != null)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Ошибка",
+                    "Не удалось отправить отзыв. Попробуйте позже.",
                     "OK");
             }
         }

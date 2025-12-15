@@ -15,6 +15,8 @@
             <converters:IsNullConverter x:Key="IsNullConverter" />
             <converters:StringEqualsConverter x:Key="StringEqualsConverter" />
             <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <converters:InverseIntToBoolConverter x:Key="InverseIntToBoolConverter" />
+            <converters:RatingToColorConverter x:Key="RatingToColorConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -383,18 +385,186 @@
                         </DataTrigger>
                     </VerticalStackLayout.Triggers>
 
-                    <Label Text="Отзывы"
-                           FontSize="20"
-                           FontAttributes="Bold"
-                           TextColor="Black"
-                           Margin="0,8,0,8"/>
+                    <!-- Заголовок и кнопка -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,8">
+                        <Label Grid.Column="0"
+                               Text="Отзывы"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               TextColor="Black"
+                               VerticalOptions="Center"/>
+                        <Button Grid.Column="1"
+                                Text="Оставить отзыв"
+                                Command="{Binding ShowReviewFormCommand}"
+                                BackgroundColor="#0B4A3B"
+                                TextColor="White"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                CornerRadius="8"
+                                Padding="16,8"
+                                VerticalOptions="Center"/>
+                    </Grid>
 
-                    <!-- Заглушка для отзывов (пока нет данных) -->
+                    <!-- Форма отзыва -->
                     <Frame BackgroundColor="White"
                            CornerRadius="12"
                            Padding="16"
                            Margin="0,0,0,12"
-                           HasShadow="True">
+                           HasShadow="True"
+                           IsVisible="{Binding IsReviewFormVisible}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="Оставить отзыв"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="Black"/>
+                            
+                            <!-- Имя автора (опционально) -->
+                            <Entry Text="{Binding ReviewAuthorName}"
+                                   Placeholder="Ваше имя (необязательно)"
+                                   FontSize="14"
+                                   BackgroundColor="#F5F5F5"
+                                   PlaceholderColor="#999"/>
+                            
+                            <!-- Рейтинг -->
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Оценка:"
+                                       FontSize="14"
+                                       TextColor="#666"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Button Text="1"
+                                            FontSize="16"
+                                            CornerRadius="20"
+                                            WidthRequest="40"
+                                            HeightRequest="40"
+                                            BackgroundColor="{Binding ReviewRating, Converter={StaticResource RatingToColorConverter}, ConverterParameter=1}"
+                                            TextColor="White"
+                                            Command="{Binding SelectRatingCommand}"
+                                            CommandParameter="1"/>
+                                    <Button Text="2"
+                                            FontSize="16"
+                                            CornerRadius="20"
+                                            WidthRequest="40"
+                                            HeightRequest="40"
+                                            BackgroundColor="{Binding ReviewRating, Converter={StaticResource RatingToColorConverter}, ConverterParameter=2}"
+                                            TextColor="White"
+                                            Command="{Binding SelectRatingCommand}"
+                                            CommandParameter="2"/>
+                                    <Button Text="3"
+                                            FontSize="16"
+                                            CornerRadius="20"
+                                            WidthRequest="40"
+                                            HeightRequest="40"
+                                            BackgroundColor="{Binding ReviewRating, Converter={StaticResource RatingToColorConverter}, ConverterParameter=3}"
+                                            TextColor="White"
+                                            Command="{Binding SelectRatingCommand}"
+                                            CommandParameter="3"/>
+                                    <Button Text="4"
+                                            FontSize="16"
+                                            CornerRadius="20"
+                                            WidthRequest="40"
+                                            HeightRequest="40"
+                                            BackgroundColor="{Binding ReviewRating, Converter={StaticResource RatingToColorConverter}, ConverterParameter=4}"
+                                            TextColor="White"
+                                            Command="{Binding SelectRatingCommand}"
+                                            CommandParameter="4"/>
+                                    <Button Text="5"
+                                            FontSize="16"
+                                            CornerRadius="20"
+                                            WidthRequest="40"
+                                            HeightRequest="40"
+                                            BackgroundColor="{Binding ReviewRating, Converter={StaticResource RatingToColorConverter}, ConverterParameter=5}"
+                                            TextColor="White"
+                                            Command="{Binding SelectRatingCommand}"
+                                            CommandParameter="5"/>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                            
+                            <!-- Текст отзыва -->
+                            <Editor Text="{Binding ReviewText}"
+                                    Placeholder="Напишите ваш отзыв..."
+                                    FontSize="14"
+                                    BackgroundColor="#F5F5F5"
+                                    PlaceholderColor="#999"
+                                    HeightRequest="100"
+                                    AutoSize="TextChanges"/>
+                            
+                            <!-- Кнопки -->
+                            <HorizontalStackLayout Spacing="12">
+                                <Button Text="Отмена"
+                                        Command="{Binding HideReviewFormCommand}"
+                                        BackgroundColor="#E0E0E0"
+                                        TextColor="#666"
+                                        FontSize="14"
+                                        CornerRadius="8"
+                                        Padding="16,8"
+                                        HorizontalOptions="FillAndExpand"/>
+                                <Button Text="Отправить"
+                                        Command="{Binding SubmitReviewCommand}"
+                                        BackgroundColor="#0B4A3B"
+                                        TextColor="White"
+                                        FontSize="14"
+                                        FontAttributes="Bold"
+                                        CornerRadius="8"
+                                        Padding="16,8"
+                                        HorizontalOptions="FillAndExpand"/>
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Список отзывов -->
+                    <CollectionView ItemsSource="{Binding Reviews}"
+                                    SelectionMode="None"
+                                    IsVisible="{Binding Reviews.Count, Converter={StaticResource IntToBoolConverter}}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame BackgroundColor="White"
+                                       CornerRadius="12"
+                                       Padding="16"
+                                       Margin="0,0,0,12"
+                                       HasShadow="True">
+                                    <VerticalStackLayout Spacing="8">
+                                        <!-- Заголовок отзыва -->
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                                <Label Text="{Binding AuthorName}"
+                                                       FontSize="16"
+                                                       FontAttributes="Bold"
+                                                       TextColor="Black"/>
+                                                <Label Text="{Binding CreatedAt, StringFormat='{0:dd.MM.yyyy HH:mm}'}"
+                                                       FontSize="12"
+                                                       TextColor="#999"/>
+                                            </VerticalStackLayout>
+                                            <!-- Рейтинг -->
+                                            <HorizontalStackLayout Grid.Column="1" Spacing="2">
+                                                <Label Text="⭐"
+                                                       FontSize="16"
+                                                       VerticalOptions="Center"/>
+                                                <Label Text="{Binding Rating}"
+                                                       FontSize="16"
+                                                       FontAttributes="Bold"
+                                                       TextColor="#FF9800"
+                                                       VerticalOptions="Center"/>
+                                            </HorizontalStackLayout>
+                                        </Grid>
+                                        
+                                        <!-- Текст отзыва -->
+                                        <Label Text="{Binding Text}"
+                                               FontSize="14"
+                                               TextColor="#666"
+                                               LineBreakMode="WordWrap"/>
+                                    </VerticalStackLayout>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Заглушка, если отзывов нет -->
+                    <Frame BackgroundColor="White"
+                           CornerRadius="12"
+                           Padding="16"
+                           Margin="0,0,0,12"
+                           HasShadow="True"
+                           IsVisible="{Binding Reviews.Count, Converter={StaticResource InverseIntToBoolConverter}}">
                         <VerticalStackLayout Spacing="8">
                             <Label Text="Отзывы пока отсутствуют"
                                    FontSize="14"

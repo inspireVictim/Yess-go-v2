@@ -1,11 +1,12 @@
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace YessGoFront.Models;
 
 /// <summary>
 /// Элемент корзины
 /// </summary>
-public class CartItem
+public partial class CartItem : ObservableObject
 {
     [JsonPropertyName("product_id")]
     public int ProductId { get; set; }
@@ -40,8 +41,25 @@ public class CartItem
     [JsonPropertyName("yess_coins")]
     public decimal? YessCoins { get; set; }
 
+    private int _quantity = 1;
+
+    /// <summary>
+    /// Количество товара (уведомляет UI об изменениях)
+    /// </summary>
     [JsonPropertyName("quantity")]
-    public int Quantity { get; set; } = 1;
+    public int Quantity
+    {
+        get => _quantity;
+        set
+        {
+            if (SetProperty(ref _quantity, value))
+            {
+                // Уведомляем об изменении вычисляемых свойств
+                OnPropertyChanged(nameof(TotalPrice));
+                OnPropertyChanged(nameof(TotalYessCoins));
+            }
+        }
+    }
 
     /// <summary>
     /// Общая цена за все единицы товара

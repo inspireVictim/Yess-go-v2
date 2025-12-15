@@ -388,6 +388,17 @@ public partial class BasketPage : ContentPage
                     // Подписываемся на изменение центра карты
                     map.Navigator.ViewportChanged += (s, args) => OnMapViewportChanged(mapView, group);
 
+                    // Принудительно обновляем карту
+                    try
+                    {
+                        mapView.Map?.Refresh();
+                        Debug.WriteLine($"[BasketPage] Map refreshed for partner {group.PartnerId}");
+                    }
+                    catch (Exception invEx)
+                    {
+                        Debug.WriteLine($"[BasketPage] Warning: Could not refresh map: {invEx.Message}");
+                    }
+
                     _logger?.LogInformation("Map initialized for partner {PartnerId}", group.PartnerId);
                     Debug.WriteLine($"[BasketPage] Map initialized for partner {group.PartnerId}");
                 }
@@ -406,6 +417,19 @@ public partial class BasketPage : ContentPage
             {
                 try
                 {
+                    // Проверяем, что MapView имеет правильные размеры
+                    if (mapView.Width <= 0 || mapView.Height <= 0)
+                    {
+                        Debug.WriteLine($"[BasketPage] Warning: MapView has invalid size: {mapView.Width}x{mapView.Height}");
+                        // Пытаемся установить размеры из контейнера
+                        if (mapContainer.Width > 0 && mapContainer.Height > 0)
+                        {
+                            mapView.WidthRequest = mapContainer.Width;
+                            mapView.HeightRequest = mapContainer.Height;
+                            Debug.WriteLine($"[BasketPage] Set MapView size from container: {mapContainer.Width}x{mapContainer.Height}");
+                        }
+                    }
+
                     if (group.PartnerLatitude.HasValue && group.PartnerLongitude.HasValue)
                     {
                         CenterMapOnPartner(mapView, group);
@@ -415,6 +439,17 @@ public partial class BasketPage : ContentPage
                     {
                         CenterMapOnDefaultLocation(mapView);
                         Debug.WriteLine($"[BasketPage] Map centered on default location for partner {group.PartnerId}");
+                    }
+
+                    // Принудительно обновляем карту после центрирования
+                    try
+                    {
+                        mapView.Map?.Refresh();
+                        Debug.WriteLine($"[BasketPage] Map refreshed after centering for partner {group.PartnerId}");
+                    }
+                    catch (Exception invEx)
+                    {
+                        Debug.WriteLine($"[BasketPage] Warning: Could not refresh map after centering: {invEx.Message}");
                     }
                 }
                 catch (Exception ex)

@@ -75,24 +75,15 @@ public partial class BasketPage : ContentPage
         if (_viewModel != null)
         {
             await _viewModel.LoadCartCommand.ExecuteAsync(null);
-            // Инициализируем карты после загрузки
-            await Task.Delay(1000); // Задержка для рендеринга UI
-            InitializeMaps();
+            // Карты будут инициализированы лениво через OnMapContainerGridLoaded
+            // Не вызываем InitializeMaps здесь, чтобы избежать задержек
         }
     }
 
     private void OnPartnerGroupsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        // Инициализируем карты при изменении коллекции
-        if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add || 
-            e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await Task.Delay(1000); // Задержка для рендеринга UI
-                InitializeMaps();
-            });
-        }
+        // Карты будут инициализированы лениво через OnMapContainerGridLoaded
+        // Не вызываем InitializeMaps здесь, чтобы избежать задержек и рекурсивного поиска
     }
 
     public async void OnBackButtonClicked(object sender, EventArgs e)
@@ -203,134 +194,9 @@ public partial class BasketPage : ContentPage
         }
     }
 
-    private void InitializeMaps()
-    {
-        try
-        {
-            if (_viewModel == null)
-            {
-                _logger?.LogWarning("ViewModel is null, cannot initialize maps");
-                return;
-            }
-
-            if (_mapViews == null)
-            {
-                _logger?.LogWarning("MapViews dictionary is null");
-                return;
-            }
-
-            // Находим CollectionView
-            var collectionView = this.FindByName<CollectionView>("PartnerGroupsCollectionView");
-            if (collectionView == null)
-            {
-                collectionView = FindVisualElement<CollectionView>(this);
-            }
-
-            if (collectionView == null)
-            {
-                _logger?.LogWarning("CollectionView not found for map initialization");
-                return;
-            }
-
-            // Инициализируем карты для каждой группы партнёров
-            // Ищем все Grid контейнеры карт через визуальное дерево
-            if (_viewModel.PartnerGroups != null)
-            {
-                foreach (var group in _viewModel.PartnerGroups)
-                {
-                    if (group != null && !_mapViews.ContainsKey(group.PartnerId))
-                    {
-                        FindAndInitializeMapForPartner(collectionView, group);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error initializing maps");
-            Debug.WriteLine($"[BasketPage] Error initializing maps: {ex.Message}");
-        }
-    }
-
-    private T? FindVisualElement<T>(VisualElement parent) where T : VisualElement
-    {
-        if (parent is T result)
-            return result;
-
-        if (parent is Layout layout)
-        {
-            foreach (var child in layout.Children)
-            {
-                if (child is VisualElement visualChild)
-                {
-                    var found = FindVisualElement<T>(visualChild);
-                    if (found != null)
-                        return found;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private void FindAndInitializeMapForPartner(VisualElement parent, PartnerCartGroup group)
-    {
-        try
-        {
-            if (group == null || _mapViews == null)
-            {
-                _logger?.LogWarning("Group or MapViews is null");
-                return;
-            }
-
-            // Ищем Grid с именем MapContainerGrid, у которого BindingContext равен нашей группе
-            var grids = FindAllVisualElements<Grid>(parent);
-            foreach (var grid in grids)
-            {
-                if (grid?.BindingContext is PartnerCartGroup gridGroup && 
-                    gridGroup.PartnerId == group.PartnerId)
-                {
-                    // Проверяем, есть ли внутри Grid с именем MapContainer
-                    var mapContainer = grid.Children?.OfType<Grid>().FirstOrDefault();
-                    if (mapContainer != null && !_mapViews.ContainsKey(group.PartnerId))
-                    {
-                        InitializeMapView(mapContainer, group);
-                        break;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error finding map container for partner {PartnerId}", group?.PartnerId ?? 0);
-        }
-    }
-
-    private List<T> FindAllVisualElements<T>(VisualElement parent) where T : VisualElement
-    {
-        var results = new List<T>();
-        FindAllVisualElementsRecursive(parent, results);
-        return results;
-    }
-
-    private void FindAllVisualElementsRecursive<T>(VisualElement parent, List<T> results) where T : VisualElement
-    {
-        if (parent is T result)
-        {
-            results.Add(result);
-        }
-
-        if (parent is Layout layout)
-        {
-            foreach (var child in layout.Children)
-            {
-                if (child is VisualElement visualChild)
-                {
-                    FindAllVisualElementsRecursive(visualChild, results);
-                }
-            }
-        }
-    }
+    // Удалены методы InitializeMaps, FindVisualElement, FindAndInitializeMapForPartner, 
+    // FindAllVisualElements, FindAllVisualElementsRecursive - они больше не нужны,
+    // так как инициализация карт происходит лениво через OnMapContainerGridLoaded
 
     private async void InitializeMapView(Grid mapContainer, PartnerCartGroup group)
     {
@@ -376,11 +242,7 @@ public partial class BasketPage : ContentPage
                 return;
             }
 
-            // Небольшая задержка перед инициализацией карты (как в MapPage)
-            // Это нужно для того, чтобы MapView успел полностью отрендериться
-            await Task.Delay(300);
-
-            // Инициализируем карту в главном потоке
+            // Инициализируем карту в главном потоке (без задержки - MapView уже добавлен)
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 try
@@ -430,10 +292,7 @@ public partial class BasketPage : ContentPage
                 }
             });
 
-            // Небольшая задержка перед центрированием карты
-            await Task.Delay(200);
-
-            // Центрируем карту в главном потоке
+            // Центрируем карту в главном потоке (без задержки)
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 try
@@ -745,12 +604,12 @@ public partial class BasketPage : ContentPage
             {
                 if (!_mapViews.ContainsKey(group.PartnerId))
                 {
-                    // Находим контейнер для карты
+                    // Находим контейнер для карты напрямую через Children (без рекурсивного поиска)
                     var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
                     if (mapContainer != null)
                     {
                         Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: Initializing map for partner {group.PartnerId}");
-                        // InitializeMapView сам управляет потоками и задержками
+                        // Инициализируем карту без задержек
                         InitializeMapView(mapContainer, group);
                     }
                     else

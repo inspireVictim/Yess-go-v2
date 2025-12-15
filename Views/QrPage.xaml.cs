@@ -118,9 +118,9 @@ public partial class QrPage : ContentPage
                         BarCodeReader.IsDetecting = true;
                         System.Diagnostics.Debug.WriteLine("[QrPage] Камера активирована");
 
-                        // Настраиваем камеру на высокое качество через небольшую задержку
-                        // чтобы камера успела инициализироваться
-                        Task.Delay(500).ContinueWith(async _ =>
+                        // Настраиваем камеру на высокое качество без задержки
+                        // (камера уже активирована, можно настраивать сразу)
+                        _ = Task.Run(async () =>
                         {
                             await ConfigureCameraForHighQuality();
                         });
@@ -187,13 +187,11 @@ public partial class QrPage : ContentPage
     {
         try
         {
+            // Настраиваем камеру без лишних вызовов MainThread (уже на правильном потоке)
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 try
                 {
-                    // Небольшая задержка для полной инициализации камеры ZXing
-                    await Task.Delay(300);
-
 #if ANDROID
                     await ConfigureCameraForHighQualityAndroid();
 #elif IOS

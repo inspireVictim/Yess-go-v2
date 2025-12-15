@@ -113,15 +113,9 @@ namespace YessGoFront.Views
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
 
-            // Обновляем баланс напрямую из Wallet.Balance через API (из базы данных)
-            // RefreshBalanceAsync загружает баланс без кэширования, обеспечивая актуальность данных
-            // Это гарантирует, что изменения в БД (включая ручное редактирование) сразу отображаются
             // Story timeline grid width
             if (BindingContext is MainPageViewModel viewModel)
             {
-                // Загружаем баланс напрямую из БД без кэширования
-                _ = viewModel.RefreshBalanceAsync();
-
                 var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
                 if (progressContainer != null)
                 {
@@ -131,8 +125,8 @@ namespace YessGoFront.Views
                         viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
                 }
 
-                // Принудительно обновляем данные пользователя и баланс при каждом появлении страницы
-                // Запускаем в фоне, чтобы не блокировать UI
+                // Оптимизация: загружаем данные пользователя и баланс параллельно в фоне
+                // Ограничиваем частоту вызовов, чтобы не перегружать сеть
                 if (!_isRefreshingUser)
                 {
                     _isRefreshingUser = true;
@@ -140,45 +134,48 @@ namespace YessGoFront.Views
                     {
                         try
                         {
-                            Debug.WriteLine("[MainPage] OnAppearing: Refreshing user data and balance...");
+                            Debug.WriteLine("[MainPage] OnAppearing: Refreshing user data and balance in parallel...");
                             
                             // Используем таймаут для обновления (15 секунд)
                             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                             
-                            await MainThread.InvokeOnMainThreadAsync(async () =>
-                            {
-                                try
+                            // Загружаем баланс и пользователя параллельно
+                            await Task.WhenAll(
+                                Task.Run(async () =>
                                 {
-                                    await viewModel.RefreshUserAsync();
-                                    Debug.WriteLine($"[MainPage] OnAppearing: User data refreshed - DisplayName={viewModel.DisplayName}, Phone={viewModel.Phone}, Balance={viewModel.Balance}");
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    Debug.WriteLine("[MainPage] OnAppearing: RefreshUserAsync timed out");
-                                    // Пытаемся загрузить хотя бы баланс при таймауте
                                     try
                                     {
-                                        await viewModel.LoadBalanceAsync();
+                                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                                        {
+                                            await viewModel.RefreshBalanceAsync();
+                                        });
                                     }
-                                    catch (Exception ex2)
+                                    catch (Exception ex)
                                     {
-                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance after timeout: {ex2.Message}");
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing balance: {ex.Message}");
                                     }
-                                }
-                                catch (Exception ex)
+                                }, cts.Token),
+                                Task.Run(async () =>
                                 {
-                                    Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing user data: {ex.Message}");
-                                    // Пытаемся загрузить хотя бы баланс, если обновление пользователя не удалось
                                     try
                                     {
-                                        await viewModel.LoadBalanceAsync();
+                                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                                        {
+                                            await viewModel.RefreshUserAsync();
+                                        });
                                     }
-                                    catch (Exception ex2)
+                                    catch (Exception ex)
                                     {
-                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance: {ex2.Message}");
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing user data: {ex.Message}");
                                     }
-                                }
-                            });
+                                }, cts.Token)
+                            );
+
+                            Debug.WriteLine($"[MainPage] OnAppearing: User data and balance refreshed - DisplayName={viewModel.DisplayName}, Phone={viewModel.Phone}, Balance={viewModel.Balance}");
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Debug.WriteLine("[MainPage] OnAppearing: Refresh operations timed out");
                         }
                         catch (Exception ex)
                         {

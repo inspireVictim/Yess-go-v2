@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
@@ -72,6 +73,24 @@ public partial class BasketViewModel : ObservableObject
                 return;
             }
 
+            // Оптимизация: загружаем всех партнёров одним батч-запросом вместо N+1 запросов
+            Dictionary<int, PartnerDetailDto>? partnersDict = null;
+            if (_partnersService != null)
+            {
+                try
+                {
+                    var partnerIds = itemsByPartner.Keys.Select(id => id.ToString()).ToList();
+                    var partners = await _partnersService.GetPartnersByIdsAsync(partnerIds);
+                    partnersDict = partners.ToDictionary(p => p.Id);
+                    _logger?.LogInformation("Loaded {Count} partners in batch for cart", partners.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to load partners in batch, will skip coordinates");
+                    // Продолжаем без координат партнёров
+                }
+            }
+
             foreach (var (partnerId, items) in itemsByPartner)
             {
                 if (items == null || !items.Any())
@@ -105,23 +124,12 @@ public partial class BasketViewModel : ObservableObject
                     group.DiscountPercent = (group.TotalDiscount / totalOriginalPrice) * 100;
                 }
 
-                // Загружаем координаты партнёра
-                if (_partnersService != null)
+                // Используем данные из батч-запроса
+                if (partnersDict != null && partnersDict.TryGetValue(partnerId, out var partner))
                 {
-                    try
-                    {
-                        var partner = await _partnersService.GetPartnerByIdAsync(partnerId.ToString());
-                        if (partner != null)
-                        {
-                            group.PartnerLatitude = partner.Latitude;
-                            group.PartnerLongitude = partner.Longitude;
-                            group.PartnerAddress = partner.Address;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "Failed to load partner coordinates for partner {PartnerId}", partnerId);
-                    }
+                    group.PartnerLatitude = partner.Latitude;
+                    group.PartnerLongitude = partner.Longitude;
+                    group.PartnerAddress = partner.Address;
                 }
 
                 PartnerGroups.Add(group);
@@ -155,38 +163,35 @@ public partial class BasketViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Обновляет количество товара в коллекции без перезагрузки всей корзины
-    /// Выполняется на главном потоке для безопасности
+    /// Обновляет количество товара в коллекции без перезагрузки всей корзины.
+    /// Предполагается, что вызывается с главного потока (из команд UI).
     /// </summary>
-    private async void UpdateCartItemInCollection(int productId, int newQuantity)
+    private void UpdateCartItemInCollection(int productId, int newQuantity)
     {
-        await MainThread.InvokeOnMainThreadAsync(() =>
+        try
         {
-            try
+            foreach (var group in PartnerGroups)
             {
-                foreach (var group in PartnerGroups)
+                var cartItem = group.Items.FirstOrDefault(i => i.ProductId == productId);
+                if (cartItem != null)
                 {
-                    var cartItem = group.Items.FirstOrDefault(i => i.ProductId == productId);
-                    if (cartItem != null)
-                    {
-                        // Обновляем количество (это автоматически вызовет OnPropertyChanged от CartItem)
-                        cartItem.Quantity = newQuantity;
-                        
-                        // Пересчитываем итоги группы
-                        group.RecalculateTotals();
-                        
-                        // НЕ заменяем элемент в коллекции - это нарушает привязки
-                        // Вместо этого полагаемся на OnPropertyChanged от CartItem
-                        
-                        break;
-                    }
+                    // Обновляем количество (это автоматически вызовет OnPropertyChanged от CartItem)
+                    cartItem.Quantity = newQuantity;
+
+                    // Пересчитываем итоги группы
+                    group.RecalculateTotals();
+
+                    // НЕ заменяем элемент в коллекции - это нарушает привязки
+                    // Вместо этого полагаемся на OnPropertyChanged от CartItem
+
+                    break;
                 }
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Ошибка обновления количества в коллекции");
-            }
-        });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка обновления количества в коллекции");
+        }
     }
 
     [RelayCommand]

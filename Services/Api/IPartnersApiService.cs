@@ -41,5 +41,10 @@ public interface IPartnersApiService
     /// Получить продукты партнёра
     /// </summary>
     Task<IReadOnlyList<ProductDto>> GetProductsAsync(string partnerId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Получить несколько партнёров по ID (батчинг для оптимизации)
+    /// </summary>
+    Task<IReadOnlyList<PartnerDetailDto>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
 }
 

@@ -23,7 +23,9 @@
 		<CFBundleShortVersionString Condition="$(TargetFramework.Contains('-ios'))">1.0.0</CFBundleShortVersionString>
 
 		<!-- Минимальные версии платформ -->
-		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">24</SupportedOSPlatformVersion>
+		<!-- Android 23 (6.0) требуется для androidx.savedstate и других зависимостей -->
+		<!-- Это все еще поддерживает ~90% всех Android устройств -->
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-android'))">23</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-ios'))">15.0</SupportedOSPlatformVersion>
 
 		<!-- Подавление предупреждений о версиях пакетов -->
@@ -40,8 +42,11 @@
 	<PropertyGroup Condition="$(TargetFramework.Contains('-android'))">
 		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
 
-		<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
-		<AndroidMinSdkVersion>24</AndroidMinSdkVersion>
+		<!-- Поддерживаем Android начиная с API 23 (Android 6.0 Marshmallow) -->
+		<!-- API 23 требуется для androidx.savedstate и других зависимостей -->
+		<!-- Это все еще поддерживает ~90% всех Android устройств -->
+		<SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+		<AndroidMinSdkVersion>23</AndroidMinSdkVersion>
 
 		<AndroidEnableProguard>false</AndroidEnableProguard>
 

@@ -125,6 +125,35 @@ public partial class BasketViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Обновляет количество товара в коллекции без перезагрузки всей корзины
+    /// </summary>
+    private void UpdateCartItemInCollection(int productId, int newQuantity)
+    {
+        foreach (var group in PartnerGroups)
+        {
+            var cartItem = group.Items.FirstOrDefault(i => i.ProductId == productId);
+            if (cartItem != null)
+            {
+                // Обновляем количество
+                cartItem.Quantity = newQuantity;
+                
+                // Пересчитываем итоги группы
+                group.RecalculateTotals();
+                
+                // Уведомляем ObservableCollection об изменении элемента
+                // Для этого заменяем элемент на новый (это вызовет уведомление)
+                var index = group.Items.IndexOf(cartItem);
+                if (index >= 0)
+                {
+                    group.Items[index] = cartItem; // Это вызовет CollectionChanged
+                }
+                
+                break;
+            }
+        }
+    }
+
     [RelayCommand]
     private async Task RemoveItemAsync(CartItem? item)
     {
@@ -157,8 +186,11 @@ public partial class BasketViewModel : ObservableObject
 
         try
         {
-            await _cartService.UpdateQuantityAsync(item.ProductId, item.Quantity + 1);
-            await LoadCartAsync();
+            var newQuantity = item.Quantity + 1;
+            await _cartService.UpdateQuantityAsync(item.ProductId, newQuantity);
+            
+            // Обновляем только изменённый элемент в коллекции без перезагрузки всей корзины
+            UpdateCartItemInCollection(item.ProductId, newQuantity);
         }
         catch (Exception ex)
         {
@@ -189,7 +221,9 @@ public partial class BasketViewModel : ObservableObject
             else
             {
                 await _cartService.UpdateQuantityAsync(item.ProductId, newQuantity);
-                await LoadCartAsync();
+                
+                // Обновляем только изменённый элемент в коллекции без перезагрузки всей корзины
+                UpdateCartItemInCollection(item.ProductId, newQuantity);
             }
         }
         catch (Exception ex)
@@ -450,5 +484,37 @@ public partial class PartnerCartGroup : ObservableObject
     
     [ObservableProperty]
     private bool isLocationSelected;
+
+    /// <summary>
+    /// Пересчитывает итоговые суммы группы на основе текущих элементов
+    /// </summary>
+    public void RecalculateTotals()
+    {
+        TotalPrice = Items.Sum(item => item.TotalPrice);
+        TotalYessCoins = Items.Sum(item => item.TotalYessCoins);
+        TotalDiscount = Items
+            .Where(item => item.OriginalPrice.HasValue)
+            .Sum(item => (item.OriginalPrice.Value - item.Price) * item.Quantity);
+        
+        // Вычисляем процент скидки
+        var totalOriginalPrice = Items
+            .Where(item => item.OriginalPrice.HasValue)
+            .Sum(item => item.OriginalPrice.Value * item.Quantity);
+        
+        if (totalOriginalPrice > 0)
+        {
+            DiscountPercent = (TotalDiscount / totalOriginalPrice) * 100;
+        }
+        else
+        {
+            DiscountPercent = 0;
+        }
+        
+        // Уведомляем об изменении свойств
+        OnPropertyChanged(nameof(TotalPrice));
+        OnPropertyChanged(nameof(TotalYessCoins));
+        OnPropertyChanged(nameof(TotalDiscount));
+        OnPropertyChanged(nameof(DiscountPercent));
+    }
 }
 

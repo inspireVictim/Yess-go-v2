@@ -284,10 +284,14 @@
                                                 </DataTrigger>
                                             </Border.Triggers>
                                             <Grid x:Name="MapContainerGrid"
-                                                  Loaded="OnMapContainerGridLoaded">
+                                                  Loaded="OnMapContainerGridLoaded"
+                                                  HorizontalOptions="Fill"
+                                                  VerticalOptions="Fill">
                                                 <!-- Контейнер для карты (MapView будет добавлен программно) -->
                                                 <Grid x:Name="MapContainer" 
-                                                      BackgroundColor="#E0E0E0"/>
+                                                      BackgroundColor="#E0E0E0"
+                                                      HorizontalOptions="Fill"
+                                                      VerticalOptions="Fill"/>
                                                 
                                                 <!-- Центральный маркер для выбора местоположения -->
                                                 <Image Source="icon_location.png"
@@ -295,7 +299,8 @@
                                                        HeightRequest="32"
                                                        HorizontalOptions="Center"
                                                        VerticalOptions="Center"
-                                                       Aspect="AspectFit"/>
+                                                       Aspect="AspectFit"
+                                                       ZIndex="1000"/>
                                             </Grid>
                                         </Border>
                                         

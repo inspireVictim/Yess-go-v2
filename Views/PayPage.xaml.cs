@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 
 namespace YessGoFront.Views;
@@ -7,6 +9,7 @@ namespace YessGoFront.Views;
 public partial class PayPage : ContentPage
 {
     private bool _isNavigating = false;
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
 
     public PayPage()
     {
@@ -14,6 +17,32 @@ public partial class PayPage : ContentPage
     }
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PayPage] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
     {
         if (_isNavigating) return;
         _isNavigating = true;
@@ -37,6 +66,32 @@ public partial class PayPage : ContentPage
 
     private async void OnQrPaymentClicked(object? sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnQrPaymentClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PayPage] Error in OnQrPaymentClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnQrPaymentClickedAsync()
+    {
         if (_isNavigating) return;
         _isNavigating = true;
 
@@ -45,7 +100,8 @@ public partial class PayPage : ContentPage
             Debug.WriteLine("[PayPage] Navigating to QrPage");
             if (Shell.Current != null)
             {
-                await Shell.Current.GoToAsync("///qr", animate: true);
+                // Используем единый и стабильный маршрут таба QR
+                await Shell.Current.GoToAsync("//main/qr", animate: true);
             }
         }
         catch (Exception ex)
@@ -67,6 +123,32 @@ public partial class PayPage : ContentPage
     }
 
     private async void OnSearchPartnerClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnSearchPartnerClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PayPage] Error in OnSearchPartnerClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnSearchPartnerClickedAsync()
     {
         if (_isNavigating) return;
         _isNavigating = true;

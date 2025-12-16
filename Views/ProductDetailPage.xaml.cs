@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
@@ -18,6 +20,8 @@ public partial class ProductDetailPage : ContentPage
     private readonly IPartnersService _partnersService;
     private readonly ICartService _cartService;
     private readonly ILogger<ProductDetailPage>? _logger;
+    private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
 
     public string? ProductId
     {
@@ -52,7 +56,27 @@ public partial class ProductDetailPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        
+
+        if (_isAppearing)
+            return; // Уже выполняется
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ProductDetailPage] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
         // Загружаем данные после того, как все QueryProperty установлены
         if (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(partnerId))
         {
@@ -124,6 +148,32 @@ public partial class ProductDetailPage : ContentPage
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ProductDetailPage] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
+    {
         // Возвращаемся назад в стеке навигации
         if (Shell.Current != null)
         {
@@ -132,6 +182,32 @@ public partial class ProductDetailPage : ContentPage
     }
 
     private async void OnAddToCartClicked(object sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnAddToCartClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ProductDetailPage] Error in OnAddToCartClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnAddToCartClickedAsync()
     {
         if (_product == null)
         {

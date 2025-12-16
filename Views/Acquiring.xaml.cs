@@ -17,6 +17,7 @@ public partial class Acquiring : ContentPage
     private decimal _amount;
     private readonly IPaymentApiService? _paymentApiService;
     private bool _isProcessingPayment = false;
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
 
     public string? AmountString
     {
@@ -105,6 +106,33 @@ public partial class Acquiring : ContentPage
 
     private async void OnPayButtonClicked(object? sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnPayButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Acquiring] Error in OnPayButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnPayButtonClickedAsync()
+    {
+        // Защита от повторных нажатий (дополнительно к _isProcessingPayment)
         if (_isProcessingPayment || _amount <= 0 || _paymentApiService == null)
         {
             return;
@@ -189,6 +217,32 @@ public partial class Acquiring : ContentPage
     }
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Acquiring] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
     {
         await GoBackAsync();
     }

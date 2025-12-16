@@ -1,4 +1,4 @@
-﻿using System;
+﻿ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -22,6 +22,8 @@ namespace YessGoFront.Views
         // ============================
         private bool _isNavigating;
         private bool _isRefreshingUser;
+        private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
+        private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
         private const string WalletRoute = "///wallet";
         private const string TransactionsRoute = "///TransactionsPage";
 
@@ -88,6 +90,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return; // Уже выполняется
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             _imgA ??= FindByName("StoryImageA") as Image;
             _imgB ??= FindByName("StoryImageB") as Image;
 
@@ -102,26 +124,31 @@ namespace YessGoFront.Views
 
             HookPartnerRows();
 
-            // ДОП. ФИКС — ждём загрузки контента (BindLayout) в фоне (fire-and-forget)
+            // ДОП. ФИКС — ждём загрузки контента (BindLayout) в фоне (контролируемая задача)
+            // Отменяем предыдущую задачу
+            _autoScrollCts?.Cancel();
+            _autoScrollCts = new CancellationTokenSource();
             _ = Task.Run(async () =>
             {
-                await Task.Delay(300);
-                await MainThread.InvokeOnMainThreadAsync(() => StartSmoothAutoScroll());
-            });
+                try
+                {
+                    // Убрана задержка Task.Delay(300) для улучшения UX
+                    await MainThread.InvokeOnMainThreadAsync(() => StartSmoothAutoScroll());
+                }
+                catch (OperationCanceledException) { /* Игнорируем отмену */ }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainPage] Error in auto scroll task: {ex.Message}");
+                }
+            }, _autoScrollCts.Token);
 
             // Navbar
             if (BottomBar != null)
                 BottomBar.UpdateSelectedTab("Home");
 
-            // Обновляем баланс напрямую из Wallet.Balance через API (из базы данных)
-            // RefreshBalanceAsync загружает баланс без кэширования, обеспечивая актуальность данных
-            // Это гарантирует, что изменения в БД (включая ручное редактирование) сразу отображаются
             // Story timeline grid width
             if (BindingContext is MainPageViewModel viewModel)
             {
-                // Загружаем баланс напрямую из БД без кэширования
-                _ = viewModel.RefreshBalanceAsync();
-
                 var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
                 if (progressContainer != null)
                 {
@@ -131,8 +158,8 @@ namespace YessGoFront.Views
                         viewModel.ProgressTimelineContainerWidth = progressContainer.Width;
                 }
 
-                // Принудительно обновляем данные пользователя и баланс при каждом появлении страницы
-                // Запускаем в фоне, чтобы не блокировать UI
+                // Оптимизация: загружаем данные пользователя и баланс параллельно в фоне
+                // Ограничиваем частоту вызовов, чтобы не перегружать сеть
                 if (!_isRefreshingUser)
                 {
                     _isRefreshingUser = true;
@@ -140,45 +167,42 @@ namespace YessGoFront.Views
                     {
                         try
                         {
-                            Debug.WriteLine("[MainPage] OnAppearing: Refreshing user data and balance...");
+                            Debug.WriteLine("[MainPage] OnAppearing: Refreshing user data and balance in parallel...");
                             
                             // Используем таймаут для обновления (15 секунд)
                             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                             
-                            await MainThread.InvokeOnMainThreadAsync(async () =>
-                            {
-                                try
+                            // Загружаем баланс и пользователя параллельно (упрощено: убраны вложенные Task.Run)
+                            await Task.WhenAll(
+                                Task.Run(async () =>
                                 {
-                                    await viewModel.RefreshUserAsync();
-                                    Debug.WriteLine($"[MainPage] OnAppearing: User data refreshed - DisplayName={viewModel.DisplayName}, Phone={viewModel.Phone}, Balance={viewModel.Balance}");
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    Debug.WriteLine("[MainPage] OnAppearing: RefreshUserAsync timed out");
-                                    // Пытаемся загрузить хотя бы баланс при таймауте
                                     try
                                     {
-                                        await viewModel.LoadBalanceAsync();
+                                        await viewModel.RefreshBalanceAsync();
                                     }
-                                    catch (Exception ex2)
+                                    catch (Exception ex)
                                     {
-                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance after timeout: {ex2.Message}");
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing balance: {ex.Message}");
                                     }
-                                }
-                                catch (Exception ex)
+                                }, cts.Token),
+                                Task.Run(async () =>
                                 {
-                                    Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing user data: {ex.Message}");
-                                    // Пытаемся загрузить хотя бы баланс, если обновление пользователя не удалось
                                     try
                                     {
-                                        await viewModel.LoadBalanceAsync();
+                                        await viewModel.RefreshUserAsync();
                                     }
-                                    catch (Exception ex2)
+                                    catch (Exception ex)
                                     {
-                                        Debug.WriteLine($"[MainPage] OnAppearing: Error loading balance: {ex2.Message}");
+                                        Debug.WriteLine($"[MainPage] OnAppearing: Error refreshing user data: {ex.Message}");
                                     }
-                                }
-                            });
+                                }, cts.Token)
+                            );
+
+                            Debug.WriteLine($"[MainPage] OnAppearing: User data and balance refreshed - DisplayName={viewModel.DisplayName}, Phone={viewModel.Phone}, Balance={viewModel.Balance}");
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Debug.WriteLine("[MainPage] OnAppearing: Refresh operations timed out");
                         }
                         catch (Exception ex)
                         {
@@ -251,69 +275,74 @@ namespace YessGoFront.Views
         {
             try
             {
-                if (BindingContext is not MainPageViewModel vm)
-                    return;
-
-                if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
-                {
-                    if (vm.IsStoryOpen)
-                    {
-                        await Task.Delay(50);
-                        var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
-                        if (progressContainer != null && progressContainer.Width > 0)
-                            vm.ProgressTimelineContainerWidth = progressContainer.Width;
-                    }
-                    return;
-                }
-
-                if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
-                    return;
-
-                var nextSrc = vm.CurrentPageImage;
-                if (string.IsNullOrWhiteSpace(nextSrc))
-                    return;
-
-                _imgA ??= FindByName("StoryImageA") as Image;
-                _imgB ??= FindByName("StoryImageB") as Image;
-
-                if (_imgA == null || _imgB == null)
-                    return;
-
-                _swapCts?.Cancel();
-                _swapCts = new CancellationTokenSource();
-                var ct = _swapCts.Token;
-
-                try
-                {
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
-                    {
-                        var top = _topIsA ? _imgA : _imgB;
-                        var bottom = _topIsA ? _imgB : _imgA;
-
-                        bottom.Opacity = 0;
-                        bottom.Source = nextSrc;
-
-                        await Task.Delay(50, ct);
-                        await bottom.FadeTo(1, 250, Easing.Linear);
-
-                        _topIsA = !_topIsA;
-
-                        top.Source = null;
-                        top.Opacity = 0;
-                    });
-                }
-                catch (OperationCanceledException)
-                {
-                    // Игнорируем отмену операции
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[MainPage] OnVmPropertyChanged: Error updating story image: {ex.Message}");
-                }
+                await OnVmPropertyChangedAsync(sender, e);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[MainPage] OnVmPropertyChanged: Unexpected error: {ex.Message}");
+                Debug.WriteLine($"[MainPage] Error in OnVmPropertyChanged: {ex.Message}");
+            }
+        }
+
+        private async Task OnVmPropertyChangedAsync(object? sender, PropertyChangedEventArgs e)
+        {
+            if (BindingContext is not MainPageViewModel vm)
+                return;
+
+            if (e.PropertyName == nameof(MainPageViewModel.IsStoryOpen))
+            {
+                if (vm.IsStoryOpen)
+                {
+                    await Task.Delay(50);
+                    var progressContainer = FindByName("ProgressTimelineContainer") as Grid;
+                    if (progressContainer != null && progressContainer.Width > 0)
+                        vm.ProgressTimelineContainerWidth = progressContainer.Width;
+                }
+                return;
+            }
+
+            if (e.PropertyName != nameof(MainPageViewModel.CurrentPageImage))
+                return;
+
+            var nextSrc = vm.CurrentPageImage;
+            if (string.IsNullOrWhiteSpace(nextSrc))
+                return;
+
+            _imgA ??= FindByName("StoryImageA") as Image;
+            _imgB ??= FindByName("StoryImageB") as Image;
+
+            if (_imgA == null || _imgB == null)
+                return;
+
+            _swapCts?.Cancel();
+            _swapCts = new CancellationTokenSource();
+            var ct = _swapCts.Token;
+
+            try
+            {
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    var top = _topIsA ? _imgA : _imgB;
+                    var bottom = _topIsA ? _imgB : _imgA;
+
+                    bottom.Opacity = 0;
+                    bottom.Source = nextSrc;
+
+                    await Task.Delay(50, ct);
+                    await bottom.FadeTo(1, 250, Easing.Linear);
+
+                    _topIsA = !_topIsA;
+
+                    top.Source = null;
+                    top.Opacity = 0;
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                // Игнорируем отмену операции
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] OnVmPropertyChanged: Error updating story image: {ex.Message}");
             }
         }
 
@@ -477,6 +506,32 @@ namespace YessGoFront.Views
         // ============================
         private async void OnWalletTapped(object? sender, EventArgs e)
         {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnWalletTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnWalletTapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnWalletTappedAsync()
+        {
             if (_isNavigating) return;
 
             _isNavigating = true;
@@ -503,6 +558,32 @@ namespace YessGoFront.Views
         }
 
         private async void OnHistoryClicked(object? sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnHistoryClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnHistoryClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnHistoryClickedAsync()
         {
             if (_isNavigating) return;
             _isNavigating = true;
@@ -531,6 +612,32 @@ namespace YessGoFront.Views
 
         private async void OnPayYessCoinClicked(object? sender, EventArgs e)
         {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnPayYessCoinClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnPayYessCoinClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPayYessCoinClickedAsync()
+        {
             if (_isNavigating) return;
             _isNavigating = true;
 
@@ -550,6 +657,32 @@ namespace YessGoFront.Views
         }
 
         private async void OnProfileTapped(object? sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnProfileTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnProfileTapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnProfileTappedAsync()
         {
             if (_isNavigating) return;
             _isNavigating = true;
@@ -578,6 +711,32 @@ namespace YessGoFront.Views
 
 
         private async void OnMoreTapped(object sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnMoreTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnMoreTapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnMoreTappedAsync()
         {
             try
             {
@@ -616,6 +775,32 @@ namespace YessGoFront.Views
         }
 
         private async void OnCategoryTapped(object? sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnCategoryTappedAsync(sender);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnCategoryTapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCategoryTappedAsync(object? sender)
         {
             if (_isNavigating) return;
 
@@ -749,6 +934,32 @@ namespace YessGoFront.Views
         // Info Button обработчик
         // ============================
         private async void OnInfoButtonTapped(object? sender, TappedEventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _actionLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnInfoButtonTappedAsync(e);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainPage] Error in OnInfoButtonTapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnInfoButtonTappedAsync(TappedEventArgs e)
         {
             try
             {

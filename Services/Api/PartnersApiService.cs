@@ -258,5 +258,81 @@ public class PartnersApiService : ApiClient, IPartnersApiService
             throw;
         }
     }
+
+    public async Task<IReadOnlyList<PartnerDetailDto>> GetByIdsAsync(
+        IEnumerable<string> ids,
+        CancellationToken ct = default)
+    {
+        if (ids == null || !ids.Any())
+            return new List<PartnerDetailDto>();
+
+        // Формируем query параметры с ID партнёров
+        var idList = ids.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+        if (!idList.Any())
+            return new List<PartnerDetailDto>();
+
+        // Используем query параметры для батч-запроса
+        // Формат: /api/v1/partners/list?ids=1,2,3,4,5
+        var idsParam = string.Join(",", idList);
+        var endpoint = $"{ApiEndpoints.PartnersEndpoints.List}?ids={Uri.EscapeDataString(idsParam)}";
+
+        Logger?.LogInformation("[PartnersApiService] Fetching {Count} partners by IDs: {Ids}", idList.Count, idsParam);
+        System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Fetching {idList.Count} partners by IDs: {idsParam}");
+
+        try
+        {
+            // Пытаемся получить как список PartnerDetailDto
+            var result = await GetAsync<List<PartnerDetailDto>>(endpoint, ct);
+            
+            if (result == null || !result.Any())
+            {
+                // Если не получилось, пробуем получить как PartnerDto и преобразовать
+                var partnerDtos = await GetAsync<List<PartnerDto>>(endpoint, ct);
+                if (partnerDtos != null && partnerDtos.Any())
+                {
+                    // Преобразуем PartnerDto в PartnerDetailDto (с базовыми полями)
+                    result = partnerDtos.Select(p => new PartnerDetailDto
+                    {
+                        Id = p.Id,
+                        Name = p.Name,
+                        LogoUrl = p.LogoUrl,
+                        Address = null, // Эти поля могут быть недоступны в кратком формате
+                        Phone = null,
+                        Latitude = null,
+                        Longitude = null
+                    }).ToList();
+                }
+            }
+
+            Logger?.LogInformation("[PartnersApiService] Successfully loaded {Count} partners by IDs", result?.Count ?? 0);
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Successfully loaded {result?.Count ?? 0} partners by IDs");
+
+            return result ?? new List<PartnerDetailDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "[PartnersApiService] Error loading partners by IDs");
+            System.Diagnostics.Debug.WriteLine($"[PartnersApiService] Error loading partners by IDs: {ex.Message}");
+            
+            // Fallback: если батч-запрос не поддерживается, делаем последовательные запросы
+            // (но это должно быть редко, так как мы оптимизируем)
+            Logger?.LogWarning("[PartnersApiService] Batch request failed, falling back to individual requests");
+            var results = new List<PartnerDetailDto>();
+            foreach (var id in idList)
+            {
+                try
+                {
+                    var partner = await GetByIdAsync(id, ct);
+                    if (partner != null)
+                        results.Add(partner);
+                }
+                catch (Exception ex2)
+                {
+                    Logger?.LogWarning(ex2, "[PartnersApiService] Failed to load partner {Id}", id);
+                }
+            }
+            return results;
+        }
+    }
 }
 

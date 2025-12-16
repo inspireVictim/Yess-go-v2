@@ -15,6 +15,8 @@ namespace YessGoFront.Views
         private readonly LoginViewModel _viewModel;
         private readonly AuthNavigationHandler _authNavigationHandler;
         private bool _isNavigating = false; // Защита от повторных вызовов навигации
+        private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
+        private readonly SemaphoreSlim _navigationLock = new(1, 1); // Защита от повторных нажатий
 
         public LoginPage()
         {
@@ -33,6 +35,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return; // Уже выполняется
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // чтобы не было двойных подписок
             _viewModel.OnLoginSuccess -= OnLoginSuccess;
             _viewModel.OnLoginSuccess += OnLoginSuccess;
@@ -146,9 +168,9 @@ namespace YessGoFront.Views
                 try
                 {
                     // Используем таймаут для проверки PIN (10 секунд)
-                    // HasPinAsync не принимает CancellationToken, поэтому используем Task.Run с таймаутом
+                    // Упрощено: убран вложенный Task.Run
                     using var pinCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    hasPin = await Task.Run(async () => await domainAuthService.HasPinAsync(), pinCts.Token);
+                    hasPin = await domainAuthService.HasPinAsync();
                     System.Diagnostics.Debug.WriteLine($"[LoginPage] OnLoginSuccess: hasValidPin={hasPin}");
                 }
                 catch (OperationCanceledException)
@@ -226,6 +248,32 @@ namespace YessGoFront.Views
 
         private async void OpenRegister_Tapped(object? sender, EventArgs e)
         {
+            // Защита от повторных нажатий
+            if (!await _navigationLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OpenRegister_TappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Error in OpenRegister_Tapped: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _navigationLock.Release();
+            }
+        }
+
+        private async Task OpenRegister_TappedAsync()
+        {
             await Shell.Current.GoToAsync("///register");
         }
 
@@ -245,6 +293,32 @@ namespace YessGoFront.Views
         }
 
         public async void OnRegistrationPage(object sender, EventArgs e)
+        {
+            // Защита от повторных нажатий
+            if (!await _navigationLock.WaitAsync(0))
+                return; // Уже обрабатывается
+
+            try
+            {
+                // Отключаем кнопку визуально
+                if (sender is VisualElement element)
+                    element.IsEnabled = false;
+
+                await OnRegistrationPageAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LoginPage] Error in OnRegistrationPage: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is VisualElement element)
+                    element.IsEnabled = true;
+                _navigationLock.Release();
+            }
+        }
+
+        private async Task OnRegistrationPageAsync()
         {
             await Shell.Current.GoToAsync("///register");
         }

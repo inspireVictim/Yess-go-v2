@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
@@ -15,6 +16,7 @@ public partial class FinikPaymentPage : ContentPage
     private string? _paymentUrlString;
     private string? _redirectUrlString;
     private bool _isPaymentCompleted = false;
+    private readonly SemaphoreSlim _actionLock = new(1, 1);
 
     public string? PaymentUrlString
     {
@@ -134,7 +136,26 @@ public partial class FinikPaymentPage : ContentPage
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
     {
-        await GoBackAsync();
+        if (!await _actionLock.WaitAsync(0))
+            return;
+
+        try
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = false;
+
+            await GoBackAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[FinikPaymentPage] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is Button btn)
+                btn.IsEnabled = true;
+            _actionLock.Release();
+        }
     }
 
     private async Task GoBackAsync()

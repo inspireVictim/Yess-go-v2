@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using YessGoFront.Services.Domain;
@@ -16,6 +17,7 @@ namespace YessGoFront.Views
         private bool _acknowledged;
         private string? _pendingReferralCode; // Временное хранение реферального кода до инициализации ViewModel
         private bool _isNavigating = false; // Защита от повторных вызовов навигации
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
         
         // Реферальный код из URL параметра
         public string? ReferralCode
@@ -218,6 +220,25 @@ namespace YessGoFront.Views
 
         private async void OpenLogin_Tapped(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OpenLogin_TappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Error in OpenLogin_Tapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OpenLogin_TappedAsync()
+        {
             await Shell.Current.GoToAsync("///login");
         }
 
@@ -240,6 +261,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnPolicyLinkTapped(object? sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnPolicyLinkTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Error in OnPolicyLinkTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPolicyLinkTappedAsync()
         {
             const string policyText = @"ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ
 
@@ -418,6 +458,25 @@ namespace YessGoFront.Views
         }
 
         public async void OnLoginsPage(object sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnLoginsPageAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RegisterPage] Error in OnLoginsPage: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnLoginsPageAsync()
         {
             await Shell.Current.GoToAsync("///login");
         }

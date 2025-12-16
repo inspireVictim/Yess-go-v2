@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Devices.Sensors;
@@ -18,6 +20,7 @@ namespace YessGoFront.Views
         private string? partnerId;
         private IPartnersService? _partnersService;
         private PartnerDetailDto? _currentPartner;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public string? PartnerId
         {
@@ -29,7 +32,7 @@ namespace YessGoFront.Views
                 if (!string.IsNullOrWhiteSpace(partnerId))
                 {
                     System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Loading partner with ID: '{partnerId}'");
-                    LoadPartner(partnerId);
+                    _ = LoadPartnerAsync(partnerId);
                 }
                 else
                 {
@@ -45,7 +48,7 @@ namespace YessGoFront.Views
             _partnersService = MauiProgram.Services.GetService<IPartnersService>();
         }
 
-        private async void LoadPartner(string id)
+        private async Task LoadPartnerAsync(string id)
         {
             try
             {
@@ -347,16 +350,34 @@ namespace YessGoFront.Views
 
         private async void OnMapClicked(object sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnMapClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Error in OnMapClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnMapClickedAsync()
+        {
             System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] === OnMapClicked НАЧАЛО ===");
             
             try
             {
-                // Отключаем кнопку на время навигации
-                if (sender is Button button)
-                {
-                    button.IsEnabled = false;
-                }
-
                 System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Начало навигации к MapPage...");
                 
                 // Навигация к нашей внутренней MapPage
@@ -381,16 +402,30 @@ namespace YessGoFront.Views
             }
             finally
             {
-                // Включаем кнопку обратно
-                if (sender is Button button)
-                {
-                    button.IsEnabled = true;
-                }
                 System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] === OnMapClicked ЗАВЕРШЕНО ===");
             }
         }
 
         private async void OnCallClicked(object sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnCallClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Error in OnCallClicked: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCallClickedAsync()
         {
             if (_currentPartner != null && !string.IsNullOrWhiteSpace(_currentPartner.Phone))
             {
@@ -410,6 +445,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnWebsiteTapped(object sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnWebsiteTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Error in OnWebsiteTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnWebsiteTappedAsync()
         {
             if (_currentPartner != null && !string.IsNullOrWhiteSpace(_currentPartner.Website))
             {
@@ -431,13 +485,31 @@ namespace YessGoFront.Views
 
         private async void OnBackClicked(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Кнопка 'Назад' нажата");
-            
-            // Отключаем кнопку на время навигации, чтобы избежать двойных нажатий
-            if (BackButton != null)
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
             {
-                BackButton.IsEnabled = false;
+                if (BackButton != null)
+                    BackButton.IsEnabled = false;
+
+                await OnBackClickedAsync();
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Error in OnBackClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (BackButton != null)
+                    BackButton.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackClickedAsync()
+        {
+            System.Diagnostics.Debug.WriteLine("[PartnerDetailPage] Кнопка 'Назад' нажата");
             
             try
             {
@@ -460,17 +532,33 @@ namespace YessGoFront.Views
                     System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Альтернативный маршрут тоже не сработал: {ex2.Message}");
                 }
             }
-            finally
-            {
-                // Включаем кнопку обратно
-                if (BackButton != null)
-                {
-                    BackButton.IsEnabled = true;
-                }
-            }
         }
 
         private async void OnViewProductsClicked(object sender, EventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnViewProductsClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnerDetailPage] Error in OnViewProductsClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnViewProductsClickedAsync()
         {
             if (string.IsNullOrWhiteSpace(partnerId))
             {

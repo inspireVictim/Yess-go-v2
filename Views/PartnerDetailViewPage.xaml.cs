@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
@@ -13,8 +15,35 @@ public partial class PartnerDetailViewPage : ContentPage
 {
     private string? partnerId;
     private readonly PartnerDetailViewModel _viewModel;
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
 
     private async void OnBackButtonClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
     {
         // Возвращаемся назад в стеке навигации
         if (Shell.Current != null)
@@ -24,6 +53,32 @@ public partial class PartnerDetailViewPage : ContentPage
     }
 
     private async void OnBasketButtonClicked(object? sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBasketButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Error in OnBasketButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBasketButtonClickedAsync()
     {
         // Переход на страницу корзины
         if (Shell.Current != null)
@@ -130,6 +185,32 @@ public partial class PartnerDetailViewPage : ContentPage
 
     private async void OnAddToCartClicked(object sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnAddToCartClickedAsync(sender);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Error in OnAddToCartClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnAddToCartClickedAsync(object sender)
+    {
         if (sender is Button button && button.CommandParameter is ProductDto product && _viewModel != null)
         {
             await _viewModel.AddToCartCommand.ExecuteAsync(product);
@@ -153,47 +234,60 @@ public partial class PartnerDetailViewPage : ContentPage
 
     private async void OnProductTapped(object? sender, EventArgs e)
     {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
         try
         {
-            ProductDto? product = null;
-
-            // Пытаемся получить товар из BindingContext элемента
-            if (sender is BindableObject bindable && bindable.BindingContext is ProductDto productFromContext)
-            {
-                product = productFromContext;
-            }
-            // Или из TapGestureRecognizer через IGestureRecognizers
-            else if (sender is IGestureRecognizers gestureContainer)
-            {
-                var tapGesture = gestureContainer.GestureRecognizers
-                    .OfType<TapGestureRecognizer>()
-                    .FirstOrDefault();
-                
-                if (tapGesture?.CommandParameter is ProductDto productFromGesture)
-                {
-                    product = productFromGesture;
-                }
-            }
-            // Или из BindingContext визуального элемента
-            else if (sender is VisualElement element && element.BindingContext is ProductDto productFromElement)
-            {
-                product = productFromElement;
-            }
-
-            if (product != null && Shell.Current != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Navigating to ProductDetailPage with productId={product.Id}, partnerId={product.PartnerId}");
-                await Shell.Current.GoToAsync($"ProductDetailPage?productId={product.Id}&partnerId={product.PartnerId}", animate: true);
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] OnProductTapped: Could not get product from sender. Sender type: {sender?.GetType().Name}");
-            }
+            await OnProductTappedAsync(sender);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] OnProductTapped error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Error in OnProductTapped: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] StackTrace: {ex.StackTrace}");
+        }
+        finally
+        {
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnProductTappedAsync(object? sender)
+    {
+        ProductDto? product = null;
+
+        // Пытаемся получить товар из BindingContext элемента
+        if (sender is BindableObject bindable && bindable.BindingContext is ProductDto productFromContext)
+        {
+            product = productFromContext;
+        }
+        // Или из TapGestureRecognizer через IGestureRecognizers
+        else if (sender is IGestureRecognizers gestureContainer)
+        {
+            var tapGesture = gestureContainer.GestureRecognizers
+                .OfType<TapGestureRecognizer>()
+                .FirstOrDefault();
+            
+            if (tapGesture?.CommandParameter is ProductDto productFromGesture)
+            {
+                product = productFromGesture;
+            }
+        }
+        // Или из BindingContext визуального элемента
+        else if (sender is VisualElement element && element.BindingContext is ProductDto productFromElement)
+        {
+            product = productFromElement;
+        }
+
+        if (product != null && Shell.Current != null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] Navigating to ProductDetailPage with productId={product.Id}, partnerId={product.PartnerId}");
+            await Shell.Current.GoToAsync($"ProductDetailPage?productId={product.Id}&partnerId={product.PartnerId}", animate: true);
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[PartnerDetailViewPage] OnProductTapped: Could not get product from sender. Sender type: {sender?.GetType().Name}");
         }
     }
 }

@@ -34,6 +34,10 @@ public partial class BasketPage : ContentPage
     private bool _isProcessingPayment = false;
     private readonly Dictionary<int, MapView> _mapViews = new(); // Хранилище MapView по PartnerId
     private readonly Dictionary<int, System.Threading.Timer> _geocodingTimers = new(); // Таймеры для debounce reverse geocoding
+    private bool _isAppearing = false; // Защита от повторных вызовов OnAppearing
+    private readonly SemaphoreSlim _actionLock = new(1, 1); // Защита от повторных нажатий
+    private bool _isPageActive = false;
+    private readonly SemaphoreSlim _mapsLock = new(1, 1); // Защита для работы с картами
 
     public BasketPage()
     {
@@ -71,31 +75,70 @@ public partial class BasketPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        if (_isAppearing)
+            return; // Уже выполняется
+
+        _isAppearing = true;
+        try
+        {
+            await OnAppearingAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[BasketPage] Error in OnAppearing: {ex.Message}");
+        }
+        finally
+        {
+            _isAppearing = false;
+        }
+    }
+
+    protected virtual async Task OnAppearingAsync()
+    {
+        _isPageActive = true; // Отмечаем, что страница активна
+        
         // Загружаем данные корзины при появлении страницы
         if (_viewModel != null)
         {
             await _viewModel.LoadCartCommand.ExecuteAsync(null);
-            // Инициализируем карты после загрузки
-            await Task.Delay(1000); // Задержка для рендеринга UI
-            InitializeMaps();
+            // Карты будут инициализированы лениво через OnMapContainerGridLoaded
         }
     }
 
     private void OnPartnerGroupsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        // Инициализируем карты при изменении коллекции
-        if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add || 
-            e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await Task.Delay(1000); // Задержка для рендеринга UI
-                InitializeMaps();
-            });
-        }
+        // Карты будут инициализированы лениво через OnMapContainerGridLoaded
+        // Не вызываем InitializeMaps здесь, чтобы избежать задержек и рекурсивного поиска
     }
 
     public async void OnBackButtonClicked(object sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnBackButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[BasketPage] Error in OnBackButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnBackButtonClickedAsync()
     {
         try
         {
@@ -135,6 +178,32 @@ public partial class BasketPage : ContentPage
     }
 
     private async void OnTopUpButtonClicked(object sender, EventArgs e)
+    {
+        // Защита от повторных нажатий
+        if (!await _actionLock.WaitAsync(0))
+            return; // Уже обрабатывается
+
+        try
+        {
+            // Отключаем кнопку визуально
+            if (sender is VisualElement element)
+                element.IsEnabled = false;
+
+            await OnTopUpButtonClickedAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[BasketPage] Error in OnTopUpButtonClicked: {ex.Message}");
+        }
+        finally
+        {
+            if (sender is VisualElement element)
+                element.IsEnabled = true;
+            _actionLock.Release();
+        }
+    }
+
+    private async Task OnTopUpButtonClickedAsync()
     {
         if (_isProcessingPayment || _paymentApiService == null)
         {
@@ -203,122 +272,44 @@ public partial class BasketPage : ContentPage
         }
     }
 
-    private void InitializeMaps()
+    // Удалены методы InitializeMaps, FindVisualElement, FindAndInitializeMapForPartner, 
+    // FindAllVisualElements, FindAllVisualElementsRecursive - они больше не нужны,
+    // так как инициализация карт происходит лениво через OnMapContainerGridLoaded
+
+    private async Task InitializeMapView(Grid mapContainer, PartnerCartGroup group)
     {
+        // Проверяем, что страница еще активна
+        if (!_isPageActive)
+        {
+            Debug.WriteLine($"[BasketPage] InitializeMapView: Page is not active, skipping for partner {group.PartnerId}");
+            return;
+        }
+        
         try
         {
-            // Находим CollectionView
-            var collectionView = this.FindByName<CollectionView>("PartnerGroupsCollectionView");
-            if (collectionView == null)
+            // Используем блокировку для проверки
+            if (!await _mapsLock.WaitAsync(0))
             {
-                collectionView = FindVisualElement<CollectionView>(this);
-            }
-
-            if (collectionView == null)
-            {
-                _logger?.LogWarning("CollectionView not found for map initialization");
+                Debug.WriteLine($"[BasketPage] InitializeMapView: Maps lock is busy for partner {group.PartnerId}");
                 return;
             }
-
-            // Инициализируем карты для каждой группы партнёров
-            // Ищем все Grid контейнеры карт через визуальное дерево
-            foreach (var group in _viewModel.PartnerGroups)
+            
+            try
             {
-                if (!_mapViews.ContainsKey(group.PartnerId))
+                if (_mapViews.ContainsKey(group.PartnerId))
                 {
-                    FindAndInitializeMapForPartner(collectionView, group);
+                    // Карта уже инициализирована
+                    return;
+                }
+                
+                if (!_isPageActive)
+                {
+                    return; // Страница уже неактивна
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error initializing maps");
-            Debug.WriteLine($"[BasketPage] Error initializing maps: {ex.Message}");
-        }
-    }
-
-    private T? FindVisualElement<T>(VisualElement parent) where T : VisualElement
-    {
-        if (parent is T result)
-            return result;
-
-        if (parent is Layout layout)
-        {
-            foreach (var child in layout.Children)
+            finally
             {
-                if (child is VisualElement visualChild)
-                {
-                    var found = FindVisualElement<T>(visualChild);
-                    if (found != null)
-                        return found;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private void FindAndInitializeMapForPartner(VisualElement parent, PartnerCartGroup group)
-    {
-        try
-        {
-            // Ищем Grid с именем MapContainerGrid, у которого BindingContext равен нашей группе
-            var grids = FindAllVisualElements<Grid>(parent);
-            foreach (var grid in grids)
-            {
-                if (grid.BindingContext is PartnerCartGroup gridGroup && 
-                    gridGroup.PartnerId == group.PartnerId)
-                {
-                    // Проверяем, есть ли внутри Grid с именем MapContainer
-                    var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
-                    if (mapContainer != null && !_mapViews.ContainsKey(group.PartnerId))
-                    {
-                        InitializeMapView(mapContainer, group);
-                        break;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error finding map container for partner {PartnerId}", group.PartnerId);
-        }
-    }
-
-    private List<T> FindAllVisualElements<T>(VisualElement parent) where T : VisualElement
-    {
-        var results = new List<T>();
-        FindAllVisualElementsRecursive(parent, results);
-        return results;
-    }
-
-    private void FindAllVisualElementsRecursive<T>(VisualElement parent, List<T> results) where T : VisualElement
-    {
-        if (parent is T result)
-        {
-            results.Add(result);
-        }
-
-        if (parent is Layout layout)
-        {
-            foreach (var child in layout.Children)
-            {
-                if (child is VisualElement visualChild)
-                {
-                    FindAllVisualElementsRecursive(visualChild, results);
-                }
-            }
-        }
-    }
-
-    private async void InitializeMapView(Grid mapContainer, PartnerCartGroup group)
-    {
-        try
-        {
-            if (_mapViews.ContainsKey(group.PartnerId))
-            {
-                // Карта уже инициализирована
-                return;
+                _mapsLock.Release();
             }
 
             // Создаём MapView в главном потоке
@@ -327,6 +318,9 @@ public partial class BasketPage : ContentPage
             {
                 try
                 {
+                    if (!_isPageActive)
+                        return;
+                
                     // Создаём MapView
                     mapView = new MapView
                     {
@@ -337,7 +331,29 @@ public partial class BasketPage : ContentPage
 
                     // Добавляем MapView в контейнер СНАЧАЛА
                     mapContainer.Children.Add(mapView);
-                    _mapViews[group.PartnerId] = mapView;
+                    
+                    // ВАЖНО: Устанавливаем размеры из контейнера сразу
+                    if (mapContainer.Width > 0 && mapContainer.Height > 0)
+                    {
+                        mapView.WidthRequest = mapContainer.Width;
+                        mapView.HeightRequest = mapContainer.Height;
+                    }
+                    
+                    // Блокируем доступ для добавления в словарь
+                    _mapsLock.Wait();
+                    try
+                    {
+                        if (!_isPageActive)
+                        {
+                            mapContainer.Children.Remove(mapView);
+                            return;
+                        }
+                        _mapViews[group.PartnerId] = mapView;
+                    }
+                    finally
+                    {
+                        _mapsLock.Release();
+                    }
                     
                     Debug.WriteLine($"[BasketPage] MapView created and added to container for partner {group.PartnerId}");
                 }
@@ -348,22 +364,29 @@ public partial class BasketPage : ContentPage
                 }
             });
 
-            if (mapView == null)
+            if (mapView == null || !_isPageActive)
             {
-                _logger?.LogError("MapView is null after creation for partner {PartnerId}", group.PartnerId);
-                Debug.WriteLine($"[BasketPage] MapView is null after creation for partner {group.PartnerId}");
+                Debug.WriteLine($"[BasketPage] MapView is null or page inactive for partner {group.PartnerId}");
                 return;
             }
 
-            // Небольшая задержка перед инициализацией карты (как в MapPage)
-            // Это нужно для того, чтобы MapView успел полностью отрендериться
-            await Task.Delay(300);
+            // ВАЖНО: Задержка для Release режима (как в MapPage)
+            await Task.Delay(300); // Увеличено с 200 до 300 для Release
+
+            if (!_isPageActive)
+            {
+                Debug.WriteLine($"[BasketPage] Page became inactive during delay for partner {group.PartnerId}");
+                return;
+            }
 
             // Инициализируем карту в главном потоке
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 try
                 {
+                    if (!_isPageActive || mapView == null)
+                        return;
+                
                     Debug.WriteLine($"[BasketPage] Initializing map for partner {group.PartnerId}");
 
                     // Создаём карту
@@ -386,7 +409,13 @@ public partial class BasketPage : ContentPage
                     Debug.WriteLine($"[BasketPage] Map set to MapView for partner {group.PartnerId}");
 
                     // Подписываемся на изменение центра карты
-                    map.Navigator.ViewportChanged += (s, args) => OnMapViewportChanged(mapView, group);
+                    map.Navigator.ViewportChanged += (s, args) => 
+                    {
+                        if (_isPageActive)
+                        {
+                            OnMapViewportChanged(mapView, group);
+                        }
+                    };
 
                     // Принудительно обновляем карту
                     try
@@ -409,14 +438,27 @@ public partial class BasketPage : ContentPage
                 }
             });
 
-            // Небольшая задержка перед центрированием карты
-            await Task.Delay(200);
+            if (!_isPageActive)
+            {
+                return;
+            }
+
+            // Еще одна небольшая задержка перед центрированием (для Release)
+            await Task.Delay(150); // Увеличено с 100 до 150
+
+            if (!_isPageActive)
+            {
+                return;
+            }
 
             // Центрируем карту в главном потоке
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
                 try
                 {
+                    if (!_isPageActive || mapView == null)
+                        return;
+                
                     // Проверяем, что MapView имеет правильные размеры
                     if (mapView.Width <= 0 || mapView.Height <= 0)
                     {
@@ -427,6 +469,28 @@ public partial class BasketPage : ContentPage
                             mapView.WidthRequest = mapContainer.Width;
                             mapView.HeightRequest = mapContainer.Height;
                             Debug.WriteLine($"[BasketPage] Set MapView size from container: {mapContainer.Width}x{mapContainer.Height}");
+                            
+                            // Еще одна задержка после установки размеров
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(200);
+                                if (_isPageActive)
+                                {
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                    {
+                                        if (group.PartnerLatitude.HasValue && group.PartnerLongitude.HasValue)
+                                        {
+                                            CenterMapOnPartner(mapView, group);
+                                        }
+                                        else
+                                        {
+                                            CenterMapOnDefaultLocation(mapView);
+                                        }
+                                        mapView.Map?.Refresh();
+                                    });
+                                }
+                            });
+                            return;
                         }
                     }
 
@@ -588,43 +652,113 @@ public partial class BasketPage : ContentPage
 
     private void OnMapViewportChanged(object sender, PartnerCartGroup group)
     {
+        // Проверяем, что страница еще активна
+        if (!_isPageActive)
+        {
+            return;
+        }
+        
         try
         {
-            if (sender is not MapView mapView || mapView.Map == null)
+            if (sender is not MapView mapView || mapView.Map == null || group == null)
                 return;
 
-            // Получаем координаты центра карты
-            var viewport = mapView.Map.Navigator.Viewport;
+            if (_geocodingTimers == null)
+            {
+                _logger?.LogWarning("GeocodingTimers dictionary is null");
+                return;
+            }
+
+            // Получаем центр карты через Navigator и Viewport
+            var map = mapView.Map;
+            if (map == null)
+                return;
+
+            var navigator = map.Navigator;
+            if (navigator == null)
+                return;
+
+            var viewport = navigator.Viewport;
+            if (viewport == null)
+                return;
+
+            // В Mapsui Viewport хранит центр через координаты CenterX/CenterY
             var centerX = viewport.CenterX;
             var centerY = viewport.CenterY;
+
+            // Преобразуем из Spherical Mercator в долготу/широту
             (double lon, double lat) = SphericalMercator.ToLonLat(centerX, centerY);
 
             // Обновляем выбранные координаты
             group.SelectedLatitude = lat;
             group.SelectedLongitude = lon;
 
-            // Отменяем предыдущий таймер для этого партнёра
-            if (_geocodingTimers.TryGetValue(group.PartnerId, out var oldTimer))
+            // Отменяем предыдущий таймер для этого партнёра (с блокировкой)
+            System.Threading.Timer? oldTimer = null;
+            lock (_geocodingTimers)
             {
-                oldTimer?.Dispose();
+                if (_geocodingTimers.TryGetValue(group.PartnerId, out oldTimer))
+                {
+                    _geocodingTimers.Remove(group.PartnerId);
+                }
+            }
+            
+            if (oldTimer != null)
+            {
+                try
+                {
+                    oldTimer.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error disposing old geocoding timer");
+                }
+            }
+
+            // Проверяем, что страница еще активна перед созданием нового таймера
+            if (!_isPageActive)
+            {
+                return;
             }
 
             // Создаём новый таймер с debounce (500ms)
             var timer = new System.Threading.Timer(async _ =>
             {
+                // Проверяем активность страницы перед выполнением
+                if (!_isPageActive)
+                {
+                    return;
+                }
+                
                 try
                 {
                     // Получаем адрес через reverse geocoding
                     var address = await GetAddressFromCoordinatesAsync(lat, lon);
                     
+                    // Проверяем активность еще раз перед обновлением UI
+                    if (!_isPageActive)
+                    {
+                        return;
+                    }
+                    
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        group.SelectedAddress = address;
-                        group.IsLocationSelected = !string.IsNullOrWhiteSpace(address);
+                        try
+                        {
+                            if (_isPageActive && group != null)
+                            {
+                                group.SelectedAddress = address;
+                                group.IsLocationSelected = !string.IsNullOrWhiteSpace(address);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Error updating group properties on main thread");
+                        }
                     });
 
                     _logger?.LogDebug("Map viewport changed for partner {PartnerId}: {Lat}, {Lon}, Address: {Address}",
-                        group.PartnerId, lat, lon, address);
+                        group?.PartnerId ?? 0, lat, lon, address);
                 }
                 catch (Exception ex)
                 {
@@ -632,7 +766,18 @@ public partial class BasketPage : ContentPage
                 }
             }, null, 500, Timeout.Infinite);
 
-            _geocodingTimers[group.PartnerId] = timer;
+            // Добавляем таймер в словарь с блокировкой
+            lock (_geocodingTimers)
+            {
+                if (_isPageActive)
+                {
+                    _geocodingTimers[group.PartnerId] = timer;
+                }
+                else
+                {
+                    timer.Dispose();
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -681,28 +826,72 @@ public partial class BasketPage : ContentPage
 
     private void OnMapContainerGridLoaded(object? sender, EventArgs e)
     {
+        // Проверяем, что страница еще активна
+        if (!_isPageActive)
+        {
+            Debug.WriteLine("[BasketPage] OnMapContainerGridLoaded: Page is not active, skipping map initialization");
+            return;
+        }
+        
         try
         {
             if (sender is Grid grid && grid.BindingContext is PartnerCartGroup group)
             {
-                if (!_mapViews.ContainsKey(group.PartnerId))
+                // Используем блокировку для проверки и инициализации
+                if (!_mapsLock.WaitAsync(0).Result)
                 {
-                    // Находим контейнер для карты
-                    var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
-                    if (mapContainer != null)
+                    Debug.WriteLine("[BasketPage] OnMapContainerGridLoaded: Maps lock is busy, retrying...");
+                    // Пытаемся через небольшую задержку
+                    _ = Task.Run(async () =>
                     {
-                        Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: Initializing map for partner {group.PartnerId}");
-                        // InitializeMapView сам управляет потоками и задержками
-                        InitializeMapView(mapContainer, group);
+                        await Task.Delay(100);
+                        if (_isPageActive && await _mapsLock.WaitAsync(100))
+                        {
+                            try
+                            {
+                                if (!_mapViews.ContainsKey(group.PartnerId))
+                                {
+                                    var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
+                                    if (mapContainer != null)
+                                    {
+                                        await InitializeMapView(mapContainer, group);
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                _mapsLock.Release();
+                            }
+                        }
+                    });
+                    return;
+                }
+                
+                try
+                {
+                    if (!_mapViews.ContainsKey(group.PartnerId))
+                    {
+                        // Находим контейнер для карты напрямую через Children
+                        var mapContainer = grid.Children.OfType<Grid>().FirstOrDefault();
+                        if (mapContainer != null)
+                        {
+                            Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: Initializing map for partner {group.PartnerId}");
+                            // Инициализируем карту с проверкой активности страницы
+                            _ = InitializeMapView(mapContainer, group);
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: MapContainer Grid not found");
+                        }
                     }
                     else
                     {
-                        Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: MapContainer Grid not found");
+                        Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: Map already initialized for partner {group.PartnerId}");
                     }
                 }
-                else
+                finally
                 {
-                    Debug.WriteLine($"[BasketPage] OnMapContainerGridLoaded: Map already initialized for partner {group.PartnerId}");
+                    _mapsLock.Release();
                 }
             }
             else
@@ -721,18 +910,62 @@ public partial class BasketPage : ContentPage
     {
         base.OnDisappearing();
         
-        // Очищаем таймеры
-        foreach (var timer in _geocodingTimers.Values)
-        {
-            timer?.Dispose();
-        }
-        _geocodingTimers.Clear();
+        // Сразу отмечаем, что страница неактивна
+        _isPageActive = false;
         
-        // Очищаем карты
-        foreach (var mapView in _mapViews.Values)
+        try
         {
-            mapView?.Map?.Layers.Clear();
+            // Используем блокировку для безопасной очистки
+            _mapsLock.Wait();
+            
+            // Очищаем таймеры
+            if (_geocodingTimers != null)
+            {
+                foreach (var timer in _geocodingTimers.Values)
+                {
+                    try
+                    {
+                        timer?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error disposing geocoding timer");
+                    }
+                }
+                _geocodingTimers.Clear();
+            }
+            
+            // Очищаем карты
+            if (_mapViews != null)
+            {
+                foreach (var mapView in _mapViews.Values)
+                {
+                    try
+                    {
+                        // Отписываемся от событий
+                        if (mapView?.Map?.Navigator != null)
+                        {
+                            // Сохраняем ссылку на обработчик для отписки
+                            var navigator = mapView.Map.Navigator;
+                            navigator.ViewportChanged -= (s, args) => { }; // Отписываемся
+                        }
+                        mapView?.Map?.Layers?.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error clearing map layers");
+                    }
+                }
+                _mapViews.Clear();
+            }
         }
-        _mapViews.Clear();
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error in OnDisappearing");
+        }
+        finally
+        {
+            _mapsLock.Release();
+        }
     }
 }

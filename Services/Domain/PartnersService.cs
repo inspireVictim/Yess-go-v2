@@ -230,5 +230,28 @@ public class PartnersService : IPartnersService
             throw new NetworkException("Не удалось загрузить продукты партнёра с сервера", ex);
         }
     }
+
+    public async Task<IReadOnlyList<PartnerDetailDto>> GetPartnersByIdsAsync(
+        IEnumerable<string> ids,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            if (ids == null || !ids.Any())
+                return new List<PartnerDetailDto>();
+
+            _logger?.LogDebug("Getting {Count} partners by IDs", ids.Count());
+            return await _apiService.GetByIdsAsync(ids, ct);
+        }
+        catch (ApiException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error getting partners by IDs");
+            throw new NetworkException("Не удалось загрузить партнёров", ex);
+        }
+    }
 }
 

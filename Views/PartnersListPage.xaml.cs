@@ -3,6 +3,8 @@ using Microsoft.Maui.Controls;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using YessGoFront.Config;
 using YessGoFront.Infrastructure.Http;
 using YessGoFront.Models;
@@ -24,6 +26,8 @@ namespace YessGoFront.Views
         private string _searchQuery = string.Empty;
         private List<PartnerDto> _allPartners = new();
         private System.Threading.Timer? _searchDebounceTimer; // Для дебаунсинга поиска
+        private bool _isAppearing = false;
+        private readonly SemaphoreSlim _actionLock = new(1, 1);
 
         public string CategorySlug { get; set; } = string.Empty;
         public string CategoryName { get; set; } = string.Empty;
@@ -44,6 +48,26 @@ namespace YessGoFront.Views
         {
             base.OnAppearing();
 
+            if (_isAppearing)
+                return;
+
+            _isAppearing = true;
+            try
+            {
+                await OnAppearingAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersListPage] Error in OnAppearing: {ex.Message}");
+            }
+            finally
+            {
+                _isAppearing = false;
+            }
+        }
+
+        protected virtual async Task OnAppearingAsync()
+        {
             // Получаем параметры навигации через QueryProperty
             _categorySlug = CategorySlug ?? string.Empty;
             _categoryName = CategoryName ?? string.Empty;
@@ -309,6 +333,30 @@ namespace YessGoFront.Views
 
         private async void OnBasketButtonClicked(object? sender, EventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = false;
+
+                await OnBasketButtonClickedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersListPage] Error in OnBasketButtonClicked: {ex.Message}");
+            }
+            finally
+            {
+                if (sender is Button btn)
+                    btn.IsEnabled = true;
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBasketButtonClickedAsync()
+        {
             // Переход на страницу корзины
             if (Shell.Current != null)
             {
@@ -317,6 +365,25 @@ namespace YessGoFront.Views
         }
 
         private async void OnBackTapped(object? sender, TappedEventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnBackTappedAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersListPage] Error in OnBackTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnBackTappedAsync()
         {
             try
             {
@@ -385,6 +452,25 @@ namespace YessGoFront.Views
 
         private async void OnPartnerTapped(object? sender, TappedEventArgs e)
         {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnPartnerTappedAsync(sender, e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersListPage] Error in OnPartnerTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnPartnerTappedAsync(object? sender, TappedEventArgs e)
+        {
             try
             {
                 if (sender == null) return;
@@ -421,6 +507,25 @@ namespace YessGoFront.Views
 
         // Обработчик нажатия по категории в ScrollView
         private async void OnCategoryTapped(object? sender, TappedEventArgs e)
+        {
+            if (!await _actionLock.WaitAsync(0))
+                return;
+
+            try
+            {
+                await OnCategoryTappedAsync(sender, e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PartnersListPage] Error in OnCategoryTapped: {ex.Message}");
+            }
+            finally
+            {
+                _actionLock.Release();
+            }
+        }
+
+        private async Task OnCategoryTappedAsync(object? sender, TappedEventArgs e)
         {
             try
             {

@@ -130,7 +130,9 @@ namespace YessGoFront.Views
                 // Выполняем загрузку данных параллельно для оптимизации
                 var categoriesTask = InitializeCategoriesAsync();
                 var partnersTask = LoadPartnersOnMap();
-                var locationTask = RequestLocationAndCenterMap();
+                
+                // ВАЖНО: Явно запрашиваем разрешения на местоположение при первом открытии
+                var locationTask = RequestLocationPermissionAndCenterMap();
                 
                 // Ждем завершения хотя бы одной задачи, остальные продолжают в фоне
                 await Task.WhenAny(categoriesTask, partnersTask, locationTask);
@@ -816,7 +818,7 @@ namespace YessGoFront.Views
             }
         }
 
-        private async Task RequestLocationAndCenterMap()
+        private async Task RequestLocationPermissionAndCenterMap()
         {
             try
             {
@@ -827,6 +829,34 @@ namespace YessGoFront.Views
                     return;
                 }
 
+                // ВАЖНО: Явно запрашиваем разрешения на местоположение
+                System.Diagnostics.Debug.WriteLine("[MapPage] Requesting location permission...");
+                var hasPermission = await _locationService.RequestLocationPermissionAsync();
+                
+                if (!hasPermission)
+                {
+                    _logger?.LogWarning("Location permission not granted, using default location");
+                    System.Diagnostics.Debug.WriteLine("[MapPage] Location permission denied, centering on default location");
+                    CenterMapOnDefaultLocation();
+                    
+                    // Показываем сообщение пользователю (только один раз)
+                    MainThread.BeginInvokeOnMainThread(async () =>
+                    {
+                        try
+                        {
+                            await DisplayAlert("Геолокация", 
+                                "Для определения вашего местоположения необходимо разрешение на использование геолокации. Вы можете включить его в настройках приложения.", 
+                                "OK");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Error showing location permission alert");
+                        }
+                    });
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine("[MapPage] Location permission granted, getting location...");
                 var location = await _locationService.GetCurrentLocationAsync();
                 
                 if (location != null)
@@ -835,16 +865,19 @@ namespace YessGoFront.Views
                     await CenterMapOnLocationAsync(location, animated: false);
                     AddUserLocationMarker(location);
                     _logger?.LogInformation($"Centered map on user location: {location.Latitude}, {location.Longitude}");
+                    System.Diagnostics.Debug.WriteLine($"[MapPage] Map centered on user location: {location.Latitude}, {location.Longitude}");
                 }
                 else
                 {
                     _logger?.LogWarning("Could not get user location, using default");
+                    System.Diagnostics.Debug.WriteLine("[MapPage] Could not get user location, using default");
                     CenterMapOnDefaultLocation();
                 }
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error getting location");
+                System.Diagnostics.Debug.WriteLine($"[MapPage] Error getting location: {ex.Message}");
                 CenterMapOnDefaultLocation();
             }
         }

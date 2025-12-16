@@ -371,7 +371,7 @@ public partial class BasketPage : ContentPage
             }
 
             // ВАЖНО: Задержка для Release режима (как в MapPage)
-            await Task.Delay(200);
+            await Task.Delay(300); // Увеличено с 200 до 300 для Release
 
             if (!_isPageActive)
             {
@@ -444,7 +444,7 @@ public partial class BasketPage : ContentPage
             }
 
             // Еще одна небольшая задержка перед центрированием (для Release)
-            await Task.Delay(100);
+            await Task.Delay(150); // Увеличено с 100 до 150
 
             if (!_isPageActive)
             {
@@ -473,7 +473,7 @@ public partial class BasketPage : ContentPage
                             // Еще одна задержка после установки размеров
                             _ = Task.Run(async () =>
                             {
-                                await Task.Delay(100);
+                                await Task.Delay(200);
                                 if (_isPageActive)
                                 {
                                     await MainThread.InvokeOnMainThreadAsync(() =>
@@ -945,7 +945,9 @@ public partial class BasketPage : ContentPage
                         // Отписываемся от событий
                         if (mapView?.Map?.Navigator != null)
                         {
-                            mapView.Map.Navigator.ViewportChanged -= (s, args) => { }; // Отписываемся
+                            // Сохраняем ссылку на обработчик для отписки
+                            var navigator = mapView.Map.Navigator;
+                            navigator.ViewportChanged -= (s, args) => { }; // Отписываемся
                         }
                         mapView?.Map?.Layers?.Clear();
                     }

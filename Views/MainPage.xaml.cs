@@ -319,7 +319,9 @@ namespace YessGoFront.Views
 
             try
             {
-                await MainThread.InvokeOnMainThreadAsync(async () =>
+                // ВАЖНО: Убрали вложенный async для оптимизации
+                // Используем BeginInvokeOnMainThread и выполняем анимации напрямую
+                MainThread.BeginInvokeOnMainThread(async () =>
                 {
                     var top = _topIsA ? _imgA : _imgB;
                     var bottom = _topIsA ? _imgB : _imgA;

@@ -340,19 +340,48 @@ public partial class BasketPage : ContentPage
                     }
                     
                     // Блокируем доступ для добавления в словарь
-                    _mapsLock.Wait();
-                    try
+                    // ВАЖНО: Не используем Wait() внутри MainThread.InvokeOnMainThreadAsync
+                    // Используем TryEnter для неблокирующей проверки
+                    if (_mapsLock.Wait(0))
                     {
-                        if (!_isPageActive)
+                        try
                         {
-                            mapContainer.Children.Remove(mapView);
-                            return;
+                            if (!_isPageActive)
+                            {
+                                mapContainer.Children.Remove(mapView);
+                                return;
+                            }
+                            _mapViews[group.PartnerId] = mapView;
                         }
-                        _mapViews[group.PartnerId] = mapView;
+                        finally
+                        {
+                            _mapsLock.Release();
+                        }
                     }
-                    finally
+                    else
                     {
-                        _mapsLock.Release();
+                        // Если блокировка занята, откладываем добавление
+                        _ = Task.Run(async () =>
+                        {
+                            await _mapsLock.WaitAsync();
+                            try
+                            {
+                                if (_isPageActive && mapView != null)
+                                {
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                    {
+                                        if (!_mapViews.ContainsKey(group.PartnerId))
+                                        {
+                                            _mapViews[group.PartnerId] = mapView;
+                                        }
+                                    });
+                                }
+                            }
+                            finally
+                            {
+                                _mapsLock.Release();
+                            }
+                        });
                     }
                     
                     Debug.WriteLine($"[BasketPage] MapView created and added to container for partner {group.PartnerId}");
@@ -838,7 +867,9 @@ public partial class BasketPage : ContentPage
             if (sender is Grid grid && grid.BindingContext is PartnerCartGroup group)
             {
                 // Используем блокировку для проверки и инициализации
-                if (!_mapsLock.WaitAsync(0).Result)
+                // ВАЖНО: Не используем .Result - это блокирует UI поток
+                // Используем неблокирующую проверку
+                if (!_mapsLock.Wait(0))
                 {
                     Debug.WriteLine("[BasketPage] OnMapContainerGridLoaded: Maps lock is busy, retrying...");
                     // Пытаемся через небольшую задержку
@@ -913,10 +944,17 @@ public partial class BasketPage : ContentPage
         // Сразу отмечаем, что страница неактивна
         _isPageActive = false;
         
+        bool lockAcquired = false;
         try
         {
             // Используем блокировку для безопасной очистки
-            _mapsLock.Wait();
+            // ВАЖНО: OnDisappearing не может быть async, используем Wait с таймаутом
+            lockAcquired = _mapsLock.Wait(100); // Таймаут 100ms
+            if (!lockAcquired)
+            {
+                Debug.WriteLine("[BasketPage] OnDisappearing: Could not acquire lock, cleaning up without lock");
+                // Продолжаем очистку без блокировки, если не удалось получить её быстро
+            }
             
             // Очищаем таймеры
             if (_geocodingTimers != null)
@@ -965,7 +1003,18 @@ public partial class BasketPage : ContentPage
         }
         finally
         {
-            _mapsLock.Release();
+            // Освобождаем блокировку только если она была получена
+            if (lockAcquired)
+            {
+                try
+                {
+                    _mapsLock.Release();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error releasing lock in OnDisappearing");
+                }
+            }
         }
     }
 }

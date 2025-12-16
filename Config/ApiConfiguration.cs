@@ -50,5 +50,18 @@ public static class ApiConfiguration
         var baseUrl = GetBaseUrl();
         return baseUrl.EndsWith("/") ? baseUrl : $"{baseUrl}/";
     }
+
+    /// <summary>
+    /// Базовый URL Django микросервиса для платежей
+    /// </summary>
+    public const string DJANGO_BASE_URL = "https://django.yessgo.org";
+
+    /// <summary>
+    /// Получить базовый URL Django микросервиса с завершающим слешем
+    /// </summary>
+    public static string GetDjangoBaseUrlWithTrailingSlash()
+    {
+        return DJANGO_BASE_URL.EndsWith("/") ? DJANGO_BASE_URL : $"{DJANGO_BASE_URL}/";
+    }
 }
 

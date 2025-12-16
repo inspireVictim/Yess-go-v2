@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using YessGoFront.Services;
 using YessGoFront.Services.Domain;
+using YessGoFront.Services.Api;
 
 namespace YessGoFront.Views
 {
@@ -165,16 +166,57 @@ namespace YessGoFront.Views
                     }
                 }
 
-                // Переходим на страницу эквайринга с параметром суммы
-                if (Shell.Current != null)
+                // Получаем сервис платежей
+                var paymentService = MauiProgram.Services?.GetService<IPaymentApiService>();
+                if (paymentService == null)
                 {
-                    var route = $"Acquiring?amount={Uri.EscapeDataString(amount.ToString("F2"))}";
-                    await Shell.Current.GoToAsync(route, animate: true);
+                    await DisplayAlert("Ошибка", "Сервис оплаты недоступен.", "OK");
+                    return;
                 }
+
+                // --- ДОБАВЛЕНИЕ ЛОГИРОВАНИЯ ---
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Начинаем вызов PaymentAPI. Сумма: {amount}");
+
+                // Создаем платеж через бэкенд Django
+                // Индикатор загрузки будет показан на странице FinikQrPage
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var paymentResponse = await paymentService.CreatePaymentAsync(
+                    amount,
+                    cts.Token);
+
+                // --- ДОБАВЛЕНИЕ ЛОГИРОВАНИЯ УСПЕХА ---
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Payment API УСПЕШНО вернул ответ. URL: {paymentResponse?.PaymentUrl ?? "null"}");
+
+                // Проверяем, что получили paymentUrl
+                if (string.IsNullOrWhiteSpace(paymentResponse?.PaymentUrl))
+                {
+                    System.Diagnostics.Debug.WriteLine("DEBUG: PaymentUrl пустой в ответе от API");
+                    await DisplayAlert("Ошибка", "Не удалось получить ссылку на оплату. Попробуйте снова.", "OK");
+                    return;
+                }
+
+                var paymentUrl = paymentResponse.PaymentUrl;
+
+                // Открываем URL напрямую в WebView (как на сайте)
+                var paymentUrlEncoded = Uri.EscapeDataString(paymentUrl);
+                var redirectUrlEncoded = !string.IsNullOrWhiteSpace(paymentResponse.RedirectUrl) 
+                    ? Uri.EscapeDataString(paymentResponse.RedirectUrl) 
+                    : string.Empty;
+                
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Открываем URL в WebView: {paymentUrl}");
+                
+                // Используем FinikPaymentPage для отображения страницы оплаты в WebView
+                var navigationPath = !string.IsNullOrWhiteSpace(redirectUrlEncoded)
+                    ? $"FinikPaymentPage?paymentUrl={paymentUrlEncoded}&redirectUrl={redirectUrlEncoded}"
+                    : $"FinikPaymentPage?paymentUrl={paymentUrlEncoded}";
+                
+                await Shell.Current.GoToAsync(navigationPath, animate: true);
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Ошибка", ex.Message, "OK");
+                // --- ДОБАВЛЕНИЕ ОБРАБОТКИ ОШИБОК ---
+                System.Diagnostics.Debug.WriteLine($"!!! КРИТИЧЕСКАЯ ОШИБКА: {ex.Message} \nStack: {ex.StackTrace}");
+                await DisplayAlert("Ошибка пополнения", $"Не удалось создать платёж. Детали: {ex.Message}", "OK");
             }
         }
 

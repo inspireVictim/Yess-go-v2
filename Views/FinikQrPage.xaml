@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="YessGoFront.Views.FinikQrPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F9F9F9">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Заголовок -->
+        <Border Grid.Row="0"
+                BackgroundColor="#0B4A3B"
+                StrokeThickness="0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <ImageButton Grid.Column="0"
+                             Source="back_partner.svg"
+                             WidthRequest="30"
+                             HeightRequest="30"
+                             BackgroundColor="Transparent"
+                             Aspect="AspectFit"
+                             Clicked="OnBackButtonClicked"/>
+                
+                <Label Grid.Column="1"
+                       Text="Оплата через Finik"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+                
+                <BoxView Grid.Column="2" 
+                         WidthRequest="30"
+                         Color="Transparent"/>
+            </Grid>
+        </Border>
+
+        <!-- Контент с QR-кодом -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="20">
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="20">
+                    <VerticalStackLayout Spacing="16" HorizontalOptions="Center">
+                        <Label Text="Отсканируйте QR-код для оплаты"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#0B4A3B"
+                               HorizontalOptions="Center"/>
+
+                        <ActivityIndicator x:Name="LoadingIndicator"
+                                          IsRunning="True"
+                                          IsVisible="True"
+                                          Color="#0B4A3B"
+                                          HeightRequest="40"
+                                          WidthRequest="40"
+                                          HorizontalOptions="Center"/>
+
+                        <Image x:Name="QrCodeImage"
+                               WidthRequest="300"
+                               HeightRequest="300"
+                               Aspect="AspectFit"
+                               IsVisible="False"
+                               HorizontalOptions="Center"/>
+
+                        <Label x:Name="ErrorLabel"
+                               Text=""
+                               FontSize="14"
+                               TextColor="Red"
+                               IsVisible="False"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="White"
+                       CornerRadius="16"
+                       HasShadow="True"
+                       Padding="20">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Инструкция:"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#0B4A3B"/>
+                        <Label Text="1. Откройте приложение Finik на вашем телефоне"
+                               FontSize="14"
+                               TextColor="#666"/>
+                        <Label Text="2. Нажмите на кнопку 'Сканировать QR'"
+                               FontSize="14"
+                               TextColor="#666"/>
+                        <Label Text="3. Наведите камеру на QR-код"
+                               FontSize="14"
+                               TextColor="#666"/>
+                        <Label Text="4. Подтвердите оплату в приложении Finik"
+                               FontSize="14"
+                               TextColor="#666"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Кнопка "Назад" -->
+        <Grid Grid.Row="2" Padding="16,8,16,18">
+            <Button Text="Назад"
+                    HeightRequest="52"
+                    CornerRadius="26"
+                    FontAttributes="Bold"
+                    BackgroundColor="#0B4A3B"
+                    TextColor="White"
+                    Clicked="OnBackButtonClicked"/>
+        </Grid>
+    </Grid>
+</ContentPage>
+

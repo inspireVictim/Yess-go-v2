@@ -27,8 +27,12 @@ public class PaymentApiService : ApiClient, IPaymentApiService
             // Округляем сумму до 2 знаков после запятой для корректной отправки
             var roundedAmount = Math.Round(amount, 2);
             
-            // Создаем запрос с правильным форматом
-            var request = new { amount = roundedAmount };
+            // Создаем запрос с правильным форматом для Django бэкенда
+            // Django бэкенд ожидает только поле "amount"
+            var request = new 
+            { 
+                amount = roundedAmount
+            };
             
             Logger?.LogDebug("Отправка запроса на создание платежа: Amount={Amount}, Endpoint={Endpoint}", 
                 roundedAmount, ApiEndpoints.PaymentEndpoints.Create);

@@ -2,26 +2,11 @@ namespace YessGoFront.Config;
 
 /// <summary>
 /// Конфигурация для Finik Payment SDK
-/// ВАЖНО: Эти значения временно захардкожены для тестирования.
-/// В будущем их следует получать с бэкенда или из SecureStorage.
+/// ВАЖНО: Вся логика работы с Finik API реализована на бэкенде (Django микросервис).
+/// Фронтенд только передает данные (user_id, customer_name, amount) на бэкенд.
 /// </summary>
 public static class FinikConfig
 {
-    /// <summary>
-    /// API ключ от Finik (получается у представителей Finik)
-    /// </summary>
-    public const string ApiKey = "YOUR_API_KEY_HERE";
-
-    /// <summary>
-    /// Account ID бенефициара (получается у представителей Finik)
-    /// </summary>
-    public const string AccountId = "YOUR_ACCOUNT_ID_HERE";
-
-    /// <summary>
-    /// URL для callback/webhook (Finik отправит сюда POST запрос с результатом платежа)
-    /// </summary>
-    public const string CallbackUrl = "https://your-backend-url.kg/api/finik/callback";
-
     /// <summary>
     /// Использовать beta сервер (true для тестирования, false для production)
     /// </summary>

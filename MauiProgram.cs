@@ -234,7 +234,22 @@ public static class MauiProgram
         services.AddHttpClient<IBannerApiService, BannerApiService>("ApiClient");
         services.AddHttpClient<IPromoCodeApiService, PromoCodeApiService>("ApiClient");
         services.AddHttpClient<INotificationApiService, NotificationApiService>("ApiClient");
-        services.AddHttpClient<IPaymentApiService, PaymentApiService>("ApiClient");
+        // Отдельный HttpClient для платежей, который указывает на Django микросервис
+        services.AddHttpClient<IPaymentApiService, PaymentApiService>("PaymentClient", (sp, client) =>
+        {
+            client.BaseAddress = new Uri(ApiConfiguration.GetDjangoBaseUrlWithTrailingSlash());
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+            {
+                // TODO: remove after Android trusts Let's Encrypt R12 chain properly
+                return true; // временная мера, пока не заработает нормальная цепочка
+            }
+        })
+        .AddHttpMessageHandler<LoggingHandler>(); // Только LoggingHandler, без AuthHandler для платежей
     }
 
     private static void ConfigureServices(IServiceCollection services)

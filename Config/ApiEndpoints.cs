@@ -70,11 +70,12 @@ public static class ApiEndpoints
         public static string GetBalance(int userId) => $"{Wallet}?userId={userId}";
     }
 
-    // Payment endpoints (для работы с Finik Web SDK через backend)
+    // Payment endpoints (для работы с Finik Web SDK через Django backend)
     public static class PaymentEndpoints
     {
-        public const string Create = $"{ApiVersion}/payments/create";
-        public static string GetPaymentStatus(string paymentId) => $"{ApiVersion}/payments/{Uri.EscapeDataString(paymentId)}/status";
+        // Django микросервис использует /create/ (с завершающим слешем)
+        public const string Create = "/create/";
+        public static string GetPaymentStatus(string paymentId) => $"/v1/payments/{Uri.EscapeDataString(paymentId)}/status";
     }
 
     // QR endpoints

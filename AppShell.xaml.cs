@@ -56,6 +56,7 @@ namespace YessGoFront
             Routing.RegisterRoute("payment", typeof(Views.PaymentPage));
             Routing.RegisterRoute("receipt", typeof(Views.ReceiptPage));
             Routing.RegisterRoute("FinikPaymentPage", typeof(FinikPaymentPage));
+            Routing.RegisterRoute("FinikQrPage", typeof(Views.FinikQrPage));
 
 
         }

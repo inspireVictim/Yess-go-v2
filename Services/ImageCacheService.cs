@@ -204,9 +204,9 @@ public class ImageCacheService : IImageCacheService
         }
     }
 
-    public void ClearCache()
+    public async Task ClearCacheAsync()
     {
-        _cacheLock.Wait();
+        await _cacheLock.WaitAsync();
         try
         {
             foreach (var cached in _cache.Values)
@@ -220,6 +220,13 @@ public class ImageCacheService : IImageCacheService
         {
             _cacheLock.Release();
         }
+    }
+
+    [Obsolete("Use ClearCacheAsync instead to avoid blocking UI thread")]
+    public void ClearCache()
+    {
+        // Для обратной совместимости, но не рекомендуется использовать
+        ClearCacheAsync().GetAwaiter().GetResult();
     }
 }
 

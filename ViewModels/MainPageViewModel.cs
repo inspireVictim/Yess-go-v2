@@ -873,20 +873,35 @@ namespace YessGoFront.ViewModels
                     // Добавляем элементы батчами для лучшей производительности
                     // (ObservableCollection не имеет AddRange, но батчинг уменьшает количество обновлений UI)
                     const int batchSize = 10;
+                    
+                    // Row1
                     for (int i = 0; i < rows.row1.Count; i += batchSize)
                     {
                         var batch = rows.row1.Skip(i).Take(batchSize);
                         foreach (var p in batch) PartnersRow1.Add(p);
+                        // Даем UI обновиться между батчами
+                        if (i + batchSize < rows.row1.Count)
+                            await Task.Yield();
                     }
+                    
+                    // Row2
                     for (int i = 0; i < rows.row2.Count; i += batchSize)
                     {
                         var batch = rows.row2.Skip(i).Take(batchSize);
                         foreach (var p in batch) PartnersRow2.Add(p);
+                        // Даем UI обновиться между батчами
+                        if (i + batchSize < rows.row2.Count)
+                            await Task.Yield();
                     }
+                    
+                    // Row3
                     for (int i = 0; i < rows.row3.Count; i += batchSize)
                     {
                         var batch = rows.row3.Skip(i).Take(batchSize);
                         foreach (var p in batch) PartnersRow3.Add(p);
+                        // Даем UI обновиться между батчами
+                        if (i + batchSize < rows.row3.Count)
+                            await Task.Yield();
                     }
                 });
 
@@ -1101,7 +1116,9 @@ namespace YessGoFront.ViewModels
                     double elapsed = sw.ElapsedMilliseconds - startTime - _pausedDuration.TotalMilliseconds;
                     double prog = Math.Clamp(elapsed / durationMs, 0, 1);
 
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    // ВАЖНО: Убрали вложенный async для оптимизации
+                    // Используем BeginInvokeOnMainThread для неблокирующего обновления
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
                         PageProgress = prog;
                         // Проверяем границы перед установкой значения
